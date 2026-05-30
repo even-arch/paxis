@@ -1,0 +1,351 @@
+// PAXIS — Point Asia eXchange & Inventory System
+// Prisma Schema
+// 單租戶設計，不需要 TenantID
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// 系統設定 (SYS_)
+// =============================================================================
+
+model SYS_User {
+  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name        String    @db.VarChar(50)
+  loginId     String    @unique @db.VarChar(50)
+  password    String    @db.VarChar(100)
+  isEnabled   Boolean   @default(true)
+  language    String    @default("zh-TW") @db.VarChar(6)
+  createdAt   DateTime  @default(now())
+
+  purchaseOrders  PO_Order[]
+  costSheets      COST_Sheet[]
+
+  @@map("SYS_User")
+}
+
+model SYS_Currency {
+  code        String    @id @db.VarChar(3)   // USD, TWD, EUR, JPY...
+  name        String    @db.VarChar(50)
+  symbol      String    @db.VarChar(5)
+  exchangeRate Decimal  @db.Decimal(11, 6)   // 對 TWD 的匯率
+  updatedAt   DateTime  @updatedAt
+
+  @@map("SYS_Currency")
+}
+
+// =============================================================================
+// 商品管理 (PRD_)
+// =============================================================================
+
+model PRD_Product {
+  id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name          String    @db.VarChar(200)
+  sku           String?   @unique @db.VarChar(100)
+  modelNo       String?   @db.VarChar(100)
+  description   String?   @db.Text
+  specification String?   @db.Text
+
+  // 包裝規格
+  unitPerInner  Int?      @db.UnsignedInt    // 每內箱數量
+  unitPerCarton Int?      @db.UnsignedInt    // 每外箱數量
+  cbm           Decimal?  @db.Decimal(10, 4) // 材積 (cubic meter)
+  grossWeight   Decimal?  @db.Decimal(8, 3)  // 毛重 KGS
+  netWeight     Decimal?  @db.Decimal(8, 3)  // 淨重 KGS
+  length        Decimal?  @db.Decimal(8, 2)  // CM
+  width         Decimal?  @db.Decimal(8, 2)
+  height        Decimal?  @db.Decimal(8, 2)
+
+  // 貿易資訊
+  htsCode       String?   @db.VarChar(20)    // HTS / HS 海關編碼
+  countryOfOrigin String? @db.VarChar(2)     // ISO 國碼
+  unit          String?   @db.VarChar(20)    // PCS, SET, KGS...
+
+  // Patisco 介接
+  patiscoProductId BigInt? @db.UnsignedBigInt // 對應 Patisco PRD_Product.ID
+
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  supplierProducts  SUP_SupplierProduct[]
+  inventoryItems    INV_Stock[]
+  purchaseItems     PO_Item[]
+  costSheets        COST_Sheet[]
+  categories        PRD_CategoryMapping[]
+
+  @@index([sku])
+  @@index([modelNo])
+  @@map("PRD_Product")
+}
+
+model PRD_Category {
+  id        BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  name      String   @db.VarChar(100)
+  parentId  BigInt?  @db.UnsignedBigInt
+  parent    PRD_Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  PRD_Category[] @relation("CategoryTree")
+  products  PRD_CategoryMapping[]
+
+  @@map("PRD_Category")
+}
+
+model PRD_CategoryMapping {
+  productId   BigInt  @db.UnsignedBigInt
+  categoryId  BigInt  @db.UnsignedBigInt
+  product     PRD_Product  @relation(fields: [productId], references: [id])
+  category    PRD_Category @relation(fields: [categoryId], references: [id])
+
+  @@id([productId, categoryId])
+  @@map("PRD_CategoryMapping")
+}
+
+// =============================================================================
+// 供應商管理 (SUP_)
+// =============================================================================
+
+model SUP_Supplier {
+  id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name          String    @db.VarChar(150)
+  shortName     String?   @db.VarChar(50)
+  address       String?   @db.VarChar(200)
+  city          String?   @db.VarChar(50)
+  countryCode   String?   @db.VarChar(2)
+  postalCode    String?   @db.VarChar(10)
+  phoneNo       String?   @db.VarChar(30)
+  fax           String?   @db.VarChar(30)
+  email         String?   @db.VarChar(100)
+  contactPerson String?   @db.VarChar(50)
+  taxId         String?   @db.VarChar(20)
+  paymentTerms  String?   @db.VarChar(100) // e.g. "T/T 30 days"
+  currencyCode  String?   @db.VarChar(3)   // 慣用幣別
+  note          String?   @db.Text
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  products      SUP_SupplierProduct[]
+  purchaseOrders PO_Order[]
+  contacts      SUP_Contact[]
+
+  @@index([name])
+  @@map("SUP_Supplier")
+}
+
+model SUP_Contact {
+  id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  supplierId  BigInt   @db.UnsignedBigInt
+  supplier    SUP_Supplier @relation(fields: [supplierId], references: [id])
+  name        String   @db.VarChar(50)
+  title       String?  @db.VarChar(50)
+  phoneNo     String?  @db.VarChar(30)
+  mobile      String?  @db.VarChar(30)
+  email       String?  @db.VarChar(100)
+  isDefault   Boolean  @default(false)
+
+  @@index([supplierId])
+  @@map("SUP_Contact")
+}
+
+model SUP_SupplierProduct {
+  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  supplierId  BigInt    @db.UnsignedBigInt
+  productId   BigInt    @db.UnsignedBigInt
+  supplier    SUP_Supplier @relation(fields: [supplierId], references: [id])
+  product     PRD_Product  @relation(fields: [productId], references: [id])
+
+  supplierSku   String?   @db.VarChar(100) // 供應商自己的料號
+  unitPrice     Decimal?  @db.Decimal(11, 4)
+  currencyCode  String?   @db.VarChar(3)
+  moq           Int?      @db.UnsignedInt  // 最小起訂量
+  leadTimeDays  Int?      @db.UnsignedSmallInt
+  isPreferred   Boolean   @default(false)  // 主要供應商
+  note          String?   @db.Text
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([supplierId, productId])
+  @@index([productId])
+  @@map("SUP_SupplierProduct")
+}
+
+// =============================================================================
+// 採購單 (PO_)
+// =============================================================================
+
+// 採購狀態
+// 0=草稿, 1=已送出, 2=部分到貨, 3=完成, 4=取消
+model PO_Order {
+  id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  poNo          String    @unique @db.VarChar(40)  // 採購單號，自動產生
+  supplierId    BigInt    @db.UnsignedBigInt
+  supplier      SUP_Supplier @relation(fields: [supplierId], references: [id])
+
+  status        Int       @default(0) @db.TinyInt
+  currencyCode  String    @db.VarChar(3)
+  exchangeRate  Decimal   @db.Decimal(11, 6) // 當時匯率快照
+  totalAmount   Decimal?  @db.Decimal(11, 4)
+
+  expectedDate  DateTime? @db.Date           // 預計到貨日
+  shippedDate   DateTime? @db.Date           // 實際出貨日
+  arrivedDate   DateTime? @db.Date           // 實際到貨日
+
+  port          String?   @db.VarChar(50)    // 裝運港
+  shipVia       String?   @db.VarChar(50)    // 運送方式
+  note          String?   @db.Text
+
+  createdBy     BigInt    @db.UnsignedBigInt
+  creator       SYS_User  @relation(fields: [createdBy], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  items         PO_Item[]
+  receipts      PO_Receipt[]
+
+  @@index([supplierId, status])
+  @@index([poNo])
+  @@map("PO_Order")
+}
+
+model PO_Item {
+  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  orderId     BigInt    @db.UnsignedBigInt
+  order       PO_Order  @relation(fields: [orderId], references: [id])
+  productId   BigInt    @db.UnsignedBigInt
+  product     PRD_Product @relation(fields: [productId], references: [id])
+
+  unitPrice   Decimal   @db.Decimal(11, 4)
+  quantity    Int       @db.UnsignedInt
+  receivedQty Int       @default(0) @db.UnsignedInt // 已入庫數量
+  unit        String?   @db.VarChar(20)
+  note        String?   @db.VarChar(200)
+
+  receiptItems PO_ReceiptItem[]
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("PO_Item")
+}
+
+model PO_Receipt {
+  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  orderId     BigInt    @db.UnsignedBigInt
+  order       PO_Order  @relation(fields: [orderId], references: [id])
+  receiptNo   String    @db.VarChar(40)
+  receivedAt  DateTime  @default(now())
+  note        String?   @db.Text
+
+  items       PO_ReceiptItem[]
+  stockMovements INV_Movement[]
+
+  @@index([orderId])
+  @@map("PO_Receipt")
+}
+
+model PO_ReceiptItem {
+  id          BigInt     @id @default(autoincrement()) @db.UnsignedBigInt
+  receiptId   BigInt     @db.UnsignedBigInt
+  receipt     PO_Receipt @relation(fields: [receiptId], references: [id])
+  poItemId    BigInt     @db.UnsignedBigInt
+  poItem      PO_Item    @relation(fields: [poItemId], references: [id])
+  quantity    Int        @db.UnsignedInt
+
+  @@index([receiptId])
+  @@map("PO_ReceiptItem")
+}
+
+// =============================================================================
+// 庫存管理 (INV_)
+// =============================================================================
+
+model INV_Stock {
+  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  productId   BigInt    @unique @db.UnsignedBigInt
+  product     PRD_Product @relation(fields: [productId], references: [id])
+
+  quantity    Int       @default(0) // 現有庫存
+  safetyStock Int       @default(0) // 安全庫存量
+  updatedAt   DateTime  @updatedAt
+
+  @@map("INV_Stock")
+}
+
+// 異動類型：1=進貨入庫, 2=銷售出庫, 3=手動調整, 4=盤點調整
+model INV_Movement {
+  id          BigInt      @id @default(autoincrement()) @db.UnsignedBigInt
+  productId   BigInt      @db.UnsignedBigInt
+  type        Int         @db.TinyInt
+  quantity    Int         // 正數=入庫, 負數=出庫
+  balanceAfter Int        // 異動後庫存量
+
+  // 來源參考
+  receiptId         BigInt? @db.UnsignedBigInt
+  receipt           PO_Receipt? @relation(fields: [receiptId], references: [id])
+  patiscoOrderId    BigInt? @db.UnsignedBigInt // Patisco 訂單 ID
+  patiscoOrderNo    String? @db.VarChar(40)
+
+  note        String?   @db.VarChar(200)
+  createdAt   DateTime  @default(now())
+
+  @@index([productId, createdAt])
+  @@index([receiptId])
+  @@map("INV_Movement")
+}
+
+// =============================================================================
+// 成本計算 (COST_)
+// 對應 ET61 的 K-MART / WAL-MART 到岸成本計算表
+// =============================================================================
+
+model COST_Sheet {
+  id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name          String    @db.VarChar(100)  // 試算表名稱
+  productId     BigInt    @db.UnsignedBigInt
+  product       PRD_Product @relation(fields: [productId], references: [id])
+
+  // FOB 成本
+  fobPrice      Decimal   @db.Decimal(11, 4)
+  fobCurrency   String    @db.VarChar(3)
+  fobExRate     Decimal   @db.Decimal(11, 6) // FOB 幣別對 USD 匯率快照
+
+  // 出口端
+  countryOfOrigin String? @db.VarChar(2)
+  portOfLoading   String? @db.VarChar(50)
+
+  // 進口端成本（USD）
+  htsCode         String? @db.VarChar(20)
+  dutyRate        Decimal? @db.Decimal(6, 4)  // 關稅率 %
+  dutyAmount      Decimal? @db.Decimal(11, 4)
+  oceanFreight    Decimal? @db.Decimal(11, 4)
+  insurance       Decimal? @db.Decimal(11, 4)
+  agentFee        Decimal? @db.Decimal(11, 4)
+  consolidation   Decimal? @db.Decimal(11, 4)
+  deconsolidation Decimal? @db.Decimal(11, 4)
+  userFee         Decimal? @db.Decimal(11, 4)
+  harborFee       Decimal? @db.Decimal(11, 4)
+  otherCharge     Decimal? @db.Decimal(11, 4)
+  otherChargeNote String?  @db.VarChar(100)
+
+  // 計算結果
+  landedCost    Decimal?  @db.Decimal(11, 4) // 到岸總成本
+  sellingPrice  Decimal?  @db.Decimal(11, 4) // 建議售價
+  grossMarginPct Decimal? @db.Decimal(6, 4)  // 毛利率 %
+
+  // 容器資訊
+  container40ftQty  Int?  @db.UnsignedInt   // 40呎貨櫃裝載量（箱）
+  container40ftPcs  Int?  @db.UnsignedInt   // 40呎貨櫃裝載量（件）
+
+  createdBy     BigInt    @db.UnsignedBigInt
+  creator       SYS_User  @relation(fields: [createdBy], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([productId])
+  @@map("COST_Sheet")
+}
