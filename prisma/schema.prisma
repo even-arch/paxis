@@ -82,6 +82,44 @@ model SYS_User {
   @@map("SYS_User")
 }
 
+// 公司基本資料（單筆，id=1）
+model SYS_Company {
+  id            Int      @id @default(autoincrement())
+
+  // 名稱（多語言）
+  nameZh        String   @default("")   // 繁體中文公司名稱
+  nameEn        String   @default("")   // 英文公司名稱
+  shortName     String   @default("")   // 簡稱（文件用）
+
+  // 地址（多語言）
+  addressZh     String   @default("")
+  addressEn     String   @default("")
+  city          String   @default("")
+  countryCode   String   @default("TW")
+
+  // 聯絡
+  phone         String   @default("")
+  fax           String   @default("")
+  email         String   @default("")
+  website       String   @default("")
+
+  // 貿易身分
+  taxId         String   @default("")   // 統一編號 / VAT
+  bankName      String   @default("")
+  bankAccount   String   @default("")
+  bankSwift     String   @default("")
+
+  // 自訂欄位（JSON 陣列：[{ label: string, value: string }]）
+  customFields  Json     @default("[]")
+
+  // Logo（base64 data URL，列印時嵌入）
+  logoBase64    String?  @db.Text
+
+  updatedAt     DateTime @updatedAt
+
+  @@map("SYS_Company")
+}
+
 model SYS_Currency {
   code        String    @id // USD, TWD, EUR, JPY...
   name        String   

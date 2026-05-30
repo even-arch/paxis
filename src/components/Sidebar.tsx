@@ -12,8 +12,12 @@ const navItems = [
   { label: '採購單', href: '/purchases', icon: '🛒' },
   { label: '庫存管理', href: '/inventory', icon: '🗃️' },
   { label: '成本計算', href: '/cost', icon: '💰' },
+]
+
+const settingsItems = [
+  { label: '公司資料', href: '/settings/company', icon: '🏢' },
+  { label: 'AI 功能', href: '/settings/ai', icon: '✨' },
   { label: 'Patisco 同步', href: '/settings/patisco', icon: '🔗' },
-  { label: 'AI 功能設定', href: '/settings/ai', icon: '✨' },
 ]
 
 export default function Sidebar() {
@@ -26,8 +30,27 @@ export default function Sidebar() {
         <p className="text-xs text-gray-400">錫諾系統進銷存</p>
       </div>
 
-      <nav className="flex-1 py-4 space-y-1 px-2">
+      <nav className="flex-1 py-4 px-2 flex flex-col gap-0.5 overflow-y-auto">
         {navItems.map(item => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
+              pathname.startsWith(item.href)
+                ? 'bg-blue-600 text-white'
+                : 'text-gray-300 hover:bg-gray-800',
+            )}
+          >
+            <span>{item.icon}</span>
+            <span>{item.label}</span>
+          </Link>
+        ))}
+
+        <div className="mt-4 mb-1 px-3">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">設定</span>
+        </div>
+        {settingsItems.map(item => (
           <Link
             key={item.href}
             href={item.href}
