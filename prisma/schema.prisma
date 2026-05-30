@@ -77,16 +77,37 @@ model SYS_User {
   encryptedAiKey  String?   // AES-256-GCM 加密後的 API Key
   aiParseModel    String?   // 文件解析模型（留空用預設）
 
-  purchaseOrders  PO_Order[]
-  costSheets      COST_Sheet[]
-  passwordResets  SYS_PasswordReset[]
+  purchaseOrders   PO_Order[]
+  costSheets       COST_Sheet[]
+  passwordResets   SYS_PasswordReset[]
+  settingAuditLogs SYS_SettingAuditLog[]
+  productHistories PRD_ProductHistory[]
 
   @@map("SYS_User")
+}
+
+// 存貨計價方法變更稽核日誌
+model SYS_SettingAuditLog {
+  id          Int      @id @default(autoincrement())
+  field       String   // 被修改的設定欄位名稱，例如 'inventoryMethod'
+  oldValue    String?
+  newValue    String?
+  reason      String?  @db.Text // 變更原因（供稽核說明）
+  changedBy   Int
+  changer     SYS_User @relation(fields: [changedBy], references: [id])
+  changedAt   DateTime @default(now())
+
+  @@index([field, changedAt])
+  @@map("SYS_SettingAuditLog")
 }
 
 // 公司基本資料（單筆，id=1）
 model SYS_Company {
   id            Int      @id @default(autoincrement())
+
+  // 存貨計價方法（一旦設定不可輕易更改，變更需寫入 SYS_SettingAuditLog）
+  // WAC = 加權平均成本, FIFO = 先進先出, LIFO = 後進先出, SPECIFIC = 個別辨識
+  inventoryMethod String @default("WAC")
 
   // 名稱（多語言）
   nameZh        String   @default("")   // 繁體中文公司名稱
@@ -195,6 +216,11 @@ model PRD_Product {
   // Patisco 介接
   patiscoProductId Int?  // 對應 Patisco PRD_Product.ID
 
+  // POS 對接預留
+  sellingPrice      Decimal? // 建議售價（供 POS 定價參考）
+  isAvailableForPos Boolean  @default(false) // 是否開放 POS 系統販售
+  posProductId      String?  // 對應 POS 系統的產品 ID（對接後填入）
+
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -205,10 +231,45 @@ model PRD_Product {
   purchaseItems     PO_Item[]
   costSheets        COST_Sheet[]
   categories        PRD_CategoryMapping[]
+  history           PRD_ProductHistory[]
 
   @@index([sku])
   @@index([modelNo])
   @@map("PRD_Product")
+}
+
+// 產品歷史快照（全欄位，每次異動自動寫入）
+// sourceType: 'PO_RECEIPT' = 採購入庫, 'AI_IMPORT' = AI 匯入, 'MANUAL_EDIT' = 手動編輯
+model PRD_ProductHistory {
+  id          Int      @id @default(autoincrement())
+  productId   Int
+  product     PRD_Product @relation(fields: [productId], references: [id])
+
+  // 快照（異動當時的全欄位值）
+  name          String
+  sku           String?
+  modelNo       String?
+  specification String?
+  unitPerInner  Int?
+  unitPerCarton Int?
+  cbm           Decimal?
+  grossWeight   Decimal?
+  netWeight     Decimal?
+  unit          String?
+  unitCost      Decimal? // 進貨成本快照
+  currency      String?  // 幣別
+
+  // 來源
+  sourceType  String   // 'PO_RECEIPT' | 'AI_IMPORT' | 'MANUAL_EDIT'
+  poOrderId   Int?     // 連結採購單（可點進去看原始單據）
+  poOrderNo   String?  // 採購單號（反正規化，直接顯示用）
+
+  changedBy   Int
+  changer     SYS_User @relation(fields: [changedBy], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([productId, createdAt])
+  @@map("PRD_ProductHistory")
 }
 
 model PRD_Category {
@@ -434,6 +495,8 @@ model INV_Stock {
 //   5 = 手動調整入
 //   6 = 手動調整出
 //   7 = 盤點調整
+//   8 = POS 銷售出庫（預留給 POS 對接）
+//   9 = POS 退貨入庫（預留給 POS 對接）
 model INV_Movement {
   id           Int      @id @default(autoincrement())
   productId    Int

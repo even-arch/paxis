@@ -14,6 +14,11 @@ export default async function ProductDetailPage({ params }: Props) {
       supplierProducts: {
         include: { supplier: { select: { id: true, name: true, shortName: true } } },
       },
+      history: {
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        include: { changer: { select: { name: true } } },
+      },
     },
   })
 
@@ -114,10 +119,75 @@ export default async function ProductDetailPage({ params }: Props) {
           </Card>
         )}
 
+        {/* POS 設定 */}
+        {(product.sellingPrice || product.isAvailableForPos) && (
+          <Card title="POS 設定">
+            <Row label="建議售價" value={product.sellingPrice ? product.sellingPrice.toString() : undefined} />
+            <Row label="開放 POS 販售" value={product.isAvailableForPos ? '是' : '否'} />
+            <Row label="POS 產品 ID" value={product.posProductId} />
+          </Card>
+        )}
+
+        {/* 資料異動歷史 */}
+        {product.history.length > 0 && (
+          <Card title="資料異動歷史">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-left text-gray-500 border-b">
+                    <th className="pb-2 font-medium">時間</th>
+                    <th className="pb-2 font-medium">來源</th>
+                    <th className="pb-2 font-medium">單據</th>
+                    <th className="pb-2 font-medium">品名</th>
+                    <th className="pb-2 font-medium">SKU</th>
+                    <th className="pb-2 font-medium">規格</th>
+                    <th className="pb-2 font-medium">成本</th>
+                    <th className="pb-2 font-medium">操作人</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {product.history.map(h => (
+                    <tr key={h.id} className="hover:bg-gray-50">
+                      <td className="py-2 text-gray-500 whitespace-nowrap">{formatDate(h.createdAt)}</td>
+                      <td className="py-2">
+                        <SourceBadge type={h.sourceType} />
+                      </td>
+                      <td className="py-2">
+                        {h.poOrderId
+                          ? <Link href={`/purchases/${h.poOrderId}`} className="text-blue-600 hover:underline">{h.poOrderNo ?? h.poOrderId}</Link>
+                          : <span className="text-gray-400">-</span>
+                        }
+                      </td>
+                      <td className="py-2">{h.name}</td>
+                      <td className="py-2 text-gray-500">{h.sku ?? '-'}</td>
+                      <td className="py-2 text-gray-500 max-w-[160px] truncate">{h.specification ?? '-'}</td>
+                      <td className="py-2 whitespace-nowrap">
+                        {h.unitCost ? `${h.currency ?? ''} ${h.unitCost}` : '-'}
+                      </td>
+                      <td className="py-2 text-gray-500">{h.changer.name}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+
         <p className="text-xs text-gray-400">建立時間：{formatDate(product.createdAt)}</p>
       </div>
     </div>
   )
+}
+
+const SOURCE_LABEL: Record<string, { text: string; cls: string }> = {
+  PO_RECEIPT:  { text: '採購入庫', cls: 'bg-green-100 text-green-700' },
+  AI_IMPORT:   { text: 'AI 匯入', cls: 'bg-purple-100 text-purple-700' },
+  MANUAL_EDIT: { text: '手動編輯', cls: 'bg-gray-100 text-gray-600' },
+}
+
+function SourceBadge({ type }: { type: string }) {
+  const s = SOURCE_LABEL[type] ?? { text: type, cls: 'bg-gray-100 text-gray-600' }
+  return <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${s.cls}`}>{s.text}</span>
 }
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {

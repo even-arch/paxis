@@ -3,7 +3,6 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 
-// 取得公司資料（若不存在自動建立空白記錄）
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -19,21 +18,32 @@ export async function PUT(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const userId = parseInt((session.user as { id?: string })?.id ?? '', 10)
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const body = await req.json()
 
-  // 只允許更新已知欄位，防止任意欄位注入
   const {
     nameZh, nameEn, shortName,
     addressZh, addressEn, city, countryCode,
     phone, fax, email, website,
     taxId, bankName, bankAccount, bankSwift,
     customFields, logoBase64,
+    inventoryMethod,
+    inventoryMethodReason, // 變更原因（僅當 inventoryMethod 有變時使用）
   } = body
+
+  // 取得目前的計價方法，判斷是否有變更
+  const current = await prisma.sYS_Company.findFirst({ where: { id: 1 } })
+  const oldMethod = current?.inventoryMethod ?? 'WAC'
+  const newMethod = inventoryMethod ?? 'WAC'
+  const methodChanged = oldMethod !== newMethod
 
   const company = await prisma.sYS_Company.upsert({
     where: { id: 1 },
     create: {
       id: 1,
+      inventoryMethod: newMethod,
       nameZh: nameZh ?? '', nameEn: nameEn ?? '', shortName: shortName ?? '',
       addressZh: addressZh ?? '', addressEn: addressEn ?? '',
       city: city ?? '', countryCode: countryCode ?? 'TW',
@@ -43,6 +53,7 @@ export async function PUT(req: NextRequest) {
       logoBase64: logoBase64 ?? null,
     },
     update: {
+      inventoryMethod: newMethod,
       nameZh, nameEn, shortName,
       addressZh, addressEn, city, countryCode,
       phone, fax, email, website,
@@ -51,6 +62,19 @@ export async function PUT(req: NextRequest) {
       logoBase64,
     },
   })
+
+  // 計價方法有變更時，寫入稽核日誌
+  if (methodChanged) {
+    await prisma.sYS_SettingAuditLog.create({
+      data: {
+        field: 'inventoryMethod',
+        oldValue: oldMethod,
+        newValue: newMethod,
+        reason: inventoryMethodReason ?? null,
+        changedBy: userId,
+      },
+    })
+  }
 
   return NextResponse.json(company)
 }

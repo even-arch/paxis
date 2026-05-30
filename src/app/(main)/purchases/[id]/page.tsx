@@ -50,12 +50,16 @@ export default async function PurchaseDetailPage({ params }: Props) {
         <PurchaseActions
           orderId={params.id}
           status={order.status}
+          defaultCurrency={order.currencyCode}
           items={order.items.map(i => ({
             id: i.id,
             productName: i.product.name,
+            productSku: i.product.sku ?? null,
             quantity: i.quantity,
             receivedQty: i.receivedQty,
             unit: i.unit ?? i.product.unit ?? 'PCS',
+            unitPrice: i.unitPrice.toString(),
+            currencyCode: order.currencyCode,
           }))}
         />
       </div>
