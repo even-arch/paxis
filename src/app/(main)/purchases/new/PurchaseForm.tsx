@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { SHIP_VIA, CURRENCIES } from '@/modules/purchase/poUtils'
+import type { ParsedInvoice } from '@/app/api/ai/parse-invoice/route'
 
 type Supplier = { id: number; name: string; shortName: string | null; currencyCode: string | null }
 type Product = { id: number; name: string; sku: string | null; unit: string | null }
@@ -25,6 +26,12 @@ export default function PurchaseForm({ suppliers, products }: { suppliers: Suppl
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // AI 解析
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [aiParsing, setAiParsing] = useState(false)
+  const [aiMsg, setAiMsg] = useState<{ type: 'ok' | 'err' | 'info'; text: string } | null>(null)
+  const [parsedPreview, setParsedPreview] = useState<ParsedInvoice | null>(null)
+
   function handleSupplierChange(id: string) {
     setSupplierId(id)
     const sup = suppliers.find(s => String(s.id) === id)
@@ -42,6 +49,74 @@ export default function PurchaseForm({ suppliers, products }: { suppliers: Suppl
 
   function addLine() { setItems(prev => [...prev, emptyLine()]) }
   function removeLine(idx: number) { setItems(prev => prev.filter((_, i) => i !== idx)) }
+
+  async function handleAiParse(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setAiParsing(true)
+    setAiMsg({ type: 'info', text: `AI 解析中：${file.name}…` })
+    setParsedPreview(null)
+
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await fetch('/api/ai/parse-invoice', { method: 'POST', body: fd })
+    setAiParsing(false)
+    e.target.value = ''   // 允許重新上傳同一檔
+
+    if (!res.ok) {
+      const d = await res.json()
+      setAiMsg({ type: 'err', text: d.error ?? 'AI 解析失敗' })
+      return
+    }
+
+    const { data } = await res.json() as { data: ParsedInvoice }
+    setParsedPreview(data)
+    setAiMsg({ type: 'ok', text: '解析完成，請確認後套用' })
+  }
+
+  function applyParsed() {
+    if (!parsedPreview) return
+
+    // 帶入供應商（模糊比對）
+    if (parsedPreview.supplierName) {
+      const name = parsedPreview.supplierName.toLowerCase()
+      const match = suppliers.find(s =>
+        s.name.toLowerCase().includes(name) || name.includes(s.name.toLowerCase())
+      )
+      if (match) setSupplierId(String(match.id))
+    }
+
+    // 帶入幣別
+    if (parsedPreview.currency) setCurrencyCode(parsedPreview.currency)
+
+    // 帶入備註（發票號）
+    if (parsedPreview.invoiceNo) setNote(prev =>
+      prev ? prev : `Ref: ${parsedPreview!.invoiceNo}`
+    )
+
+    // 帶入明細（商品描述模糊比對）
+    if (parsedPreview.items.length > 0) {
+      const newLines: LineItem[] = parsedPreview.items.map(pi => {
+        const desc = pi.description.toLowerCase()
+        const matched = products.find(p =>
+          p.name.toLowerCase().includes(desc) ||
+          desc.includes(p.name.toLowerCase()) ||
+          (p.sku && (p.sku.toLowerCase() === (pi.sku ?? '').toLowerCase()))
+        )
+        return {
+          productId: matched ? String(matched.id) : '',
+          quantity: String(pi.qty),
+          unitPrice: String(pi.unitPrice),
+          unit: pi.unit ?? matched?.unit ?? 'PCS',
+          note: matched ? '' : pi.description,  // 未比對到的保留原始描述
+        }
+      })
+      setItems(newLines)
+    }
+
+    setParsedPreview(null)
+    setAiMsg({ type: 'ok', text: '已套用。未能自動比對的商品欄位以空白顯示，請手動選擇。' })
+  }
 
   const subtotal = items.reduce((sum, item) => {
     const qty = parseFloat(item.quantity) || 0
@@ -142,7 +217,74 @@ export default function PurchaseForm({ suppliers, products }: { suppliers: Suppl
 
       {/* 採購明細 */}
       <section className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-base font-semibold text-gray-700 mb-4">採購明細</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-gray-700">採購明細</h2>
+          <div className="flex items-center gap-2">
+            <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.csv,.txt"
+              className="hidden" onChange={handleAiParse} />
+            <button type="button" disabled={aiParsing}
+              onClick={() => fileRef.current?.click()}
+              className="flex items-center gap-1.5 text-sm border border-purple-300 text-purple-700 bg-purple-50 px-3 py-1.5 rounded-md hover:bg-purple-100 disabled:opacity-50">
+              <span>{aiParsing ? '⏳' : '✨'}</span>
+              <span>{aiParsing ? 'AI 解析中…' : 'AI 解析發票/採購單'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* AI 訊息 */}
+        {aiMsg && (
+          <div className={`mb-4 p-3 rounded-md text-sm ${
+            aiMsg.type === 'ok' ? 'bg-green-50 text-green-700' :
+            aiMsg.type === 'err' ? 'bg-red-50 text-red-700' :
+            'bg-blue-50 text-blue-700'
+          }`}>
+            {aiMsg.text}
+          </div>
+        )}
+
+        {/* AI 解析預覽 */}
+        {parsedPreview && (
+          <div className="mb-4 border border-purple-200 rounded-lg p-4 bg-purple-50 space-y-2">
+            <p className="text-sm font-medium text-purple-800">AI 解析結果預覽</p>
+            {parsedPreview.supplierName && (
+              <p className="text-xs text-purple-700">供應商：{parsedPreview.supplierName}</p>
+            )}
+            {parsedPreview.invoiceNo && (
+              <p className="text-xs text-purple-700">單號：{parsedPreview.invoiceNo}</p>
+            )}
+            {parsedPreview.currency && (
+              <p className="text-xs text-purple-700">幣別：{parsedPreview.currency}</p>
+            )}
+            <table className="w-full text-xs mt-2">
+              <thead>
+                <tr className="text-purple-600 border-b border-purple-200">
+                  <th className="text-left pb-1">品名</th>
+                  <th className="text-right pb-1">數量</th>
+                  <th className="text-right pb-1">單價</th>
+                </tr>
+              </thead>
+              <tbody>
+                {parsedPreview.items.map((it, i) => (
+                  <tr key={i} className="border-b border-purple-100">
+                    <td className="py-0.5">{it.description}{it.sku ? ` (${it.sku})` : ''}</td>
+                    <td className="text-right py-0.5">{it.qty} {it.unit}</td>
+                    <td className="text-right py-0.5">{it.unitPrice}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="flex gap-2 pt-1">
+              <button type="button" onClick={applyParsed}
+                className="text-sm bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700">
+                套用到表單
+              </button>
+              <button type="button" onClick={() => { setParsedPreview(null); setAiMsg(null) }}
+                className="text-sm border border-purple-300 text-purple-600 px-3 py-1 rounded hover:bg-purple-100">
+                捨棄
+              </button>
+            </div>
+          </div>
+        )}
         <div className="space-y-3">
           {items.map((item, idx) => (
             <div key={idx} className="grid grid-cols-12 gap-2 items-end border-b border-gray-50 pb-3">

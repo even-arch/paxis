@@ -13,6 +13,7 @@ const navItems = [
   { label: '庫存管理', href: '/inventory', icon: '🗃️' },
   { label: '成本計算', href: '/cost', icon: '💰' },
   { label: 'Patisco 同步', href: '/settings/patisco', icon: '🔗' },
+  { label: 'AI 功能設定', href: '/settings/ai', icon: '✨' },
 ]
 
 export default function Sidebar() {

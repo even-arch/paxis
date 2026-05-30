@@ -65,12 +65,16 @@ model SYS_PatiscoSync {
 
 model SYS_User {
   id          Int    @id @default(autoincrement())
-  name        String   
+  name        String
   loginId     String    @unique
-  password    String   
+  password    String
   isEnabled   Boolean   @default(true)
   language    String    @default("zh-TW")
   createdAt   DateTime  @default(now())
+
+  // AI 功能：使用者自備 API Key，消耗自己的 token
+  aiProvider      String?   // 'claude' | 'openai'
+  encryptedAiKey  String?   // AES-256-GCM 加密後的 API Key
 
   purchaseOrders  PO_Order[]
   costSheets      COST_Sheet[]
