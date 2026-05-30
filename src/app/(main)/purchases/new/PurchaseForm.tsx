@@ -220,7 +220,7 @@ export default function PurchaseForm({ suppliers, products }: { suppliers: Suppl
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-gray-700">採購明細</h2>
           <div className="flex items-center gap-2">
-            <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.csv,.txt"
+            <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.txt"
               className="hidden" onChange={handleAiParse} />
             <button type="button" disabled={aiParsing}
               onClick={() => fileRef.current?.click()}
