@@ -29,7 +29,7 @@ export async function PUT(req: NextRequest) {
 
   const { aiProvider, apiKey } = await req.json()
 
-  if (!aiProvider || !['claude', 'openai'].includes(aiProvider)) {
+  if (!aiProvider || !['anthropic', 'openai'].includes(aiProvider)) {
     return NextResponse.json({ error: 'Invalid provider' }, { status: 400 })
   }
 

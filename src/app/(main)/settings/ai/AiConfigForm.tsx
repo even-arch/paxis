@@ -9,7 +9,7 @@ interface AiConfig {
 
 export default function AiConfigForm() {
   const [config, setConfig] = useState<AiConfig | null>(null)
-  const [provider, setProvider] = useState('claude')
+  const [provider, setProvider] = useState('anthropic')
   const [apiKey, setApiKey] = useState('')
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
@@ -47,7 +47,7 @@ export default function AiConfigForm() {
     if (!confirm('確定要移除 AI API Key？')) return
     await fetch('/api/settings/ai', { method: 'DELETE' })
     setConfig({ aiProvider: '', apiKeySet: false, apiKeyHint: '' })
-    setProvider('claude')
+    setProvider('anthropic')
     setMsg({ type: 'ok', text: '已移除' })
   }
 
@@ -66,7 +66,7 @@ export default function AiConfigForm() {
           <label className="block text-sm font-medium text-gray-700 mb-1">AI 供應商</label>
           <div className="flex gap-4">
             {[
-              { value: 'claude', label: 'Claude (Anthropic)', hint: 'sk-ant-...' },
+              { value: 'anthropic', label: 'Claude (Anthropic)', hint: 'sk-ant-...' },
               { value: 'openai', label: 'ChatGPT (OpenAI)', hint: 'sk-...' },
             ].map(opt => (
               <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
@@ -100,7 +100,7 @@ export default function AiConfigForm() {
             placeholder={
               config?.apiKeySet
                 ? '輸入新 Key 以覆蓋，或留空保留現有 Key'
-                : provider === 'claude'
+                : provider === 'anthropic'
                 ? 'sk-ant-api03-...'
                 : 'sk-proj-...'
             }
