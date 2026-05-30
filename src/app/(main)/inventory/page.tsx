@@ -30,7 +30,9 @@ export default async function InventoryPage({ searchParams }: Props) {
 
   let rows: Row[] = products.map(p => {
     const s = stockMap.get(p.id)
-    return { product: p, quantity: s?.quantity ?? 0, safetyStock: s?.safetyStock ?? 0, stockId: s?.id ?? null }
+    const qty = s?.quantity ?? 0
+    const reserved = s?.reservedQty ?? 0
+    return { product: p, quantity: qty - reserved, safetyStock: s?.safetyStock ?? 0, stockId: s?.id ?? null }
   })
 
   const lowRows = rows.filter(r => r.quantity <= r.safetyStock)

@@ -7,9 +7,11 @@ type Props = { params: { productId: string } }
 
 const MOVEMENT_TYPE: Record<number, { label: string; color: string }> = {
   1: { label: '進貨入庫', color: 'text-green-600' },
-  2: { label: '銷售出庫', color: 'text-red-500' },
-  3: { label: '手動調整', color: 'text-blue-500' },
-  4: { label: '盤點調整', color: 'text-purple-500' },
+  2: { label: 'PI 預留', color: 'text-orange-500' },
+  3: { label: '取消預留', color: 'text-gray-500' },
+  4: { label: '出倉', color: 'text-red-500' },
+  5: { label: '手動調整', color: 'text-blue-500' },
+  6: { label: '盤點調整', color: 'text-purple-500' },
 }
 
 export default async function InventoryDetailPage({ params }: Props) {
@@ -33,8 +35,10 @@ export default async function InventoryDetailPage({ params }: Props) {
   if (!product || !product.isActive) notFound()
 
   const currentStock = stock?.quantity ?? 0
+  const reservedQty = stock?.reservedQty ?? 0
+  const availableQty = currentStock - reservedQty
   const safetyStock = stock?.safetyStock ?? 0
-  const isLow = currentStock <= safetyStock
+  const isLow = availableQty <= safetyStock
   const isZero = currentStock === 0
 
   return (
@@ -49,21 +53,34 @@ export default async function InventoryDetailPage({ params }: Props) {
       <div className="bg-white rounded-lg shadow p-6 mb-4">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-sm text-gray-500 mb-1">現有庫存</p>
+            <p className="text-sm text-gray-500 mb-1">實際庫存 / 可用庫存</p>
             <div className="flex items-baseline gap-2">
               <span className={`text-5xl font-bold ${isZero ? 'text-red-600' : isLow ? 'text-yellow-600' : 'text-gray-900'}`}>
                 {currentStock.toLocaleString()}
               </span>
+              <span className="text-gray-400 text-xl">/</span>
+              <span className={`text-3xl font-semibold ${isLow ? 'text-yellow-600' : 'text-green-600'}`}>
+                {availableQty.toLocaleString()}
+              </span>
               <span className="text-gray-400 text-lg">{product.unit ?? 'PCS'}</span>
             </div>
+            {reservedQty > 0 && (
+              <p className="text-orange-500 text-xs mt-1">已預留 {reservedQty.toLocaleString()} {product.unit ?? 'PCS'}（PI 正本）</p>
+            )}
             {isZero && <p className="text-red-500 text-sm mt-1 font-medium">⚠ 庫存為零，需要緊急補貨</p>}
-            {!isZero && isLow && <p className="text-yellow-600 text-sm mt-1">⚠ 低於安全庫存（{safetyStock}），建議補貨</p>}
+            {!isZero && isLow && <p className="text-yellow-600 text-sm mt-1">⚠ 可用量低於安全庫存（{safetyStock}），建議補貨</p>}
             {!isLow && <p className="text-green-600 text-sm mt-1">✓ 庫存正常</p>}
           </div>
 
-          <div className="text-right">
-            <p className="text-sm text-gray-500">安全庫存</p>
-            <p className="text-2xl font-semibold text-gray-600">{safetyStock.toLocaleString()}</p>
+          <div className="text-right space-y-2">
+            <div>
+              <p className="text-xs text-gray-500">已預留</p>
+              <p className="text-xl font-semibold text-orange-500">{reservedQty.toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">安全庫存</p>
+              <p className="text-xl font-semibold text-gray-600">{safetyStock.toLocaleString()}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -119,14 +136,14 @@ export default async function InventoryDetailPage({ params }: Props) {
                       <span className={`font-medium text-xs ${t.color}`}>{t.label}</span>
                     </td>
                     <td className="px-4 py-2 text-right">
-                      <span className={m.quantity > 0 ? 'text-green-600 font-medium' : 'text-red-500 font-medium'}>
-                        {m.quantity > 0 ? '+' : ''}{m.quantity.toLocaleString()}
+                      <span className={m.qtyDelta > 0 ? 'text-green-600 font-medium' : 'text-red-500 font-medium'}>
+                        {m.qtyDelta > 0 ? '+' : ''}{m.qtyDelta.toLocaleString()}
                       </span>
                     </td>
-                    <td className="px-4 py-2 text-right text-gray-600">{m.balanceAfter.toLocaleString()}</td>
+                    <td className="px-4 py-2 text-right text-gray-600">{m.quantityAfter.toLocaleString()}</td>
                     <td className="px-4 py-2 text-gray-400 text-xs">
-                      {m.patiscoOrderNo
-                        ? <span className="text-blue-500 font-mono">Patisco: {m.patiscoOrderNo}</span>
+                      {m.patiscoDocNo
+                        ? <span className="text-blue-500 font-mono">Patisco: {m.patiscoDocNo}</span>
                         : m.note ?? '-'}
                     </td>
                   </tr>

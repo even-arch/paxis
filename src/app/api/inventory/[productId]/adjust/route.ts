@@ -6,8 +6,7 @@ import { prisma } from '@/lib/db'
 type Params = { params: { productId: string } }
 
 /**
- * 手動庫存調整（盤點）
- * body: { type: 3|4, quantity: number, note: string }
+ * 手動庫存調整
  * type 3 = 手動調整, type 4 = 盤點調整
  * quantity: 正數=入庫, 負數=出庫
  */
@@ -26,28 +25,27 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const stock = await prisma.iNV_Stock.upsert({
     where: { productId },
-    create: { productId, quantity: Math.max(0, qty), safetyStock: 0 },
+    create: { productId, quantity: Math.max(0, qty), reservedQty: 0, safetyStock: 0 },
     update: { quantity: { increment: qty } },
   })
 
-  // 確保庫存不低於 0
+  // 確保不低於 0
+  const finalQty = Math.max(0, stock.quantity)
   if (stock.quantity < 0) {
-    await prisma.iNV_Stock.update({
-      where: { productId },
-      data: { quantity: 0 },
-    })
-    stock.quantity = 0
+    await prisma.iNV_Stock.update({ where: { productId }, data: { quantity: 0 } })
   }
 
   await prisma.iNV_Movement.create({
     data: {
       productId,
       type,
-      quantity: qty,
-      balanceAfter: stock.quantity,
+      qtyDelta: qty,
+      reservedDelta: 0,
+      quantityAfter: finalQty,
+      reservedAfter: stock.reservedQty,
       note: body.note || (type === 4 ? '盤點調整' : '手動調整'),
     },
   })
 
-  return NextResponse.json({ ok: true, quantity: stock.quantity })
+  return NextResponse.json({ ok: true, quantity: finalQty })
 }

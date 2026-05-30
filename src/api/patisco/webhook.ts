@@ -1,8 +1,3 @@
-/**
- * Patisco Webhook 處理
- * Patisco 訂單確認後呼叫此端點，觸發 PAXIS 庫存扣減與採購建議
- */
-
 import { prisma } from '@/lib/db'
 
 export type PatiscoOrderConfirmedPayload = {
@@ -16,12 +11,6 @@ export type PatiscoOrderConfirmedPayload = {
   }>
 }
 
-/**
- * 處理 Patisco 訂單確認事件
- * 1. 扣減庫存
- * 2. 若庫存低於安全庫存，標記需要採購
- * 回傳需要補貨的商品清單（含建議供應商）
- */
 export async function handleOrderConfirmed(payload: PatiscoOrderConfirmedPayload) {
   const results: Array<{
     patiscoProductId: number
@@ -33,12 +22,8 @@ export async function handleOrderConfirmed(payload: PatiscoOrderConfirmedPayload
   }> = []
 
   for (const item of payload.items) {
-    // 找對應的 PAXIS 商品
     const product = await prisma.pRD_Product.findFirst({
-      where: {
-        patiscoProductId: item.productId,
-        isActive: true,
-      },
+      where: { patiscoProductId: item.productId, isActive: true },
       include: {
         inventoryItems: true,
         supplierProducts: {
@@ -50,34 +35,30 @@ export async function handleOrderConfirmed(payload: PatiscoOrderConfirmedPayload
     })
 
     if (!product || !product.inventoryItems[0]) {
-      results.push({
-        patiscoProductId: item.productId,
-        sku: item.sku,
-        deducted: 0,
-        stockAfter: 0,
-        belowSafety: false,
-      })
+      results.push({ patiscoProductId: item.productId, sku: item.sku, deducted: 0, stockAfter: 0, belowSafety: false })
       continue
     }
 
     const stock = product.inventoryItems[0]
     const newQty = Math.max(0, stock.quantity - item.quantity)
 
-    // 更新庫存
     await prisma.iNV_Stock.update({
       where: { id: stock.id },
       data: { quantity: newQty },
     })
 
-    // 寫入庫存異動紀錄（type=2 銷售出庫）
+    // 新 schema：type=4 出倉（PI 正本確認後裝箱出倉）
     await prisma.iNV_Movement.create({
       data: {
         productId: product.id,
-        type: 2,
-        quantity: -item.quantity,
-        balanceAfter: newQty,
-        patiscoOrderId: payload.orderId,
-        patiscoOrderNo: payload.orderNo,
+        type: 4,
+        qtyDelta: -item.quantity,
+        reservedDelta: 0,
+        quantityAfter: newQty,
+        reservedAfter: stock.reservedQty,
+        patiscoDocType: 'DELIVERY_ORDER',
+        patiscoDocId: payload.orderId,
+        patiscoDocNo: payload.orderNo,
         note: `Patisco 訂單 ${payload.orderNo}`,
       },
     })
