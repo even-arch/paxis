@@ -17,11 +17,24 @@ datasource db {
 // =============================================================================
 
 // Patisco 連線設定（密碼 AES-256-GCM 加密儲存）
+// Patisco 連線設定
+// 支援兩種模式：
+//   1. 帳密模式：存 username + encryptedPass，cron 定時重新登入
+//   2. Token 模式：直接貼上 JWT + apiKey（JWT 到期後需手動重貼）
 model SYS_PatiscoConfig {
   id             Int      @id @default(autoincrement())
   mcpUrl         String   @default("https://mcp.patisco.com:9443")
-  username       String
-  encryptedPass  String   // AES-256-GCM 加密的密碼
+
+  // 模式 1：帳密（選填，有填才能自動 refresh JWT）
+  username       String?
+  encryptedPass  String?  // AES-256-GCM 加密
+
+  // 模式 2：直接貼 Token（選填，JWT 到期需手動更新）
+  encryptedJwt   String?  // AES-256-GCM 加密，JWT 有時效
+  apiKey         String?  // Patisco API Key（長效，UUID 格式）
+  userId         String?  // Patisco userId（供顯示用）
+  jwtExpiresAt   DateTime? // JWT 到期時間（若能解析）
+
   webhookSecret  String?  // Webhook 簽名驗證密鑰（選用）
   cronSecret     String?  // Cron 安全驗證密鑰（選用）
   isActive       Boolean  @default(true)

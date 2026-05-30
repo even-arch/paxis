@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { encrypt, decrypt } from '@/lib/crypto'
+import { encrypt } from '@/lib/crypto'
 
-/** 取得目前設定（密碼不回傳，只回傳是否已設定） */
 export async function GET(_req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -19,53 +18,73 @@ export async function GET(_req: NextRequest) {
   return NextResponse.json({
     configured: true,
     mcpUrl: config.mcpUrl,
-    username: config.username,
+    // 帳密模式
+    username: config.username ?? '',
     passwordSet: !!config.encryptedPass,
+    // Token 模式
+    apiKey: config.apiKey ?? '',
+    userId: config.userId ?? '',
+    jwtSet: !!config.encryptedJwt,
+    jwtExpiresAt: config.jwtExpiresAt?.toISOString() ?? null,
+    jwtExpired: config.jwtExpiresAt ? config.jwtExpiresAt < new Date() : false,
+    // 安全
     webhookSecretSet: !!config.webhookSecret,
     cronSecretSet: !!config.cronSecret,
-    lastTestedAt: config.lastTestedAt,
-    lastTestStatus: config.lastTestStatus,
-    lastTestMsg: config.lastTestMsg,
-    updatedAt: config.updatedAt,
+    // 狀態
+    lastTestedAt: config.lastTestedAt?.toISOString() ?? null,
+    lastTestStatus: config.lastTestStatus ?? null,
+    lastTestMsg: config.lastTestMsg ?? null,
+    updatedAt: config.updatedAt.toISOString(),
   })
 }
 
-/** 儲存設定 */
 export async function PUT(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { mcpUrl, username, password, webhookSecret, cronSecret } = body
-
-  if (!username) return NextResponse.json({ error: '帳號為必填' }, { status: 400 })
-
-  // 找現有設定
   const existing = await prisma.sYS_PatiscoConfig.findFirst({ where: { isActive: true } })
 
-  // 密碼：有傳新的就加密，沒傳就保留舊的
-  let encryptedPass = existing?.encryptedPass ?? ''
-  if (password) {
-    encryptedPass = encrypt(password)
-  }
-
-  if (!encryptedPass) {
-    return NextResponse.json({ error: '首次設定必須填入密碼' }, { status: 400 })
-  }
-
-  const data = {
-    mcpUrl: mcpUrl || 'https://mcp.patisco.com:9443',
-    username,
-    encryptedPass,
-    webhookSecret: webhookSecret || null,
-    cronSecret: cronSecret || null,
+  const data: Record<string, unknown> = {
+    mcpUrl: body.mcpUrl || 'https://mcp.patisco.com:9443',
     isActive: true,
+  }
+
+  // ── 帳密模式 ──────────────────────────────────────────────────────────────
+  if (body.username !== undefined) data.username = body.username || null
+  if (body.password) data.encryptedPass = encrypt(body.password)
+
+  // ── Token 模式 ────────────────────────────────────────────────────────────
+  if (body.jwt) {
+    data.encryptedJwt = encrypt(body.jwt)
+    // 嘗試解析 JWT 到期時間
+    try {
+      const payload = JSON.parse(Buffer.from(body.jwt.split('.')[1], 'base64').toString())
+      if (payload.exp) data.jwtExpiresAt = new Date(payload.exp * 1000)
+    } catch { /* ignore */ }
+  }
+  if (body.apiKey !== undefined) data.apiKey = body.apiKey || null
+  if (body.userId !== undefined) data.userId = body.userId || null
+
+  // ── 安全設定 ──────────────────────────────────────────────────────────────
+  if (body.webhookSecret !== undefined) data.webhookSecret = body.webhookSecret || null
+  if (body.cronSecret !== undefined) data.cronSecret = body.cronSecret || null
+
+  // 必須至少有一種登入方式
+  const hasPassword = body.password || existing?.encryptedPass
+  const hasToken = body.jwt || existing?.encryptedJwt
+  const hasUsername = body.username || existing?.username
+  if (!hasPassword && !hasToken) {
+    return NextResponse.json({ error: '請填入密碼或直接貼上 JWT Token' }, { status: 400 })
+  }
+  if (hasPassword && !hasUsername && !body.username) {
+    return NextResponse.json({ error: '使用帳密模式時，帳號為必填' }, { status: 400 })
   }
 
   if (existing) {
     await prisma.sYS_PatiscoConfig.update({ where: { id: existing.id }, data })
   } else {
-    await prisma.sYS_PatiscoConfig.create({ data })
+    await prisma.sYS_PatiscoConfig.create({ data: data as Parameters<typeof prisma.sYS_PatiscoConfig.create>[0]['data'] })
   }
 
   return NextResponse.json({ ok: true })

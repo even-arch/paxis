@@ -45,69 +45,106 @@ export type PatiscoPIProduct = {
 // ─── 認證 ─────────────────────────────────────────────────────────────────────
 
 /**
- * 讀取 Patisco 連線設定
- * 優先順序：DB (SYS_PatiscoConfig) → 環境變數
+ * 取得 Patisco 認證憑證
+ * 優先順序：
+ *   1. DB Token 模式（直接貼 JWT + API Key）→ JWT 未過期才用
+ *   2. DB 帳密模式（自動登入）
+ *   3. 環境變數備援
  */
-export async function getPatiscoConfig(): Promise<{
-  mcpUrl: string; username: string; password: string
-} | null> {
-  // 優先讀 DB
+export async function patiscoLogin(): Promise<(PatiscoCredentials & { _mcpUrl: string }) | null> {
   try {
     const { prisma } = await import('@/lib/db')
     const { decrypt } = await import('@/lib/crypto')
+
     const config = await prisma.sYS_PatiscoConfig.findFirst({
       where: { isActive: true },
       orderBy: { id: 'desc' },
     })
-    if (config?.username && config?.encryptedPass) {
-      return {
-        mcpUrl: config.mcpUrl,
-        username: config.username,
-        password: decrypt(config.encryptedPass),
+
+    if (config) {
+      const mcpUrl = config.mcpUrl
+
+      // ── 模式 1：Token 模式（JWT + API Key 直接使用）──────────────────────
+      if (config.encryptedJwt && config.apiKey) {
+        // 檢查 JWT 是否過期
+        const isExpired = config.jwtExpiresAt && config.jwtExpiresAt < new Date()
+        if (!isExpired) {
+          const jwt = decrypt(config.encryptedJwt)
+          return {
+            jwt,
+            apiKey: config.apiKey,
+            userId: config.userId ?? '',
+            tenantId: '',
+            _mcpUrl: mcpUrl,
+          }
+        }
+        console.warn('[patisco] JWT 已過期，嘗試帳密重新登入')
+      }
+
+      // ── 模式 2：帳密模式（自動登入取得新 JWT）───────────────────────────
+      if (config.username && config.encryptedPass) {
+        const password = decrypt(config.encryptedPass)
+        const result = await doLogin(mcpUrl, config.username, password)
+        if (result) {
+          // 更新 DB 的 JWT 快取
+          const expiresAt = parseJwtExpiry(result.jwt)
+          await prisma.sYS_PatiscoConfig.update({
+            where: { id: config.id },
+            data: {
+              encryptedJwt: (await import('@/lib/crypto')).encrypt(result.jwt),
+              apiKey: result.apiKey,
+              userId: result.userId,
+              jwtExpiresAt: expiresAt,
+            },
+          })
+          return { ...result, _mcpUrl: mcpUrl }
+        }
+        return null
       }
     }
-  } catch {
-    // DB 讀取失敗 → fallthrough
+  } catch (err) {
+    console.warn('[patisco] DB 讀取失敗，嘗試環境變數', err)
   }
 
-  // fallback 到環境變數
+  // ── 模式 3：環境變數備援 ─────────────────────────────────────────────────
   const username = process.env.PATISCO_USERNAME ?? ''
   const password = process.env.PATISCO_PASSWORD ?? ''
-  if (!username || !password) return null
-  return { mcpUrl: DEFAULT_MCP_URL, username, password }
-}
-
-/**
- * 登入取得 JWT + API Key
- * Vercel serverless 每次 invocation 都重新認證（無法持久化 in-memory token）
- */
-export async function patiscoLogin(): Promise<PatiscoCredentials | null> {
-  const config = await getPatiscoConfig()
-  if (!config) {
-    console.warn('[patisco] 未設定 Patisco 帳號，跳過')
+  const mcpUrl = DEFAULT_MCP_URL
+  if (!username || !password) {
+    console.warn('[patisco] 未設定任何 Patisco 憑證，跳過')
     return null
   }
+  const result = await doLogin(mcpUrl, username, password)
+  return result ? { ...result, _mcpUrl: mcpUrl } : null
+}
 
+/** 實際執行登入（Email / Login ID + 密碼） */
+async function doLogin(mcpUrl: string, loginId: string, password: string): Promise<PatiscoCredentials | null> {
   try {
-    const res = await fetch(`${config.mcpUrl}/auth/login`, {
+    const res = await fetch(`${mcpUrl}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ loginId: config.username, password: config.password }),
-      signal: AbortSignal.timeout(10_000),
+      body: JSON.stringify({ loginId, password }),
+      signal: AbortSignal.timeout(15_000),
     })
-
     if (!res.ok) {
-      console.error('[patisco] 登入失敗', res.status)
+      console.error('[patisco] 登入失敗', res.status, await res.text())
       return null
     }
-
-    const creds = await res.json() as PatiscoCredentials
-    // 把 mcpUrl 也帶著，供後續呼叫使用
-    return { ...creds, _mcpUrl: config.mcpUrl } as PatiscoCredentials & { _mcpUrl: string }
+    return await res.json() as PatiscoCredentials
   } catch (err) {
     console.error('[patisco] 登入錯誤', err)
     return null
   }
+}
+
+/** 解析 JWT exp 欄位，回傳到期時間 */
+function parseJwtExpiry(jwt: string): Date | null {
+  try {
+    const payload = JSON.parse(Buffer.from(jwt.split('.')[1], 'base64').toString())
+    if (payload.exp) return new Date(payload.exp * 1000)
+  } catch { /* ignore */ }
+  return null
 }
 
 // ─── JSON-RPC 基礎呼叫 ────────────────────────────────────────────────────────

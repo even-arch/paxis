@@ -7,6 +7,11 @@ type Config = {
   mcpUrl: string
   username: string
   passwordSet: boolean
+  apiKey: string
+  userId: string
+  jwtSet: boolean
+  jwtExpiresAt: string | null
+  jwtExpired: boolean
   webhookSecretSet: boolean
   cronSecretSet: boolean
   lastTestedAt: string | null
@@ -14,14 +19,29 @@ type Config = {
   lastTestMsg: string | null
 } | null
 
+type Mode = 'token' | 'password'
+
 export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Config }) {
   const router = useRouter()
+  // 預設：有 apiKey 就用 token 模式，否則 password 模式
+  const [mode, setMode] = useState<Mode>(
+    initialConfig?.apiKey ? 'token' : 'password'
+  )
   const [mcpUrl, setMcpUrl] = useState(initialConfig?.mcpUrl ?? 'https://mcp.patisco.com:9443')
+
+  // Token 模式
+  const [jwt, setJwt] = useState('')
+  const [apiKey, setApiKey] = useState(initialConfig?.apiKey ?? '')
+
+  // 帳密模式
   const [username, setUsername] = useState(initialConfig?.username ?? '')
   const [password, setPassword] = useState('')
+
+  // 安全設定
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const [webhookSecret, setWebhookSecret] = useState('')
   const [cronSecret, setCronSecret] = useState('')
-  const [showAdvanced, setShowAdvanced] = useState(false)
+
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [syncing, setSyncing] = useState(false)
@@ -30,23 +50,48 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
     ok: boolean; tools?: string[]; msg?: string; error?: string
   } | null>(null)
 
-  const isConfigured = !!initialConfig?.username
+  const isConfigured = !!initialConfig
+  const jwtExpired = initialConfig?.jwtExpired
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
-    if (!username) { setMsg({ type: 'error', text: '請填寫帳號' }); return }
-    if (!isConfigured && !password) { setMsg({ type: 'error', text: '首次設定必須填入密碼' }); return }
+    setMsg(null)
 
-    setSaving(true); setMsg(null)
+    const body: Record<string, string> = {
+      mcpUrl,
+      webhookSecret,
+      cronSecret,
+    }
+
+    if (mode === 'token') {
+      if (!apiKey && !initialConfig?.apiKey) {
+        setMsg({ type: 'error', text: '請填入 API Key' }); return
+      }
+      if (!jwt && !initialConfig?.jwtSet) {
+        setMsg({ type: 'error', text: '首次設定請貼上 JWT Token' }); return
+      }
+      if (jwt) body.jwt = jwt
+      body.apiKey = apiKey
+    } else {
+      if (!username) { setMsg({ type: 'error', text: '請填入帳號' }); return }
+      if (!password && !initialConfig?.passwordSet) {
+        setMsg({ type: 'error', text: '首次設定請填入密碼' }); return
+      }
+      body.username = username
+      if (password) body.password = password
+    }
+
+    setSaving(true)
     const res = await fetch('/api/settings/patisco', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mcpUrl, username, password: password || undefined, webhookSecret, cronSecret }),
+      body: JSON.stringify(body),
     })
     setSaving(false)
 
     if (res.ok) {
       setMsg({ type: 'ok', text: '設定已儲存' })
+      setJwt('')
       setPassword('')
       router.refresh()
     } else {
@@ -78,50 +123,54 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
     router.refresh()
   }
 
+  // 連線狀態顏色
+  const statusColor = initialConfig?.lastTestStatus === 'ok' ? 'bg-green-500'
+    : (initialConfig?.lastTestStatus === 'error' || jwtExpired) ? 'bg-red-500'
+    : 'bg-gray-400'
+  const statusText = jwtExpired ? 'JWT 已過期，請更新'
+    : initialConfig?.lastTestStatus === 'ok' ? '已連線'
+    : initialConfig?.lastTestStatus === 'error' ? '連線失敗'
+    : isConfigured ? '未測試'
+    : '尚未設定'
+
   return (
     <div className="bg-white rounded-lg shadow">
-      {/* 連線狀態列 */}
-      <div className={`px-6 py-3 flex items-center justify-between border-b ${
-        initialConfig?.lastTestStatus === 'ok'
-          ? 'bg-green-50 border-green-100'
-          : initialConfig?.lastTestStatus === 'error'
-          ? 'bg-red-50 border-red-100'
+      {/* 狀態列 */}
+      <div className={`px-6 py-3 flex items-center justify-between border-b rounded-t-lg ${
+        initialConfig?.lastTestStatus === 'ok' && !jwtExpired ? 'bg-green-50 border-green-100'
+          : (initialConfig?.lastTestStatus === 'error' || jwtExpired) ? 'bg-red-50 border-red-100'
           : 'bg-gray-50 border-gray-100'
       }`}>
         <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full ${
-            initialConfig?.lastTestStatus === 'ok' ? 'bg-green-500' :
-            initialConfig?.lastTestStatus === 'error' ? 'bg-red-500' : 'bg-gray-400'
-          }`} />
-          <span className="text-sm font-medium text-gray-700">
-            {initialConfig?.lastTestStatus === 'ok' ? '已連線'
-              : initialConfig?.lastTestStatus === 'error' ? '連線失敗'
-              : isConfigured ? '未測試'
-              : '尚未設定'}
-          </span>
-          {initialConfig?.lastTestMsg && (
+          <span className={`w-2 h-2 rounded-full ${statusColor}`} />
+          <span className="text-sm font-medium text-gray-700">{statusText}</span>
+          {initialConfig?.userId && (
+            <span className="text-xs text-gray-400">— userId: {initialConfig.userId}</span>
+          )}
+          {initialConfig?.lastTestMsg && !jwtExpired && (
             <span className="text-xs text-gray-500">— {initialConfig.lastTestMsg}</span>
           )}
         </div>
         {isConfigured && (
           <div className="flex gap-2">
-            <button
-              onClick={handleTest}
-              disabled={testing}
-              className="text-sm px-3 py-1 border border-gray-300 rounded hover:bg-white disabled:opacity-50"
-            >
+            <button onClick={handleTest} disabled={testing}
+              className="text-sm px-3 py-1 border border-gray-300 rounded hover:bg-white disabled:opacity-50">
               {testing ? '測試中...' : '測試連線'}
             </button>
-            <button
-              onClick={handleManualSync}
-              disabled={syncing}
-              className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-            >
+            <button onClick={handleManualSync} disabled={syncing}
+              className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
               {syncing ? '同步中...' : '手動同步'}
             </button>
           </div>
         )}
       </div>
+
+      {/* JWT 到期警示 */}
+      {jwtExpired && (
+        <div className="px-6 py-2 bg-orange-50 border-b border-orange-200 text-sm text-orange-700">
+          ⚠ JWT Token 已過期（{initialConfig?.jwtExpiresAt?.slice(0, 10)}）。請切換到「Token 模式」重新貼上，或在「帳密模式」下儲存帳密讓系統自動重新登入。
+        </div>
+      )}
 
       {/* 測試結果 */}
       {testResult && (
@@ -130,71 +179,119 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
             <div>
               <p className="font-medium">✓ {testResult.msg}</p>
               {testResult.tools && testResult.tools.length > 0 && (
-                <p className="text-xs mt-1 text-green-600">可用工具：{testResult.tools.join('、')}</p>
+                <p className="text-xs mt-1 text-green-600 font-mono">
+                  {testResult.tools.join('  ·  ')}
+                </p>
               )}
             </div>
-          ) : (
-            <p>✗ {testResult.error}</p>
-          )}
+          ) : <p>✗ {testResult.error}</p>}
         </div>
       )}
 
-      <form onSubmit={handleSave} className="p-6 space-y-4">
-        <h2 className="text-base font-semibold text-gray-700">MCP 連線憑證</h2>
-
+      <form onSubmit={handleSave} className="p-6 space-y-5">
+        {/* MCP URL */}
         <div>
           <label className={lbl}>MCP Gateway URL</label>
-          <input type="url" value={mcpUrl} onChange={e => setMcpUrl(e.target.value)}
-            className={inp} placeholder="https://mcp.patisco.com:9443" />
-          <p className="text-xs text-gray-400 mt-1">Patisco MCP 伺服器位址，通常不需要修改</p>
+          <input type="url" value={mcpUrl} onChange={e => setMcpUrl(e.target.value)} className={inp}
+            placeholder="https://mcp.patisco.com:9443" />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className={lbl}>Patisco 帳號 <span className="text-red-500">*</span></label>
-            <input type="text" value={username} onChange={e => setUsername(e.target.value)}
-              className={inp} placeholder="your-login-id" autoComplete="username" />
-          </div>
-          <div>
-            <label className={lbl}>
-              密碼 {isConfigured && <span className="text-gray-400 font-normal">（留空保留舊密碼）</span>}
-              {!isConfigured && <span className="text-red-500"> *</span>}
-            </label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-              className={inp} placeholder={isConfigured ? '••••••••（留空不變更）' : '請輸入密碼'}
-              autoComplete="current-password" />
-          </div>
-        </div>
-
-        {/* 進階設定 */}
+        {/* 模式切換 */}
         <div>
-          <button
-            type="button"
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="text-sm text-blue-600 hover:underline"
-          >
-            {showAdvanced ? '▲ 收起進階設定' : '▼ 進階設定（Webhook / Cron 安全驗證）'}
-          </button>
+          <label className={lbl}>登入方式</label>
+          <div className="flex gap-0 border border-gray-300 rounded-md overflow-hidden w-fit">
+            <button type="button" onClick={() => setMode('token')}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${mode === 'token' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+              🔑 直接貼 JWT + API Key
+            </button>
+            <button type="button" onClick={() => setMode('password')}
+              className={`px-4 py-2 text-sm font-medium transition-colors border-l ${mode === 'password' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+              👤 帳號 + 密碼（自動刷新）
+            </button>
+          </div>
+        </div>
 
-          {showAdvanced && (
-            <div className="mt-3 grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-md">
+        {/* Token 模式 */}
+        {mode === 'token' && (
+          <div className="space-y-4 p-4 bg-blue-50 rounded-md border border-blue-100">
+            <p className="text-xs text-blue-600">
+              使用 Patisco MCP 憑證取得工具登入後，把 JWT Token 和 API Key 貼到這裡。
+              JWT 有時效性，過期後需要重新取得。
+            </p>
+            <div>
+              <label className={lbl}>
+                JWT Token
+                {initialConfig?.jwtSet && !jwtExpired && (
+                  <span className="text-green-600 font-normal ml-1 text-xs">✓ 已設定（未過期）</span>
+                )}
+                {jwtExpired && <span className="text-red-500 font-normal ml-1 text-xs">⚠ 已過期</span>}
+              </label>
+              <textarea value={jwt} onChange={e => setJwt(e.target.value)}
+                className={`${inp} h-28 font-mono text-xs`}
+                placeholder={initialConfig?.jwtSet ? '留空保留目前的 JWT（如果未過期）\n貼上新 JWT 可更新...' : '貼上 JWT Token（eyJhbGci...）'} />
+            </div>
+            <div>
+              <label className={lbl}>
+                API Key
+                {initialConfig?.apiKey && <span className="text-green-600 font-normal ml-1 text-xs">✓ 已設定</span>}
+              </label>
+              <input type="text" value={apiKey} onChange={e => setApiKey(e.target.value)}
+                className={`${inp} font-mono`}
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+              <p className="text-xs text-gray-400 mt-1">API Key 是長效的，通常不需要更換</p>
+            </div>
+          </div>
+        )}
+
+        {/* 帳密模式 */}
+        {mode === 'password' && (
+          <div className="space-y-4 p-4 bg-gray-50 rounded-md border border-gray-200">
+            <p className="text-xs text-gray-500">
+              系統每次同步時自動用帳密登入取得新 JWT，適合長期穩定運行。
+              帳號格式為 Email（例如：even@pointasia.com.tw）
+            </p>
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={lbl}>
-                  Webhook Secret
-                  {initialConfig?.webhookSecretSet && <span className="text-green-600 ml-1 text-xs">✓ 已設定</span>}
-                </label>
-                <input type="password" value={webhookSecret} onChange={e => setWebhookSecret(e.target.value)}
-                  className={inp} placeholder={initialConfig?.webhookSecretSet ? '（留空保留舊值）' : '選用'} />
-                <p className="text-xs text-gray-400 mt-1">用於驗證 Patisco Webhook 推送的簽名</p>
+                <label className={lbl}>Email / Login ID <span className="text-red-500">*</span></label>
+                <input type="email" value={username} onChange={e => setUsername(e.target.value)}
+                  className={inp} placeholder="even@pointasia.com.tw" autoComplete="username" />
               </div>
               <div>
                 <label className={lbl}>
-                  Cron Secret
+                  密碼
+                  {initialConfig?.passwordSet
+                    ? <span className="text-green-600 font-normal ml-1 text-xs">✓ 已設定（留空不變更）</span>
+                    : <span className="text-red-500"> *</span>}
+                </label>
+                <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                  className={inp} placeholder={initialConfig?.passwordSet ? '••••（留空不變更）' : '請輸入密碼'}
+                  autoComplete="current-password" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 進階設定 */}
+        <div>
+          <button type="button" onClick={() => setShowAdvanced(!showAdvanced)}
+            className="text-sm text-blue-600 hover:underline">
+            {showAdvanced ? '▲ 收起' : '▼ 進階設定（Webhook / Cron 安全驗證）'}
+          </button>
+          {showAdvanced && (
+            <div className="mt-3 grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-md">
+              <div>
+                <label className={lbl}>Webhook Secret
+                  {initialConfig?.webhookSecretSet && <span className="text-green-600 ml-1 text-xs">✓ 已設定</span>}
+                </label>
+                <input type="password" value={webhookSecret} onChange={e => setWebhookSecret(e.target.value)}
+                  className={inp} placeholder={initialConfig?.webhookSecretSet ? '留空保留舊值' : '選用'} />
+              </div>
+              <div>
+                <label className={lbl}>Cron Secret
                   {initialConfig?.cronSecretSet && <span className="text-green-600 ml-1 text-xs">✓ 已設定</span>}
                 </label>
                 <input type="password" value={cronSecret} onChange={e => setCronSecret(e.target.value)}
-                  className={inp} placeholder={initialConfig?.cronSecretSet ? '（留空保留舊值）' : '選用'} />
-                <p className="text-xs text-gray-400 mt-1">防止 Cron 端點被外部呼叫</p>
+                  className={inp} placeholder={initialConfig?.cronSecretSet ? '留空保留舊值' : '選用'} />
               </div>
             </div>
           )}
@@ -206,7 +303,7 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
           </div>
         )}
 
-        <div className="flex gap-3 pt-2">
+        <div className="flex gap-3 pt-2 border-t border-gray-100">
           <button type="submit" disabled={saving}
             className="bg-blue-600 text-white px-5 py-2 rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
             {saving ? '儲存中...' : '儲存設定'}

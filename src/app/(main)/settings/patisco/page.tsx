@@ -22,8 +22,13 @@ export default async function PatiscoSyncPage() {
 
   const configData = config ? {
     mcpUrl: config.mcpUrl,
-    username: config.username,
+    username: config.username ?? '',
     passwordSet: !!config.encryptedPass,
+    apiKey: config.apiKey ?? '',
+    userId: config.userId ?? '',
+    jwtSet: !!config.encryptedJwt,
+    jwtExpiresAt: config.jwtExpiresAt?.toISOString() ?? null,
+    jwtExpired: config.jwtExpiresAt ? config.jwtExpiresAt < new Date() : false,
     webhookSecretSet: !!config.webhookSecret,
     cronSecretSet: !!config.cronSecret,
     lastTestedAt: config.lastTestedAt?.toISOString() ?? null,
