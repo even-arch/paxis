@@ -8,55 +8,69 @@ export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const user = await prisma.sYS_User.findUnique({
-    where: { id: Number(session.user.id) },
-    select: { aiProvider: true, encryptedAiKey: true, aiParseModel: true },
-  })
+  try {
+    const user = await prisma.sYS_User.findUnique({
+      where: { id: Number(session.user.id) },
+      select: { aiProvider: true, encryptedAiKey: true, aiParseModel: true },
+    })
 
-  return NextResponse.json({
-    aiProvider: user?.aiProvider ?? '',
-    apiKeySet: !!user?.encryptedAiKey,
-    apiKeyHint: user?.encryptedAiKey
-      ? '••••' + decrypt(user.encryptedAiKey).slice(-4)
-      : '',
-    aiParseModel: user?.aiParseModel ?? '',
-  })
+    return NextResponse.json({
+      aiProvider: user?.aiProvider ?? '',
+      apiKeySet: !!user?.encryptedAiKey,
+      apiKeyHint: user?.encryptedAiKey
+        ? '••••' + decrypt(user.encryptedAiKey).slice(-4)
+        : '',
+      aiParseModel: user?.aiParseModel ?? '',
+    })
+  } catch (err) {
+    console.error('[GET /api/settings/ai]', err)
+    return NextResponse.json({ error: String(err) }, { status: 500 })
+  }
 }
 
 export async function PUT(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { aiProvider, apiKey, aiParseModel } = await req.json() as {
-    aiProvider?: string; apiKey?: string; aiParseModel?: string
+  try {
+    const body = await req.json() as {
+      aiProvider?: string; apiKey?: string; aiParseModel?: string | null
+    }
+
+    const { aiProvider, apiKey, aiParseModel } = body
+
+    if (!aiProvider || !['anthropic', 'openai'].includes(aiProvider)) {
+      return NextResponse.json({ error: 'Invalid provider' }, { status: 400 })
+    }
+
+    await prisma.sYS_User.update({
+      where: { id: Number(session.user.id) },
+      data: {
+        aiProvider,
+        aiParseModel: aiParseModel || null,
+        ...(apiKey?.trim() ? { encryptedAiKey: encrypt(apiKey.trim()) } : {}),
+      },
+    })
+
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    console.error('[PUT /api/settings/ai]', err)
+    return NextResponse.json({ error: String(err) }, { status: 500 })
   }
-
-  if (!aiProvider || !['anthropic', 'openai'].includes(aiProvider)) {
-    return NextResponse.json({ error: 'Invalid provider' }, { status: 400 })
-  }
-
-  const data: Record<string, string | null> = {
-    aiProvider,
-    aiParseModel: aiParseModel ?? null,
-  }
-  if (apiKey?.trim()) data.encryptedAiKey = encrypt(apiKey.trim())
-
-  await prisma.sYS_User.update({
-    where: { id: Number(session.user.id) },
-    data,
-  })
-
-  return NextResponse.json({ ok: true })
 }
 
 export async function DELETE() {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  await prisma.sYS_User.update({
-    where: { id: Number(session.user.id) },
-    data: { aiProvider: null, encryptedAiKey: null, aiParseModel: null },
-  })
-
-  return NextResponse.json({ ok: true })
+  try {
+    await prisma.sYS_User.update({
+      where: { id: Number(session.user.id) },
+      data: { aiProvider: null, encryptedAiKey: null, aiParseModel: null },
+    })
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    console.error('[DELETE /api/settings/ai]', err)
+    return NextResponse.json({ error: String(err) }, { status: 500 })
+  }
 }
