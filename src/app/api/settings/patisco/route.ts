@@ -46,7 +46,7 @@ export async function PUT(req: NextRequest) {
   const existing = await prisma.sYS_PatiscoConfig.findFirst({ where: { isActive: true } })
 
   const data: Record<string, unknown> = {
-    mcpUrl: body.mcpUrl || 'https://mcp.patisco.com:9443',
+    mcpUrl: body.mcpUrl || 'https://mcp.patisco.com',
     isActive: true,
   }
 

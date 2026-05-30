@@ -10,7 +10,7 @@
  */
 
 // 預設值（DB 設定優先，環境變數備援）
-const DEFAULT_MCP_URL = process.env.PATISCO_MCP_URL ?? 'https://mcp.patisco.com:9443'
+const DEFAULT_MCP_URL = process.env.PATISCO_MCP_URL ?? 'https://mcp.patisco.com'
 
 // ─── 型別定義 ─────────────────────────────────────────────────────────────────
 

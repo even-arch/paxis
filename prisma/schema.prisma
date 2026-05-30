@@ -23,7 +23,7 @@ datasource db {
 //   2. Token 模式：直接貼上 JWT + apiKey（JWT 到期後需手動重貼）
 model SYS_PatiscoConfig {
   id             Int      @id @default(autoincrement())
-  mcpUrl         String   @default("https://mcp.patisco.com:9443")
+  mcpUrl         String   @default("https://mcp.patisco.com")
 
   // 模式 1：帳密（選填，有填才能自動 refresh JWT）
   username       String?

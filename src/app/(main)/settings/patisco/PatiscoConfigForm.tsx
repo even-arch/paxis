@@ -27,7 +27,7 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
   const [mode, setMode] = useState<Mode>(
     initialConfig?.apiKey ? 'token' : 'password'
   )
-  const [mcpUrl, setMcpUrl] = useState(initialConfig?.mcpUrl ?? 'https://mcp.patisco.com:9443')
+  const [mcpUrl, setMcpUrl] = useState(initialConfig?.mcpUrl ?? 'https://mcp.patisco.com')
 
   // Token 模式
   const [jwt, setJwt] = useState('')
