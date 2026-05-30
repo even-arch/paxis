@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/db'
 
 type Props = { searchParams: { search?: string; filter?: string } }

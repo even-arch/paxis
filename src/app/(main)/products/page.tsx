@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { prisma } from '@/lib/db'
 import { formatDate } from '@/lib/utils'
 
+export const dynamic = 'force-dynamic'
+
 type Props = { searchParams: { search?: string; page?: string } }
 
 export default async function ProductsPage({ searchParams }: Props) {
