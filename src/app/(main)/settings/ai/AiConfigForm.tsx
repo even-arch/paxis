@@ -63,20 +63,25 @@ export default function AiConfigForm() {
 
   async function save() {
     setSaving(true); setMsg(null)
-    const res = await fetch('/api/settings/ai', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ aiProvider: provider, apiKey, aiParseModel: parseModel || null }),
-    })
-    setSaving(false)
-    if (res.ok) {
-      setMsg({ type: 'ok', text: '已儲存' })
-      setApiKey('')
-      const d: AiConfig = await fetch('/api/settings/ai').then(r => r.json())
-      setConfig(d)
-    } else {
+    try {
+      const res = await fetch('/api/settings/ai', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aiProvider: provider, apiKey, aiParseModel: parseModel || null }),
+      })
       const d = await res.json() as { error?: string }
-      setMsg({ type: 'err', text: d.error ?? '儲存失敗' })
+      if (res.ok) {
+        setMsg({ type: 'ok', text: '已儲存' })
+        setApiKey('')
+        const updated: AiConfig = await fetch('/api/settings/ai').then(r => r.json())
+        setConfig(updated)
+      } else {
+        setMsg({ type: 'err', text: `錯誤 ${res.status}：${d.error ?? '儲存失敗'}` })
+      }
+    } catch (err) {
+      setMsg({ type: 'err', text: `網路錯誤：${err instanceof Error ? err.message : String(err)}` })
+    } finally {
+      setSaving(false)
     }
   }
 
