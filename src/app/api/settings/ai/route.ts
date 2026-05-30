@@ -14,12 +14,16 @@ export async function GET() {
       select: { aiProvider: true, encryptedAiKey: true, aiParseModel: true },
     })
 
+    let apiKeyHint = ''
+    if (user?.encryptedAiKey) {
+      try { apiKeyHint = '••••' + decrypt(user.encryptedAiKey).slice(-4) }
+      catch { apiKeyHint = '（需重新設定）' }
+    }
+
     return NextResponse.json({
       aiProvider: user?.aiProvider ?? '',
       apiKeySet: !!user?.encryptedAiKey,
-      apiKeyHint: user?.encryptedAiKey
-        ? '••••' + decrypt(user.encryptedAiKey).slice(-4)
-        : '',
+      apiKeyHint,
       aiParseModel: user?.aiParseModel ?? '',
     })
   } catch (err) {
