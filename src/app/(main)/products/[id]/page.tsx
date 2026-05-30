@@ -69,10 +69,17 @@ export default async function ProductDetailPage({ params }: Props) {
           <Row label="HTS Code" value={product.htsCode} />
         </Card>
 
-        {/* 庫存 */}
+        {/* 庫存設定 */}
+        <Card title="庫存設定">
+          <Row label="接單後採購" value={product.isMadeToOrder ? '是（Made to Order）' : '否（有現貨）'} />
+          <Row label="安全庫存量" value={`${product.safetyStock} ${product.unit ?? ''}`} />
+        </Card>
+
+        {/* 庫存狀況 */}
         <Card title="庫存狀況">
-          <Row label="現有庫存" value={stock ? `${stock.quantity} ${product.unit ?? ''}` : '0'} />
-          <Row label="安全庫存" value={stock ? `${stock.safetyStock} ${product.unit ?? ''}` : '-'} />
+          <Row label="實際庫存" value={stock ? `${stock.quantity} ${product.unit ?? ''}` : '0'} />
+          <Row label="預留量" value={stock ? `${stock.reservedQty} ${product.unit ?? ''}` : '0'} />
+          <Row label="可用庫存" value={stock ? `${stock.quantity - stock.reservedQty} ${product.unit ?? ''}` : '0'} />
         </Card>
 
         {/* 供應商 */}

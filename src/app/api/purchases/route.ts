@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
       poNo: generatePoNo(),
       supplierId: Number(body.supplierId),
       status: 0, // 草稿
+      sourceType: body.sourceType !== undefined ? Number(body.sourceType) : 0,
       currencyCode: body.currencyCode,
       exchangeRate: String(body.exchangeRate || '1'),
       totalAmount: body.totalAmount ? String(body.totalAmount) : null,

@@ -79,8 +79,9 @@ export default function InventoryControls({ productId, currentStock, safetyStock
             <div>
               <label className="block text-xs text-gray-500 mb-1">調整類型</label>
               <select value={adjustType} onChange={e => setAdjustType(e.target.value)} className={inp}>
-                <option value="3">手動調整</option>
-                <option value="4">盤點調整</option>
+                <option value="5">手動調整入庫</option>
+                <option value="6">手動調整出庫</option>
+                <option value="7">盤點調整</option>
               </select>
             </div>
             <div>

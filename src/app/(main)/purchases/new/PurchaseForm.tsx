@@ -13,6 +13,7 @@ const emptyLine = (): LineItem => ({ productId: '', quantity: '', unitPrice: '',
 export default function PurchaseForm({ suppliers, products }: { suppliers: Supplier[]; products: Product[] }) {
   const router = useRouter()
   const [supplierId, setSupplierId] = useState('')
+  const [sourceType, setSourceType] = useState('0')
   const [currencyCode, setCurrencyCode] = useState('USD')
   const [exchangeRate, setExchangeRate] = useState('1')
   const [expectedDate, setExpectedDate] = useState('')
@@ -61,8 +62,8 @@ export default function PurchaseForm({ suppliers, products }: { suppliers: Suppl
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        supplierId, currencyCode, exchangeRate, expectedDate, port, shipVia,
-        patiscoOrderNo, note,
+        supplierId, sourceType: Number(sourceType), currencyCode, exchangeRate,
+        expectedDate, port, shipVia, patiscoOrderNo, note,
         items: validItems.map(i => ({
           productId: Number(i.productId),
           quantity: Number(i.quantity),
@@ -86,6 +87,13 @@ export default function PurchaseForm({ suppliers, products }: { suppliers: Suppl
       <section className="bg-white rounded-lg shadow p-6">
         <h2 className="text-base font-semibold text-gray-700 mb-4">採購資訊</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="採購觸發來源" required>
+            <select value={sourceType} onChange={e => setSourceType(e.target.value)} className={inp}>
+              <option value="0">主動補貨（預測/季節/促銷）</option>
+              <option value="1">接單後採購（Made to Order）</option>
+              <option value="2">安全庫存觸發（低於警戒線）</option>
+            </select>
+          </Field>
           <div className="md:col-span-2">
             <Field label="Patisco 訂單號（溯源用）">
               <input type="text" value={patiscoOrderNo} onChange={e => setPatiscoOrderNo(e.target.value)}

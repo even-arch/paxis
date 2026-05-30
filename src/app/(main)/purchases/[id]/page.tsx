@@ -64,6 +64,7 @@ export default async function PurchaseDetailPage({ params }: Props) {
         {/* 採購資訊 */}
         <div className="bg-white rounded-lg shadow p-6 grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-2 text-sm">
           <Row label="供應商" value={order.supplier.name} />
+          <Row label="採購觸發" value={['主動補貨', '接單採購', '安全庫存'][order.sourceType] ?? '-'} />
           <Row label="幣別" value={order.currencyCode} />
           <Row label="匯率" value={order.exchangeRate.toString()} />
           <Row label="預計到貨" value={order.expectedDate ? formatDate(order.expectedDate) : undefined} />

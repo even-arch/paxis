@@ -29,6 +29,8 @@ export default async function EditProductPage({ params }: Props) {
     height: product.height?.toString() ?? '',
     htsCode: product.htsCode ?? '',
     countryOfOrigin: product.countryOfOrigin ?? '',
+    isMadeToOrder: product.isMadeToOrder ?? false,
+    safetyStock: product.safetyStock?.toString() ?? '0',
   }
 
   return (

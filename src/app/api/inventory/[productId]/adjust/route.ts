@@ -17,7 +17,8 @@ export async function POST(req: NextRequest, { params }: Params) {
   const body = await req.json()
   const productId = Number(params.productId)
   const qty = Number(body.quantity)
-  const type = Number(body.type) || 3
+  // type: 5=手動入, 6=手動出, 7=盤點
+  const type = Number(body.type) || 5
 
   if (isNaN(qty) || qty === 0) {
     return NextResponse.json({ error: '請輸入有效的調整數量' }, { status: 400 })
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       reservedDelta: 0,
       quantityAfter: finalQty,
       reservedAfter: stock.reservedQty,
-      note: body.note || (type === 4 ? '盤點調整' : '手動調整'),
+      note: body.note || (type === 7 ? '盤點調整' : type === 6 ? '手動調整出庫' : '手動調整入庫'),
     },
   })
 

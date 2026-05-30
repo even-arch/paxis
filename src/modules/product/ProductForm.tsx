@@ -147,6 +147,35 @@ export default function ProductForm({ initialData, productId }: Props) {
         </div>
       </section>
 
+      {/* 庫存設定 */}
+      <section className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-base font-semibold text-gray-700 mb-4">庫存設定</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="安全庫存量">
+            <input
+              type="number" min="0" value={form.safetyStock}
+              onChange={e => set('safetyStock', e.target.value)}
+              className={input}
+              placeholder="低於此數量時發出補貨警示"
+            />
+          </Field>
+          <div className="flex items-center">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.isMadeToOrder}
+                onChange={e => setForm(prev => ({ ...prev, isMadeToOrder: e.target.checked }))}
+                className="w-4 h-4 rounded"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-700">接單後採購（Made to Order）</span>
+                <p className="text-xs text-gray-400">無現貨，客戶下單後才向供應商採購</p>
+              </div>
+            </label>
+          </div>
+        </div>
+      </section>
+
       {error && <p className="text-red-500 text-sm">{error}</p>}
 
       <div className="flex gap-3">

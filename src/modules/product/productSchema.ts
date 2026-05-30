@@ -15,6 +15,9 @@ export type ProductFormData = {
   height: string
   htsCode: string
   countryOfOrigin: string
+  // 庫存行為
+  isMadeToOrder: boolean
+  safetyStock: string
 }
 
 export const emptyProductForm: ProductFormData = {
@@ -34,6 +37,8 @@ export const emptyProductForm: ProductFormData = {
   height: '',
   htsCode: '',
   countryOfOrigin: '',
+  isMadeToOrder: false,
+  safetyStock: '0',
 }
 
 export function validateProduct(data: ProductFormData): string | null {

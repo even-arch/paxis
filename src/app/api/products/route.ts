@@ -72,12 +72,14 @@ export async function POST(req: NextRequest) {
       htsCode: body.htsCode || null,
       countryOfOrigin: body.countryOfOrigin || null,
       unit: body.unit || null,
+      isMadeToOrder: Boolean(body.isMadeToOrder),
+      safetyStock: body.safetyStock ? Number(body.safetyStock) : 0,
     },
   })
 
   // 初始化庫存紀錄
   await prisma.iNV_Stock.create({
-    data: { productId: product.id, quantity: 0, safetyStock: 0 },
+    data: { productId: product.id, quantity: 0, reservedQty: 0, safetyStock: 0 },
   })
 
   return NextResponse.json(product, { status: 201 })

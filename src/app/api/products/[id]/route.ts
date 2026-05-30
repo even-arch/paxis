@@ -51,6 +51,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
       htsCode: body.htsCode || null,
       countryOfOrigin: body.countryOfOrigin || null,
       unit: body.unit || null,
+      isMadeToOrder: Boolean(body.isMadeToOrder),
+      safetyStock: body.safetyStock ? Number(body.safetyStock) : 0,
     },
   })
 
