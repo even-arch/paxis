@@ -95,13 +95,13 @@ export default function PurchaseForm({ suppliers, products }: { suppliers: Suppl
     )
 
     // 帶入明細（商品描述模糊比對）
-    if (parsedPreview.items.length > 0) {
-      const newLines: LineItem[] = parsedPreview.items.map(pi => {
-        const desc = pi.description.toLowerCase()
+    const validItems = parsedPreview.items.filter(pi => pi && (pi.description || pi.sku))
+    if (validItems.length > 0) {
+      const newLines: LineItem[] = validItems.map(pi => {
+        const desc = (pi.description ?? '').toLowerCase()
         const matched = products.find(p =>
-          p.name.toLowerCase().includes(desc) ||
-          desc.includes(p.name.toLowerCase()) ||
-          (p.sku && (p.sku.toLowerCase() === (pi.sku ?? '').toLowerCase()))
+          (desc && (p.name.toLowerCase().includes(desc) || desc.includes(p.name.toLowerCase()))) ||
+          (p.sku && pi.sku && p.sku.toLowerCase() === pi.sku.toLowerCase())
         )
         return {
           productId: matched ? String(matched.id) : '',
@@ -264,11 +264,11 @@ export default function PurchaseForm({ suppliers, products }: { suppliers: Suppl
                 </tr>
               </thead>
               <tbody>
-                {parsedPreview.items.map((it, i) => (
+                {parsedPreview.items.filter(it => it).map((it, i) => (
                   <tr key={i} className="border-b border-purple-100">
-                    <td className="py-0.5">{it.description}{it.sku ? ` (${it.sku})` : ''}</td>
-                    <td className="text-right py-0.5">{it.qty} {it.unit}</td>
-                    <td className="text-right py-0.5">{it.unitPrice}</td>
+                    <td className="py-0.5">{it.description ?? '—'}{it.sku ? ` (${it.sku})` : ''}</td>
+                    <td className="text-right py-0.5">{it.qty ?? 0} {it.unit ?? ''}</td>
+                    <td className="text-right py-0.5">{it.unitPrice ?? 0}</td>
                   </tr>
                 ))}
               </tbody>
