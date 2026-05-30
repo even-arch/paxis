@@ -153,82 +153,81 @@ function parseInvoiceJson(raw: string): ParsedInvoice {
 // ── Route handler ────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const user = await prisma.sYS_User.findUnique({
-    where: { id: Number(session.user.id) },
-    select: { aiProvider: true, encryptedAiKey: true, aiParseModel: true },
-  })
+    const user = await prisma.sYS_User.findUnique({
+      where: { id: Number(session.user.id) },
+      select: { aiProvider: true, encryptedAiKey: true, aiParseModel: true },
+    })
 
-  if (!user?.aiProvider || !user?.encryptedAiKey) {
-    return NextResponse.json(
-      { error: '請先在「設定 → AI 功能」登記您的 API Key' },
-      { status: 400 }
-    )
-  }
+    if (!user?.aiProvider || !user?.encryptedAiKey) {
+      return NextResponse.json(
+        { error: '請先在「設定 → AI 功能」登記您的 API Key' },
+        { status: 400 }
+      )
+    }
 
-  const apiKey = decrypt(user.encryptedAiKey)
-  const provider = user.aiProvider  // 'anthropic' | 'openai'
-  // 使用者選擇的模型，或預設值
-  const model = user.aiParseModel
-    || (provider === 'anthropic' ? 'claude-opus-4-8' : 'gpt-4o')
+    const apiKey = decrypt(user.encryptedAiKey)
+    const provider = user.aiProvider
+    const model = user.aiParseModel
+      || (provider === 'anthropic' ? 'claude-opus-4-8' : 'gpt-4o')
 
-  const contentType = req.headers.get('content-type') ?? ''
-  let inputMessages: { role: string; content: unknown }[]
+    const contentType = req.headers.get('content-type') ?? ''
+    let inputMessages: { role: string; content: unknown }[]
 
-  if (contentType.includes('multipart/form-data')) {
-    const formData = await req.formData()
-    const file = formData.get('file') as File | null
-    if (!file) return NextResponse.json({ error: '未收到檔案' }, { status: 400 })
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await req.formData()
+      const file = formData.get('file') as File | null
+      if (!file) return NextResponse.json({ error: '未收到檔案' }, { status: 400 })
 
-    const buffer = Buffer.from(await file.arrayBuffer())
-    const mimeType = file.type
+      const buffer = Buffer.from(await file.arrayBuffer())
+      const mimeType = file.type
 
-    if (mimeType.startsWith('image/')) {
-      // Vision: send as base64 image
-      const b64 = buffer.toString('base64')
-      if (provider === 'anthropic') {
-        inputMessages = [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: [
-            { type: 'image', source: { type: 'base64', media_type: mimeType, data: b64 } },
-            { type: 'text', text: '請解析這張文件，回傳 JSON。' },
-          ]},
-        ]
+      if (mimeType.startsWith('image/')) {
+        const b64 = buffer.toString('base64')
+        if (provider === 'anthropic') {
+          inputMessages = [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: [
+              { type: 'image', source: { type: 'base64', media_type: mimeType, data: b64 } },
+              { type: 'text', text: '請解析這張文件，回傳 JSON。' },
+            ]},
+          ]
+        } else {
+          inputMessages = [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: [
+              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${b64}` } },
+              { type: 'text', text: '請解析這張文件，回傳 JSON。' },
+            ]},
+          ]
+        }
       } else {
+        const text = await extractFileText(buffer, mimeType, file.name)
+        const truncated = text.length > 60000 ? text.slice(0, 60000) + '\n...[已截斷]' : text
         inputMessages = [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: [
-            { type: 'image_url', image_url: { url: `data:${mimeType};base64,${b64}` } },
-            { type: 'text', text: '請解析這張文件，回傳 JSON。' },
-          ]},
+          { role: 'user', content: truncated },
         ]
       }
     } else {
-      // Text-based: extract text first
-      const text = await extractFileText(buffer, mimeType, file.name)
-      const truncated = text.length > 60000 ? text.slice(0, 60000) + '\n...[已截斷]' : text
+      const body = await req.json() as { text?: string }
+      if (!body.text) return NextResponse.json({ error: '未收到內容' }, { status: 400 })
       inputMessages = [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: truncated },
+        { role: 'user', content: body.text },
       ]
     }
-  } else {
-    const body = await req.json() as { text?: string }
-    if (!body.text) return NextResponse.json({ error: '未收到內容' }, { status: 400 })
-    inputMessages = [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: body.text },
-    ]
-  }
 
-  try {
     const raw = await callLLM(provider, apiKey, model, inputMessages)
     const data = parseInvoiceJson(raw)
     return NextResponse.json({ ok: true, data })
+
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    return NextResponse.json({ error: `AI 解析失敗：${msg}` }, { status: 500 })
+    console.error('[POST /api/ai/parse-invoice]', msg)
+    return NextResponse.json({ error: `解析失敗：${msg}` }, { status: 500 })
   }
 }
