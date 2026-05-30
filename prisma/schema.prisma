@@ -1,0 +1,352 @@
+// PAXIS — Point Asia eXchange & Inventory System
+// Prisma Schema
+// 單租戶設計，不需要 TenantID
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// 系統設定 (SYS_)
+// =============================================================================
+
+model SYS_User {
+  id          Int    @id @default(autoincrement())
+  name        String   
+  loginId     String    @unique
+  password    String   
+  isEnabled   Boolean   @default(true)
+  language    String    @default("zh-TW")
+  createdAt   DateTime  @default(now())
+
+  purchaseOrders  PO_Order[]
+  costSheets      COST_Sheet[]
+
+  @@map("SYS_User")
+}
+
+model SYS_Currency {
+  code        String    @id // USD, TWD, EUR, JPY...
+  name        String   
+  symbol      String   
+  exchangeRate Decimal // 對 TWD 的匯率
+  updatedAt   DateTime  @updatedAt
+
+  @@map("SYS_Currency")
+}
+
+// =============================================================================
+// 商品管理 (PRD_)
+// =============================================================================
+
+model PRD_Product {
+  id            Int    @id @default(autoincrement())
+  name          String   
+  sku           String?   @unique
+  modelNo       String?  
+  description   String?  
+  specification String?  
+
+  // 包裝規格
+  unitPerInner  Int?     // 每內箱數量
+  unitPerCarton Int?     // 每外箱數量
+  cbm           Decimal? // 材積 (cubic meter)
+  grossWeight   Decimal? // 毛重 KGS
+  netWeight     Decimal? // 淨重 KGS
+  length        Decimal? // CM
+  width         Decimal? 
+  height        Decimal? 
+
+  // 貿易資訊
+  htsCode       String?  // HTS / HS 海關編碼
+  countryOfOrigin String?// ISO 國碼
+  unit          String?  // PCS, SET, KGS...
+
+  // Patisco 介接
+  patiscoProductId Int?// 對應 Patisco PRD_Product.ID
+
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  supplierProducts  SUP_SupplierProduct[]
+  inventoryItems    INV_Stock[]
+  purchaseItems     PO_Item[]
+  costSheets        COST_Sheet[]
+  categories        PRD_CategoryMapping[]
+
+  @@index([sku])
+  @@index([modelNo])
+  @@map("PRD_Product")
+}
+
+model PRD_Category {
+  id        Int   @id @default(autoincrement())
+  name      String  
+  parentId  Int? 
+  parent    PRD_Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  PRD_Category[] @relation("CategoryTree")
+  products  PRD_CategoryMapping[]
+
+  @@map("PRD_Category")
+}
+
+model PRD_CategoryMapping {
+  productId   Int 
+  categoryId  Int 
+  product     PRD_Product  @relation(fields: [productId], references: [id])
+  category    PRD_Category @relation(fields: [categoryId], references: [id])
+
+  @@id([productId, categoryId])
+  @@map("PRD_CategoryMapping")
+}
+
+// =============================================================================
+// 供應商管理 (SUP_)
+// =============================================================================
+
+model SUP_Supplier {
+  id            Int    @id @default(autoincrement())
+  name          String   
+  shortName     String?  
+  address       String?  
+  city          String?  
+  countryCode   String?  
+  postalCode    String?  
+  phoneNo       String?  
+  fax           String?  
+  email         String?  
+  contactPerson String?  
+  taxId         String?  
+  paymentTerms  String?  // e.g. "T/T 30 days"
+  currencyCode  String?  // 慣用幣別
+  note          String?  
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  products      SUP_SupplierProduct[]
+  purchaseOrders PO_Order[]
+  contacts      SUP_Contact[]
+
+  @@index([name])
+  @@map("SUP_Supplier")
+}
+
+model SUP_Contact {
+  id          Int   @id @default(autoincrement())
+  supplierId  Int  
+  supplier    SUP_Supplier @relation(fields: [supplierId], references: [id])
+  name        String  
+  title       String? 
+  phoneNo     String? 
+  mobile      String? 
+  email       String? 
+  isDefault   Boolean  @default(false)
+
+  @@index([supplierId])
+  @@map("SUP_Contact")
+}
+
+model SUP_SupplierProduct {
+  id          Int    @id @default(autoincrement())
+  supplierId  Int   
+  productId   Int   
+  supplier    SUP_Supplier @relation(fields: [supplierId], references: [id])
+  product     PRD_Product  @relation(fields: [productId], references: [id])
+
+  supplierSku   String?  // 供應商自己的料號
+  unitPrice     Decimal? 
+  currencyCode  String?  
+  moq           Int?     // 最小起訂量
+  leadTimeDays  Int?     
+  isPreferred   Boolean   @default(false)  // 主要供應商
+  note          String?  
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([supplierId, productId])
+  @@index([productId])
+  @@map("SUP_SupplierProduct")
+}
+
+// =============================================================================
+// 採購單 (PO_)
+// =============================================================================
+
+// 採購狀態
+// 0=草稿, 1=已送出, 2=部分到貨, 3=完成, 4=取消
+model PO_Order {
+  id            Int    @id @default(autoincrement())
+  poNo          String    @unique // 採購單號，自動產生
+  supplierId    Int   
+  supplier      SUP_Supplier @relation(fields: [supplierId], references: [id])
+
+  status        Int       @default(0)
+  currencyCode  String   
+  exchangeRate  Decimal  // 當時匯率快照
+  totalAmount   Decimal? 
+
+  expectedDate  DateTime?// 預計到貨日
+  shippedDate   DateTime?// 實際出貨日
+  arrivedDate   DateTime?// 實際到貨日
+
+  port          String?  // 裝運港
+  shipVia       String?  // 運送方式
+  note          String?  
+
+  createdBy     Int   
+  creator       SYS_User  @relation(fields: [createdBy], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  items         PO_Item[]
+  receipts      PO_Receipt[]
+
+  @@index([supplierId, status])
+  @@index([poNo])
+  @@map("PO_Order")
+}
+
+model PO_Item {
+  id          Int    @id @default(autoincrement())
+  orderId     Int   
+  order       PO_Order  @relation(fields: [orderId], references: [id])
+  productId   Int   
+  product     PRD_Product @relation(fields: [productId], references: [id])
+
+  unitPrice   Decimal  
+  quantity    Int      
+  receivedQty Int       @default(0)// 已入庫數量
+  unit        String?  
+  note        String?  
+
+  receiptItems PO_ReceiptItem[]
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("PO_Item")
+}
+
+model PO_Receipt {
+  id          Int    @id @default(autoincrement())
+  orderId     Int   
+  order       PO_Order  @relation(fields: [orderId], references: [id])
+  receiptNo   String   
+  receivedAt  DateTime  @default(now())
+  note        String?  
+
+  items       PO_ReceiptItem[]
+  stockMovements INV_Movement[]
+
+  @@index([orderId])
+  @@map("PO_Receipt")
+}
+
+model PO_ReceiptItem {
+  id          Int     @id @default(autoincrement())
+  receiptId   Int    
+  receipt     PO_Receipt @relation(fields: [receiptId], references: [id])
+  poItemId    Int    
+  poItem      PO_Item    @relation(fields: [poItemId], references: [id])
+  quantity    Int       
+
+  @@index([receiptId])
+  @@map("PO_ReceiptItem")
+}
+
+// =============================================================================
+// 庫存管理 (INV_)
+// =============================================================================
+
+model INV_Stock {
+  id          Int    @id @default(autoincrement())
+  productId   Int    @unique
+  product     PRD_Product @relation(fields: [productId], references: [id])
+
+  quantity    Int       @default(0) // 現有庫存
+  safetyStock Int       @default(0) // 安全庫存量
+  updatedAt   DateTime  @updatedAt
+
+  @@map("INV_Stock")
+}
+
+// 異動類型：1=進貨入庫, 2=銷售出庫, 3=手動調整, 4=盤點調整
+model INV_Movement {
+  id          Int      @id @default(autoincrement())
+  productId   Int     
+  type        Int        
+  quantity    Int         // 正數=入庫, 負數=出庫
+  balanceAfter Int        // 異動後庫存量
+
+  // 來源參考
+  receiptId         Int?
+  receipt           PO_Receipt? @relation(fields: [receiptId], references: [id])
+  patiscoOrderId    Int?// Patisco 訂單 ID
+  patiscoOrderNo    String?
+
+  note        String?  
+  createdAt   DateTime  @default(now())
+
+  @@index([productId, createdAt])
+  @@index([receiptId])
+  @@map("INV_Movement")
+}
+
+// =============================================================================
+// 成本計算 (COST_)
+// 對應 ET61 的 K-MART / WAL-MART 到岸成本計算表
+// =============================================================================
+
+model COST_Sheet {
+  id            Int    @id @default(autoincrement())
+  name          String   // 試算表名稱
+  productId     Int   
+  product       PRD_Product @relation(fields: [productId], references: [id])
+
+  // FOB 成本
+  fobPrice      Decimal  
+  fobCurrency   String   
+  fobExRate     Decimal  // FOB 幣別對 USD 匯率快照
+
+  // 出口端
+  countryOfOrigin String?
+  portOfLoading   String?
+
+  // 進口端成本（USD）
+  htsCode         String?
+  dutyRate        Decimal?// 關稅率 %
+  dutyAmount      Decimal?
+  oceanFreight    Decimal?
+  insurance       Decimal?
+  agentFee        Decimal?
+  consolidation   Decimal?
+  deconsolidation Decimal?
+  userFee         Decimal?
+  harborFee       Decimal?
+  otherCharge     Decimal?
+  otherChargeNote String? 
+
+  // 計算結果
+  landedCost    Decimal? // 到岸總成本
+  sellingPrice  Decimal? // 建議售價
+  grossMarginPct Decimal?// 毛利率 %
+
+  // 容器資訊
+  container40ftQty  Int? // 40呎貨櫃裝載量（箱）
+  container40ftPcs  Int? // 40呎貨櫃裝載量（件）
+
+  createdBy     Int   
+  creator       SYS_User  @relation(fields: [createdBy], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([productId])
+  @@map("COST_Sheet")
+}

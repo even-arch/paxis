@@ -1,0 +1,103 @@
+{"ts":"2026-05-30T03:59:50.214Z","cmd":"goto","args":"http://localhost:3002/products/1","origin":"http://localhost:3002/login","durationMs":44,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T03:59:51.365Z","cmd":"screenshot","args":"/tmp/paxis-product-detail2.png","origin":"http://localhost:3002/login","durationMs":52,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T03:59:58.600Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3002/login","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T03:59:58.662Z","cmd":"fill","args":"@e1 admin","origin":"http://localhost:3002/login","durationMs":9,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T03:59:58.714Z","cmd":"fill","args":"@e2 admin123","origin":"http://localhost:3002/login","durationMs":5,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T03:59:58.786Z","cmd":"click","args":"@e3","origin":"http://localhost:3002/login","durationMs":26,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:00:00.894Z","cmd":"goto","args":"http://localhost:3002/products/1","origin":"http://localhost:3002/products/1","durationMs":24,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:00:02.010Z","cmd":"screenshot","args":"/tmp/paxis-product-detail3.png","origin":"http://localhost:3002/products/1","durationMs":30,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:00:47.322Z","cmd":"goto","args":"http://localhost:3002/products/new","origin":"http://localhost:3002/products/new","durationMs":32,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:00:48.416Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3002/products/new","durationMs":10,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:00:53.383Z","cmd":"click","args":"@e8","origin":"http://localhost:3002/products/new","durationMs":24,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:00:53.441Z","cmd":"type","args":"塑膠玩具車","origin":"http://localhost:3002/products/new","durationMs":6,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:00:53.515Z","cmd":"click","args":"@e9","origin":"http://localhost:3002/products/new","durationMs":27,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:00:53.570Z","cmd":"type","args":"TOY-002","origin":"http://localhost:3002/products/new","durationMs":6,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:00:53.648Z","cmd":"click","args":"@e10","origin":"http://localhost:3002/products/new","durationMs":30,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:00:53.707Z","cmd":"type","args":"CAR-2024","origin":"http://localhost:3002/products/new","durationMs":6,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:00:53.762Z","cmd":"select","args":"@e11 PCS","origin":"http://localhost:3002/products/new","durationMs":3,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:00:54.350Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3002/products/new","durationMs":3,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:00:57.134Z","cmd":"click","args":"@e39","origin":"http://localhost:3002/products/new","durationMs":30,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:00:59.225Z","cmd":"url","args":"","origin":"http://localhost:3002/products/2","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:00:59.294Z","cmd":"screenshot","args":"/tmp/paxis-product2.png","origin":"http://localhost:3002/products/2","durationMs":16,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:01:25.967Z","cmd":"goto","args":"http://localhost:3002/products","origin":"http://localhost:3002/products","durationMs":229,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:01:27.093Z","cmd":"screenshot","args":"/tmp/paxis-products-list.png","origin":"http://localhost:3002/products","durationMs":38,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:23:13.432Z","cmd":"goto","args":"http://localhost:3002/login","origin":"http://localhost:3002/login","durationMs":1204,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:23:14.519Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3002/login","durationMs":10,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:23:15.789Z","cmd":"fill","args":"@e1 admin","origin":"http://localhost:3002/login","durationMs":1213,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:23:15.845Z","cmd":"fill","args":"@e2 admin123","origin":"http://localhost:3002/login","durationMs":0,"status":"error","hasCookies":false,"mode":"launched","error":"Ref @e2 not found. Run 'snapshot' to get fresh refs."}
+{"ts":"2026-05-30T04:23:15.898Z","cmd":"click","args":"@e3","origin":"http://localhost:3002/login","durationMs":0,"status":"error","hasCookies":false,"mode":"launched","error":"Ref @e3 not found. Run 'snapshot' to get fresh refs."}
+{"ts":"2026-05-30T04:23:18.026Z","cmd":"screenshot","args":"/tmp/paxis-neon-dashboard.png","origin":"http://localhost:3002/login","durationMs":34,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:23:18.080Z","cmd":"url","args":"","origin":"http://localhost:3002/login","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:23:25.135Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3002/login","durationMs":5,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:23:30.217Z","cmd":"click","args":"@e1","origin":"http://localhost:3002/login","durationMs":5033,"status":"error","hasCookies":false,"mode":"launched","error":"click: Timeout 5000ms exceeded.\nCall log:\n  - waiting for getByRole('button', { name: 'previous' })\n    - locator resolved to <button disabled type=\"button\" aria-disabled=\"true\">…</button>\n  - attempting click action\n    2 × waiting for element to be visible, enabled and stable\n      - element is no…"}
+{"ts":"2026-05-30T04:23:35.289Z","cmd":"click","args":"@e2","origin":"http://localhost:3002/login","durationMs":5008,"status":"error","hasCookies":false,"mode":"launched","error":"click: Timeout 5000ms exceeded.\nCall log:\n  - waiting for getByRole('button', { name: 'next' })\n    - locator resolved to <button disabled type=\"button\" aria-disabled=\"true\">…</button>\n  - attempting click action\n    2 × waiting for element to be visible, enabled and stable\n      - element is not en…"}
+{"ts":"2026-05-30T04:23:35.388Z","cmd":"click","args":"@e3","origin":"http://localhost:3002/login","durationMs":20,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:23:38.477Z","cmd":"url","args":"","origin":"http://localhost:3002/login","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:23:38.546Z","cmd":"screenshot","args":"/tmp/paxis-neon-ok.png","origin":"http://localhost:3002/login","durationMs":17,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:23:57.030Z","cmd":"goto","args":"http://localhost:3002/login","origin":"http://localhost:3002/login","durationMs":32,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:23:58.114Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3002/login","durationMs":7,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:24:03.595Z","cmd":"click","args":"@e1","origin":"http://localhost:3002/login","durationMs":20,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:24:03.649Z","cmd":"type","args":"admin","origin":"http://localhost:3002/login","durationMs":4,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:24:03.728Z","cmd":"click","args":"@e2","origin":"http://localhost:3002/login","durationMs":32,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:24:03.780Z","cmd":"type","args":"admin123","origin":"http://localhost:3002/login","durationMs":4,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:24:03.862Z","cmd":"click","args":"@e3","origin":"http://localhost:3002/login","durationMs":32,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:24:06.951Z","cmd":"url","args":"","origin":"http://localhost:3002/login","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:24:07.034Z","cmd":"screenshot","args":"/tmp/paxis-neon-final.png","origin":"http://localhost:3002/login","durationMs":27,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:24:20.473Z","cmd":"url","args":"","origin":"http://localhost:3002/login","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:24:20.552Z","cmd":"screenshot","args":"/tmp/paxis-neon-after.png","origin":"http://localhost:3002/login","durationMs":27,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:25:56.943Z","cmd":"goto","args":"http://localhost:3002/login","origin":"http://localhost:3002/login","durationMs":49,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:25:59.050Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3002/login","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:27:26.093Z","cmd":"click","args":"@e1","origin":"http://localhost:3002/login","durationMs":23,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:27:26.148Z","cmd":"type","args":"admin","origin":"http://localhost:3002/login","durationMs":4,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:27:26.227Z","cmd":"click","args":"@e2","origin":"http://localhost:3002/login","durationMs":30,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:27:26.281Z","cmd":"type","args":"admin123","origin":"http://localhost:3002/login","durationMs":4,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:27:26.361Z","cmd":"click","args":"@e3","origin":"http://localhost:3002/login","durationMs":34,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:27:30.454Z","cmd":"url","args":"","origin":"http://localhost:3002/login","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:27:30.535Z","cmd":"screenshot","args":"/tmp/paxis-neon-login2.png","origin":"http://localhost:3002/login","durationMs":28,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:28:13.110Z","cmd":"goto","args":"http://localhost:3002/login","origin":"http://localhost:3002/login","durationMs":993,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:28:15.165Z","cmd":"click","args":"@e1","origin":"http://localhost:3002/login","durationMs":1,"status":"error","hasCookies":false,"mode":"launched","error":"Ref @e1 not found. Run 'snapshot' to get fresh refs."}
+{"ts":"2026-05-30T04:28:15.212Z","cmd":"click","args":"@e2","origin":"http://localhost:3002/login","durationMs":1,"status":"error","hasCookies":false,"mode":"launched","error":"Ref @e2 not found. Run 'snapshot' to get fresh refs."}
+{"ts":"2026-05-30T04:28:15.258Z","cmd":"click","args":"@e3","origin":"http://localhost:3002/login","durationMs":0,"status":"error","hasCookies":false,"mode":"launched","error":"Ref @e3 not found. Run 'snapshot' to get fresh refs."}
+{"ts":"2026-05-30T04:28:19.348Z","cmd":"url","args":"","origin":"http://localhost:3002/login","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:28:24.898Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3002/login","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:28:24.960Z","cmd":"click","args":"@e1","origin":"http://localhost:3002/login","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:28:25.015Z","cmd":"type","args":"admin","origin":"http://localhost:3002/login","durationMs":4,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:28:25.093Z","cmd":"click","args":"@e2","origin":"http://localhost:3002/login","durationMs":28,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:28:25.144Z","cmd":"type","args":"admin123","origin":"http://localhost:3002/login","durationMs":3,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:28:25.228Z","cmd":"click","args":"@e3","origin":"http://localhost:3002/login","durationMs":35,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:28:30.358Z","cmd":"url","args":"","origin":"http://localhost:3002/login","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:28:30.434Z","cmd":"screenshot","args":"/tmp/paxis-neon-login3.png","origin":"http://localhost:3002/login","durationMs":24,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:28:50.158Z","cmd":"goto","args":"http://localhost:3002/login","origin":"http://localhost:3002/login","durationMs":593,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:28:52.235Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3002/login","durationMs":9,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:28:52.310Z","cmd":"click","args":"@e1","origin":"http://localhost:3002/login","durationMs":12,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:28:52.370Z","cmd":"type","args":"admin","origin":"http://localhost:3002/login","durationMs":4,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:28:52.444Z","cmd":"click","args":"@e2","origin":"http://localhost:3002/login","durationMs":23,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:28:52.495Z","cmd":"type","args":"admin123","origin":"http://localhost:3002/login","durationMs":4,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:28:52.578Z","cmd":"click","args":"@e3","origin":"http://localhost:3002/login","durationMs":36,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:28:57.660Z","cmd":"url","args":"","origin":"http://localhost:3002/login","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:28:57.733Z","cmd":"screenshot","args":"/tmp/paxis-neon-login4.png","origin":"http://localhost:3002/login","durationMs":26,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:29:41.651Z","cmd":"goto","args":"http://localhost:3002/login","origin":"http://localhost:3002/login","durationMs":17,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:29:43.746Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3002/login","durationMs":7,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:29:43.811Z","cmd":"click","args":"@e1","origin":"http://localhost:3002/login","durationMs":12,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:29:43.869Z","cmd":"type","args":"admin","origin":"http://localhost:3002/login","durationMs":5,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:29:43.944Z","cmd":"click","args":"@e2","origin":"http://localhost:3002/login","durationMs":24,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:29:43.998Z","cmd":"type","args":"admin123","origin":"http://localhost:3002/login","durationMs":5,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:29:44.077Z","cmd":"click","args":"@e3","origin":"http://localhost:3002/login","durationMs":32,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:29:49.167Z","cmd":"url","args":"","origin":"http://localhost:3002/login","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:29:49.252Z","cmd":"screenshot","args":"/tmp/paxis-neon-final2.png","origin":"http://localhost:3002/login","durationMs":32,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:30:51.750Z","cmd":"goto","args":"http://localhost:3002/login","origin":"http://localhost:3002/login","durationMs":39,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:30:53.855Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3002/login","durationMs":8,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:30:53.927Z","cmd":"click","args":"@e1","origin":"http://localhost:3002/login","durationMs":18,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:30:53.981Z","cmd":"type","args":"admin","origin":"http://localhost:3002/login","durationMs":4,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:30:54.059Z","cmd":"click","args":"@e2","origin":"http://localhost:3002/login","durationMs":31,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:30:54.112Z","cmd":"type","args":"admin123","origin":"http://localhost:3002/login","durationMs":3,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:30:54.177Z","cmd":"click","args":"@e3","origin":"http://localhost:3002/login","durationMs":16,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:31:37.237Z","cmd":"goto","args":"http://localhost:3002/login","origin":"http://localhost:3002/login","durationMs":1276,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:31:39.306Z","cmd":"snapshot","args":"-i","origin":"http://localhost:3002/login","durationMs":7,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:31:39.376Z","cmd":"click","args":"@e1","origin":"http://localhost:3002/login","durationMs":22,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:31:39.429Z","cmd":"type","args":"admin","origin":"http://localhost:3002/login","durationMs":4,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:31:39.509Z","cmd":"click","args":"@e2","origin":"http://localhost:3002/login","durationMs":28,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:31:39.567Z","cmd":"type","args":"admin123","origin":"http://localhost:3002/login","durationMs":5,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:31:39.644Z","cmd":"click","args":"@e3","origin":"http://localhost:3002/login","durationMs":25,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:31:44.727Z","cmd":"url","args":"","origin":"http://localhost:3002/dashboard","durationMs":0,"status":"ok","hasCookies":false,"mode":"launched"}
+{"ts":"2026-05-30T04:31:44.818Z","cmd":"screenshot","args":"/tmp/paxis-neon-final3.png","origin":"http://localhost:3002/dashboard","durationMs":31,"status":"ok","hasCookies":false,"mode":"launched"}

@@ -1,0 +1,1511 @@
+[2026-05-30T03:59:50.357Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:00:01.036Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:00:47.443Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:01:25.795Z] [log] [Fast Refresh] rebuilding
+[2026-05-30T04:01:25.914Z] [log] [Fast Refresh] done in 119ms
+[2026-05-30T04:01:25.954Z] [error] Failed to fetch RSC payload for http://localhost:3002/products/2. Falling back to browser navigation. TypeError: Failed to fetch
+    at fetchServerResponse (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/router-reducer/fetch-server-response.js:57:27)
+    at fastRefreshReducerImpl (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/router-reducer/reducers/fast-refresh-reducer.js:33:67)
+    at clientReducer (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/router-reducer/router-reducer.js:41:67)
+    at Object.action (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/shared/lib/router/action-queue.js:149:55)
+    at runAction (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/shared/lib/router/action-queue.js:47:38)
+    at dispatchAction (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/shared/lib/router/action-queue.js:112:9)
+    at Object.dispatch (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/shared/lib/router/action-queue.js:144:40)
+    at eval (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/use-reducer-with-devtools.js:130:21)
+    at eval (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/app-router.js:296:25)
+    at startTransition (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react/cjs/react.development.js:2597:25)
+    at Object.fastRefresh (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/app-router.js:295:48)
+    at eval (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:277:28)
+    at startTransition (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react/cjs/react.development.js:2597:25)
+    at processMessage (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:276:44)
+    at WebSocket.handler (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:395:17)
+[2026-05-30T04:01:26.105Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:03:19.952Z] [log] [Fast Refresh] rebuilding
+[2026-05-30T04:03:20.103Z] [log] [Fast Refresh] done in 152ms
+[2026-05-30T04:23:13.578Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:23:13.999Z] [error] ./node_modules/next-auth/core/init.js:8:1
+Module not found: Can't resolve 'crypto'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/auth/[...nextauth]/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute.ts&page=%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGYXV0aCUyRiU1Qi4uLm5leHRhdXRoJTVEJTJGcm91dGUmcGFnZT0lMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZSZhcHBQYXRocz0mcGFnZVBhdGg9cHJpdmF0ZS1uZXh0LWFwcC1kaXIlMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:23:13.999Z] [error] ./node_modules/next-auth/core/lib/csrf-token.js:7:1
+Module not found: Can't resolve 'crypto'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/next-auth/core/init.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/auth/[...nextauth]/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute.ts&page=%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGYXV0aCUyRiU1Qi4uLm5leHRhdXRoJTVEJTJGcm91dGUmcGFnZT0lMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZSZhcHBQYXRocz0mcGFnZVBhdGg9cHJpdmF0ZS1uZXh0LWFwcC1kaXIlMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:23:13.999Z] [error] ./node_modules/next-auth/core/lib/email/signin.js:7:1
+Module not found: Can't resolve 'crypto'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/next-auth/core/routes/signin.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/auth/[...nextauth]/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute.ts&page=%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGYXV0aCUyRiU1Qi4uLm5leHRhdXRoJTVEJTJGcm91dGUmcGFnZT0lMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZSZhcHBQYXRocz0mcGFnZVBhdGg9cHJpdmF0ZS1uZXh0LWFwcC1kaXIlMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:23:13.999Z] [error] ./node_modules/next-auth/core/lib/utils.js:9:1
+Module not found: Can't resolve 'crypto'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/next-auth/core/init.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/auth/[...nextauth]/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute.ts&page=%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGYXV0aCUyRiU1Qi4uLm5leHRhdXRoJTVEJTJGcm91dGUmcGFnZT0lMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZSZhcHBQYXRocz0mcGFnZVBhdGg9cHJpdmF0ZS1uZXh0LWFwcC1kaXIlMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:23:13.999Z] [error] ./node_modules/oauth/lib/oauth.js:1:1
+Module not found: Can't resolve 'crypto'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/oauth/index.js
+./node_modules/next-auth/core/lib/oauth/client-legacy.js
+./node_modules/next-auth/core/lib/oauth/authorization-url.js
+./node_modules/next-auth/core/routes/signin.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/auth/[...nextauth]/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute.ts&page=%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGYXV0aCUyRiU1Qi4uLm5leHRhdXRoJTVEJTJGcm91dGUmcGFnZT0lMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZSZhcHBQYXRocz0mcGFnZVBhdGg9cHJpdmF0ZS1uZXh0LWFwcC1kaXIlMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:23:13.999Z] [error] ./node_modules/oauth/lib/oauth.js:3:1
+Module not found: Can't resolve 'http'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/oauth/index.js
+./node_modules/next-auth/core/lib/oauth/client-legacy.js
+./node_modules/next-auth/core/lib/oauth/authorization-url.js
+./node_modules/next-auth/core/routes/signin.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/auth/[...nextauth]/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute.ts&page=%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGYXV0aCUyRiU1Qi4uLm5leHRhdXRoJTVEJTJGcm91dGUmcGFnZT0lMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZSZhcHBQYXRocz0mcGFnZVBhdGg9cHJpdmF0ZS1uZXh0LWFwcC1kaXIlMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:23:13.999Z] [error] ./node_modules/oauth/lib/oauth.js:4:1
+Module not found: Can't resolve 'https'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/oauth/index.js
+./node_modules/next-auth/core/lib/oauth/client-legacy.js
+./node_modules/next-auth/core/lib/oauth/authorization-url.js
+./node_modules/next-auth/core/routes/signin.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/auth/[...nextauth]/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute.ts&page=%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGYXV0aCUyRiU1Qi4uLm5leHRhdXRoJTVEJTJGcm91dGUmcGFnZT0lMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZSZhcHBQYXRocz0mcGFnZVBhdGg9cHJpdmF0ZS1uZXh0LWFwcC1kaXIlMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:23:13.999Z] [error] ./node_modules/oauth/lib/oauth.js:6:1
+Module not found: Can't resolve 'querystring'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/oauth/index.js
+./node_modules/next-auth/core/lib/oauth/client-legacy.js
+./node_modules/next-auth/core/lib/oauth/authorization-url.js
+./node_modules/next-auth/core/routes/signin.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/auth/[...nextauth]/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute.ts&page=%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGYXV0aCUyRiU1Qi4uLm5leHRhdXRoJTVEJTJGcm91dGUmcGFnZT0lMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZSZhcHBQYXRocz0mcGFnZVBhdGg9cHJpdmF0ZS1uZXh0LWFwcC1kaXIlMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:23:13.999Z] [error] ./node_modules/oauth/lib/oauth2.js:1:1
+Module not found: Can't resolve 'querystring'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/oauth/index.js
+./node_modules/next-auth/core/lib/oauth/client-legacy.js
+./node_modules/next-auth/core/lib/oauth/authorization-url.js
+./node_modules/next-auth/core/routes/signin.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/auth/[...nextauth]/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute.ts&page=%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGYXV0aCUyRiU1Qi4uLm5leHRhdXRoJTVEJTJGcm91dGUmcGFnZT0lMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZSZhcHBQYXRocz0mcGFnZVBhdGg9cHJpdmF0ZS1uZXh0LWFwcC1kaXIlMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:23:13.999Z] [error] ./node_modules/oauth/lib/oauth2.js:2:1
+Module not found: Can't resolve 'crypto'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/oauth/index.js
+./node_modules/next-auth/core/lib/oauth/client-legacy.js
+./node_modules/next-auth/core/lib/oauth/authorization-url.js
+./node_modules/next-auth/core/routes/signin.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/auth/[...nextauth]/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute.ts&page=%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGYXV0aCUyRiU1Qi4uLm5leHRhdXRoJTVEJTJGcm91dGUmcGFnZT0lMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZSZhcHBQYXRocz0mcGFnZVBhdGg9cHJpdmF0ZS1uZXh0LWFwcC1kaXIlMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:23:14.000Z] [error] ./node_modules/oauth/lib/oauth2.js:3:1
+Module not found: Can't resolve 'https'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/oauth/index.js
+./node_modules/next-auth/core/lib/oauth/client-legacy.js
+./node_modules/next-auth/core/lib/oauth/authorization-url.js
+./node_modules/next-auth/core/routes/signin.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/auth/[...nextauth]/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute.ts&page=%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGYXV0aCUyRiU1Qi4uLm5leHRhdXRoJTVEJTJGcm91dGUmcGFnZT0lMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZSZhcHBQYXRocz0mcGFnZVBhdGg9cHJpdmF0ZS1uZXh0LWFwcC1kaXIlMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:23:14.000Z] [error] ./node_modules/oauth/lib/oauth2.js:4:1
+Module not found: Can't resolve 'http'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/oauth/index.js
+./node_modules/next-auth/core/lib/oauth/client-legacy.js
+./node_modules/next-auth/core/lib/oauth/authorization-url.js
+./node_modules/next-auth/core/routes/signin.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/auth/[...nextauth]/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute.ts&page=%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGYXV0aCUyRiU1Qi4uLm5leHRhdXRoJTVEJTJGcm91dGUmcGFnZT0lMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZSZhcHBQYXRocz0mcGFnZVBhdGg9cHJpdmF0ZS1uZXh0LWFwcC1kaXIlMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:23:14.000Z] [error] ./node_modules/oidc-token-hash/lib/index.js:2:22
+Module not found: Can't resolve 'crypto'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/openid-client/lib/client.js
+./node_modules/openid-client/lib/issuer.js
+./node_modules/openid-client/lib/index.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/auth/[...nextauth]/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute.ts&page=%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGYXV0aCUyRiU1Qi4uLm5leHRhdXRoJTVEJTJGcm91dGUmcGFnZT0lMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZSZhcHBQYXRocz0mcGFnZVBhdGg9cHJpdmF0ZS1uZXh0LWFwcC1kaXIlMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:23:14.000Z] [error] ./node_modules/openid-client/lib/client.js:2:17
+Module not found: Can't resolve 'http'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/openid-client/lib/issuer.js
+./node_modules/openid-client/lib/index.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/auth/[...nextauth]/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute.ts&page=%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGYXV0aCUyRiU1Qi4uLm5leHRhdXRoJTVEJTJGcm91dGUmcGFnZT0lMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZSZhcHBQYXRocz0mcGFnZVBhdGg9cHJpdmF0ZS1uZXh0LWFwcC1kaXIlMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:23:14.000Z] [error] ./node_modules/openid-client/lib/client.js:3:16
+Module not found: Can't resolve 'crypto'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/openid-client/lib/issuer.js
+./node_modules/openid-client/lib/index.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/auth/[...nextauth]/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute.ts&page=%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGYXV0aCUyRiU1Qi4uLm5leHRhdXRoJTVEJTJGcm91dGUmcGFnZT0lMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZSZhcHBQYXRocz0mcGFnZVBhdGg9cHJpdmF0ZS1uZXh0LWFwcC1kaXIlMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:23:14.000Z] [error] ./node_modules/openid-client/lib/client.js:5:21
+Module not found: Can't resolve 'querystring'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/openid-client/lib/issuer.js
+./node_modules/openid-client/lib/index.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/auth/[...nextauth]/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute.ts&page=%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGYXV0aCUyRiU1Qi4uLm5leHRhdXRoJTVEJTJGcm91dGUmcGFnZT0lMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZSZhcHBQYXRocz0mcGFnZVBhdGg9cHJpdmF0ZS1uZXh0LWFwcC1kaXIlMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:23:14.000Z] [error] ./node_modules/openid-client/lib/helpers/generators.js:1:35
+Module not found: Can't resolve 'crypto'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/openid-client/lib/index.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/auth/[...nextauth]/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute.ts&page=%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGYXV0aCUyRiU1Qi4uLm5leHRhdXRoJTVEJTJGcm91dGUmcGFnZT0lMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZSZhcHBQYXRocz0mcGFnZVBhdGg9cHJpdmF0ZS1uZXh0LWFwcC1kaXIlMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:23:14.000Z] [error] ./node_modules/openid-client/lib/helpers/is_key_object.js:2:1
+Module not found: Can't resolve 'crypto'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/openid-client/lib/client.js
+./node_modules/openid-client/lib/issuer.js
+./node_modules/openid-client/lib/index.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/auth/[...nextauth]/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute.ts&page=%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGYXV0aCUyRiU1Qi4uLm5leHRhdXRoJTVEJTJGcm91dGUmcGFnZT0lMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZSZhcHBQYXRocz0mcGFnZVBhdGg9cHJpdmF0ZS1uZXh0LWFwcC1kaXIlMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:23:14.000Z] [error] ./node_modules/openid-client/lib/helpers/process_response.js:1:24
+Module not found: Can't resolve 'http'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/openid-client/lib/issuer.js
+./node_modules/openid-client/lib/index.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/auth/[...nextauth]/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute.ts&page=%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGYXV0aCUyRiU1Qi4uLm5leHRhdXRoJTVEJTJGcm91dGUmcGFnZT0lMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZSZhcHBQYXRocz0mcGFnZVBhdGg9cHJpdmF0ZS1uZXh0LWFwcC1kaXIlMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:23:14.000Z] [error] ./node_modules/openid-client/lib/helpers/request.js:2:1
+Module not found: Can't resolve 'querystring'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/openid-client/lib/index.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/auth/[...nextauth]/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute.ts&page=%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGYXV0aCUyRiU1Qi4uLm5leHRhdXRoJTVEJTJGcm91dGUmcGFnZT0lMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZSZhcHBQYXRocz0mcGFnZVBhdGg9cHJpdmF0ZS1uZXh0LWFwcC1kaXIlMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:23:14.000Z] [error] ./node_modules/openid-client/lib/helpers/request.js:3:1
+Module not found: Can't resolve 'http'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/openid-client/lib/index.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/auth/[...nextauth]/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute.ts&page=%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGYXV0aCUyRiU1Qi4uLm5leHRhdXRoJTVEJTJGcm91dGUmcGFnZT0lMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZSZhcHBQYXRocz0mcGFnZVBhdGg9cHJpdmF0ZS1uZXh0LWFwcC1kaXIlMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:23:14.000Z] [error] ./node_modules/openid-client/lib/helpers/request.js:4:1
+Module not found: Can't resolve 'https'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/openid-client/lib/index.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/auth/[...nextauth]/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute.ts&page=%2Fapi%2Fauth%2F%5B...nextauth%5D%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGYXV0aCUyRiU1Qi4uLm5leHRhdXRoJTVEJTJGcm91dGUmcGFnZT0lMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZSZhcHBQYXRocz0mcGFnZVBhdGg9cHJpdmF0ZS1uZXh0LWFwcC1kaXIlMkZhcGklMkZhdXRoJTJGJTVCLi4ubmV4dGF1dGglNUQlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:23:14.691Z] [log] [Fast Refresh] rebuilding
+[2026-05-30T04:23:14.920Z] [log] [Fast Refresh] done in 229ms
+[2026-05-30T04:23:15.023Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:23:15.024Z] [error] [next-auth][error][CLIENT_FETCH_ERROR] 
+https://next-auth.js.org/errors#client_fetch_error Unexpected token '<', "<!DOCTYPE "... is not valid JSON {error: Object, url: /api/auth/session, message: Unexpected token '<', "<!DOCTYPE "... is not valid JSON}
+[2026-05-30T04:23:15.027Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:23:15.030Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:23:15.030Z] [error] [next-auth][error][CLIENT_FETCH_ERROR] 
+https://next-auth.js.org/errors#client_fetch_error Unexpected token '<', "<!DOCTYPE "... is not valid JSON {error: Object, url: /api/auth/session, message: Unexpected token '<', "<!DOCTYPE "... is not valid JSON}
+[2026-05-30T04:23:15.033Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:23:15.035Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:23:15.038Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:23:15.045Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:23:15.197Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:23:15.282Z] [log] [HMR] connected
+[2026-05-30T04:23:48.598Z] [log] [Fast Refresh] rebuilding
+[2026-05-30T04:23:48.738Z] [log] [Fast Refresh] rebuilding
+[2026-05-30T04:23:48.828Z] [error] Failed to load resource: the server responded with a status of 404 (Not Found)
+[2026-05-30T04:23:48.828Z] [warning] [Fast Refresh] performing full reload because your application had an unrecoverable error
+[2026-05-30T04:23:48.974Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:23:57.159Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:24:19.119Z] [error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-05-30T04:25:57.067Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:27:41.776Z] [error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-05-30T04:28:13.248Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:28:25.262Z] [error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-05-30T04:28:50.286Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:28:52.206Z] [log] [Fast Refresh] rebuilding
+[2026-05-30T04:28:52.359Z] [log] [Fast Refresh] done in 153ms
+[2026-05-30T04:28:52.601Z] [error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-05-30T04:28:59.015Z] [log] [Fast Refresh] rebuilding
+[2026-05-30T04:28:59.098Z] [log] [Fast Refresh] done in 84ms
+[2026-05-30T04:29:12.442Z] [error] ./node_modules/next-auth/core/init.js:8:1
+Module not found: Can't resolve 'crypto'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/products/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fproducts%2Froute.ts&page=%2Fapi%2Fproducts%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZSZwYWdlPSUyRmFwaSUyRnByb2R1Y3RzJTJGcm91dGUmYXBwUGF0aHM9JnBhZ2VQYXRoPXByaXZhdGUtbmV4dC1hcHAtZGlyJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:29:12.442Z] [error] ./node_modules/next-auth/core/lib/csrf-token.js:7:1
+Module not found: Can't resolve 'crypto'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/next-auth/core/init.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/products/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fproducts%2Froute.ts&page=%2Fapi%2Fproducts%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZSZwYWdlPSUyRmFwaSUyRnByb2R1Y3RzJTJGcm91dGUmYXBwUGF0aHM9JnBhZ2VQYXRoPXByaXZhdGUtbmV4dC1hcHAtZGlyJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:29:12.442Z] [error] ./node_modules/next-auth/core/lib/email/signin.js:7:1
+Module not found: Can't resolve 'crypto'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/next-auth/core/routes/signin.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/products/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fproducts%2Froute.ts&page=%2Fapi%2Fproducts%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZSZwYWdlPSUyRmFwaSUyRnByb2R1Y3RzJTJGcm91dGUmYXBwUGF0aHM9JnBhZ2VQYXRoPXByaXZhdGUtbmV4dC1hcHAtZGlyJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:29:12.442Z] [error] ./node_modules/next-auth/core/lib/utils.js:9:1
+Module not found: Can't resolve 'crypto'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/next-auth/core/init.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/products/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fproducts%2Froute.ts&page=%2Fapi%2Fproducts%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZSZwYWdlPSUyRmFwaSUyRnByb2R1Y3RzJTJGcm91dGUmYXBwUGF0aHM9JnBhZ2VQYXRoPXByaXZhdGUtbmV4dC1hcHAtZGlyJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:29:12.442Z] [error] ./node_modules/oauth/lib/oauth.js:1:1
+Module not found: Can't resolve 'crypto'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/oauth/index.js
+./node_modules/next-auth/core/lib/oauth/client-legacy.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/products/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fproducts%2Froute.ts&page=%2Fapi%2Fproducts%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZSZwYWdlPSUyRmFwaSUyRnByb2R1Y3RzJTJGcm91dGUmYXBwUGF0aHM9JnBhZ2VQYXRoPXByaXZhdGUtbmV4dC1hcHAtZGlyJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:29:12.442Z] [error] ./node_modules/oauth/lib/oauth.js:3:1
+Module not found: Can't resolve 'http'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/oauth/index.js
+./node_modules/next-auth/core/lib/oauth/client-legacy.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/products/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fproducts%2Froute.ts&page=%2Fapi%2Fproducts%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZSZwYWdlPSUyRmFwaSUyRnByb2R1Y3RzJTJGcm91dGUmYXBwUGF0aHM9JnBhZ2VQYXRoPXByaXZhdGUtbmV4dC1hcHAtZGlyJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:29:12.442Z] [error] ./node_modules/oauth/lib/oauth.js:4:1
+Module not found: Can't resolve 'https'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/oauth/index.js
+./node_modules/next-auth/core/lib/oauth/client-legacy.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/products/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fproducts%2Froute.ts&page=%2Fapi%2Fproducts%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZSZwYWdlPSUyRmFwaSUyRnByb2R1Y3RzJTJGcm91dGUmYXBwUGF0aHM9JnBhZ2VQYXRoPXByaXZhdGUtbmV4dC1hcHAtZGlyJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:29:12.442Z] [error] ./node_modules/oauth/lib/oauth.js:6:1
+Module not found: Can't resolve 'querystring'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/oauth/index.js
+./node_modules/next-auth/core/lib/oauth/client-legacy.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/products/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fproducts%2Froute.ts&page=%2Fapi%2Fproducts%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZSZwYWdlPSUyRmFwaSUyRnByb2R1Y3RzJTJGcm91dGUmYXBwUGF0aHM9JnBhZ2VQYXRoPXByaXZhdGUtbmV4dC1hcHAtZGlyJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:29:12.442Z] [error] ./node_modules/oauth/lib/oauth2.js:1:1
+Module not found: Can't resolve 'querystring'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/oauth/index.js
+./node_modules/next-auth/core/lib/oauth/client-legacy.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/products/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fproducts%2Froute.ts&page=%2Fapi%2Fproducts%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZSZwYWdlPSUyRmFwaSUyRnByb2R1Y3RzJTJGcm91dGUmYXBwUGF0aHM9JnBhZ2VQYXRoPXByaXZhdGUtbmV4dC1hcHAtZGlyJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:29:12.442Z] [error] ./node_modules/oauth/lib/oauth2.js:2:1
+Module not found: Can't resolve 'crypto'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/oauth/index.js
+./node_modules/next-auth/core/lib/oauth/client-legacy.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/products/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fproducts%2Froute.ts&page=%2Fapi%2Fproducts%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZSZwYWdlPSUyRmFwaSUyRnByb2R1Y3RzJTJGcm91dGUmYXBwUGF0aHM9JnBhZ2VQYXRoPXByaXZhdGUtbmV4dC1hcHAtZGlyJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:29:12.442Z] [error] ./node_modules/oauth/lib/oauth2.js:3:1
+Module not found: Can't resolve 'https'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/oauth/index.js
+./node_modules/next-auth/core/lib/oauth/client-legacy.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/products/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fproducts%2Froute.ts&page=%2Fapi%2Fproducts%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZSZwYWdlPSUyRmFwaSUyRnByb2R1Y3RzJTJGcm91dGUmYXBwUGF0aHM9JnBhZ2VQYXRoPXByaXZhdGUtbmV4dC1hcHAtZGlyJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:29:12.442Z] [error] ./node_modules/oauth/lib/oauth2.js:4:1
+Module not found: Can't resolve 'http'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/oauth/index.js
+./node_modules/next-auth/core/lib/oauth/client-legacy.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/products/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fproducts%2Froute.ts&page=%2Fapi%2Fproducts%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZSZwYWdlPSUyRmFwaSUyRnByb2R1Y3RzJTJGcm91dGUmYXBwUGF0aHM9JnBhZ2VQYXRoPXByaXZhdGUtbmV4dC1hcHAtZGlyJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:29:12.442Z] [error] ./node_modules/oidc-token-hash/lib/index.js:2:22
+Module not found: Can't resolve 'crypto'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/openid-client/lib/client.js
+./node_modules/openid-client/lib/issuer.js
+./node_modules/openid-client/lib/index.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/products/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fproducts%2Froute.ts&page=%2Fapi%2Fproducts%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZSZwYWdlPSUyRmFwaSUyRnByb2R1Y3RzJTJGcm91dGUmYXBwUGF0aHM9JnBhZ2VQYXRoPXByaXZhdGUtbmV4dC1hcHAtZGlyJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:29:12.442Z] [error] ./node_modules/openid-client/lib/client.js:2:17
+Module not found: Can't resolve 'http'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/openid-client/lib/issuer.js
+./node_modules/openid-client/lib/index.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/products/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fproducts%2Froute.ts&page=%2Fapi%2Fproducts%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZSZwYWdlPSUyRmFwaSUyRnByb2R1Y3RzJTJGcm91dGUmYXBwUGF0aHM9JnBhZ2VQYXRoPXByaXZhdGUtbmV4dC1hcHAtZGlyJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:29:12.442Z] [error] ./node_modules/openid-client/lib/client.js:3:16
+Module not found: Can't resolve 'crypto'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/openid-client/lib/issuer.js
+./node_modules/openid-client/lib/index.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/products/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fproducts%2Froute.ts&page=%2Fapi%2Fproducts%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZSZwYWdlPSUyRmFwaSUyRnByb2R1Y3RzJTJGcm91dGUmYXBwUGF0aHM9JnBhZ2VQYXRoPXByaXZhdGUtbmV4dC1hcHAtZGlyJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:29:12.442Z] [error] ./node_modules/openid-client/lib/client.js:5:21
+Module not found: Can't resolve 'querystring'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/openid-client/lib/issuer.js
+./node_modules/openid-client/lib/index.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/products/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fproducts%2Froute.ts&page=%2Fapi%2Fproducts%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZSZwYWdlPSUyRmFwaSUyRnByb2R1Y3RzJTJGcm91dGUmYXBwUGF0aHM9JnBhZ2VQYXRoPXByaXZhdGUtbmV4dC1hcHAtZGlyJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:29:12.442Z] [error] ./node_modules/openid-client/lib/helpers/generators.js:1:35
+Module not found: Can't resolve 'crypto'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/openid-client/lib/index.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/products/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fproducts%2Froute.ts&page=%2Fapi%2Fproducts%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZSZwYWdlPSUyRmFwaSUyRnByb2R1Y3RzJTJGcm91dGUmYXBwUGF0aHM9JnBhZ2VQYXRoPXByaXZhdGUtbmV4dC1hcHAtZGlyJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:29:12.442Z] [error] ./node_modules/openid-client/lib/helpers/is_key_object.js:2:1
+Module not found: Can't resolve 'crypto'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/openid-client/lib/client.js
+./node_modules/openid-client/lib/issuer.js
+./node_modules/openid-client/lib/index.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/products/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fproducts%2Froute.ts&page=%2Fapi%2Fproducts%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZSZwYWdlPSUyRmFwaSUyRnByb2R1Y3RzJTJGcm91dGUmYXBwUGF0aHM9JnBhZ2VQYXRoPXByaXZhdGUtbmV4dC1hcHAtZGlyJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:29:12.442Z] [error] ./node_modules/openid-client/lib/helpers/process_response.js:1:24
+Module not found: Can't resolve 'http'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/openid-client/lib/issuer.js
+./node_modules/openid-client/lib/index.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/products/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fproducts%2Froute.ts&page=%2Fapi%2Fproducts%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZSZwYWdlPSUyRmFwaSUyRnByb2R1Y3RzJTJGcm91dGUmYXBwUGF0aHM9JnBhZ2VQYXRoPXByaXZhdGUtbmV4dC1hcHAtZGlyJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:29:12.442Z] [error] ./node_modules/openid-client/lib/helpers/request.js:2:1
+Module not found: Can't resolve 'querystring'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/openid-client/lib/index.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/products/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fproducts%2Froute.ts&page=%2Fapi%2Fproducts%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZSZwYWdlPSUyRmFwaSUyRnByb2R1Y3RzJTJGcm91dGUmYXBwUGF0aHM9JnBhZ2VQYXRoPXByaXZhdGUtbmV4dC1hcHAtZGlyJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:29:12.442Z] [error] ./node_modules/openid-client/lib/helpers/request.js:3:1
+Module not found: Can't resolve 'http'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/openid-client/lib/index.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/products/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fproducts%2Froute.ts&page=%2Fapi%2Fproducts%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZSZwYWdlPSUyRmFwaSUyRnByb2R1Y3RzJTJGcm91dGUmYXBwUGF0aHM9JnBhZ2VQYXRoPXByaXZhdGUtbmV4dC1hcHAtZGlyJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:29:12.442Z] [error] ./node_modules/openid-client/lib/helpers/request.js:4:1
+Module not found: Can't resolve 'https'
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./node_modules/openid-client/lib/index.js
+./node_modules/next-auth/core/lib/oauth/callback.js
+./node_modules/next-auth/core/routes/callback.js
+./node_modules/next-auth/core/routes/index.js
+./node_modules/next-auth/core/index.js
+./node_modules/next-auth/next/index.js
+./node_modules/next-auth/index.js
+./src/app/api/products/route.ts
+./node_modules/next/dist/build/webpack/loaders/next-edge-app-route-loader/index.js?absolutePagePath=%2FUsers%2FEven%2FDocuments%2FClaude%2FProjects%2FPoint%20Asia%2Fpaxis%2Fsrc%2Fapp%2Fapi%2Fproducts%2Froute.ts&page=%2Fapi%2Fproducts%2Froute&appDirLoader=bmV4dC1hcHAtbG9hZGVyP25hbWU9YXBwJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZSZwYWdlPSUyRmFwaSUyRnByb2R1Y3RzJTJGcm91dGUmYXBwUGF0aHM9JnBhZ2VQYXRoPXByaXZhdGUtbmV4dC1hcHAtZGlyJTJGYXBpJTJGcHJvZHVjdHMlMkZyb3V0ZS50cyZhcHBEaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyUyRnNyYyUyRmFwcCZwYWdlRXh0ZW5zaW9ucz10c3gmcGFnZUV4dGVuc2lvbnM9dHMmcGFnZUV4dGVuc2lvbnM9anN4JnBhZ2VFeHRlbnNpb25zPWpzJnJvb3REaXI9JTJGVXNlcnMlMkZFdmVuJTJGRG9jdW1lbnRzJTJGQ2xhdWRlJTJGUHJvamVjdHMlMkZQb2ludCUyMEFzaWElMkZwYXhpcyZpc0Rldj10cnVlJnRzY29uZmlnUGF0aD10c2NvbmZpZy5qc29uJmJhc2VQYXRoPSZhc3NldFByZWZpeD0mbmV4dENvbmZpZ091dHB1dD0mcHJlZmVycmVkUmVnaW9uPSZtaWRkbGV3YXJlQ29uZmlnPWUzMCUzRCE%3D&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!
+[2026-05-30T04:29:12.529Z] [log] [Fast Refresh] done in 13515ms
+[2026-05-30T04:29:12.691Z] [log] [Fast Refresh] rebuilding
+[2026-05-30T04:29:12.747Z] [log] [Fast Refresh] done in 56ms
+[2026-05-30T04:29:12.931Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:12.937Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:12.946Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:13.121Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:13.215Z] [log] [HMR] connected
+[2026-05-30T04:29:13.256Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:13.256Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:13.261Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:13.327Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:13.403Z] [log] [HMR] connected
+[2026-05-30T04:29:13.432Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:13.432Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:13.437Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:13.567Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:13.643Z] [log] [HMR] connected
+[2026-05-30T04:29:13.672Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:13.672Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:13.676Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:13.745Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:13.822Z] [log] [HMR] connected
+[2026-05-30T04:29:13.909Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:13.909Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:13.913Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:13.978Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:14.054Z] [log] [HMR] connected
+[2026-05-30T04:29:14.085Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:14.085Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:14.089Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:14.154Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:14.224Z] [log] [HMR] connected
+[2026-05-30T04:29:14.253Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:14.253Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:14.257Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:14.325Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:14.398Z] [log] [HMR] connected
+[2026-05-30T04:29:14.429Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:14.429Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:14.435Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:14.501Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:14.576Z] [log] [HMR] connected
+[2026-05-30T04:29:14.603Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:14.603Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:14.607Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:14.673Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:14.750Z] [log] [HMR] connected
+[2026-05-30T04:29:14.791Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:14.791Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:14.795Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:14.861Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:14.932Z] [log] [HMR] connected
+[2026-05-30T04:29:14.961Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:14.961Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:14.964Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:15.031Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:15.108Z] [log] [HMR] connected
+[2026-05-30T04:29:15.145Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:15.145Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:15.151Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:15.218Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:15.290Z] [log] [HMR] connected
+[2026-05-30T04:29:15.314Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:15.314Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:15.319Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:15.383Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:15.461Z] [log] [HMR] connected
+[2026-05-30T04:29:15.502Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:15.502Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:15.506Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:15.574Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:15.646Z] [log] [HMR] connected
+[2026-05-30T04:29:15.672Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:15.672Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:15.679Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:15.744Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:15.821Z] [log] [HMR] connected
+[2026-05-30T04:29:15.863Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:15.863Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:15.868Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:15.932Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:15.999Z] [log] [HMR] connected
+[2026-05-30T04:29:16.026Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:16.026Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:16.030Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:16.099Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:16.177Z] [log] [HMR] connected
+[2026-05-30T04:29:16.212Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:16.212Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:16.220Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:16.283Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:16.354Z] [log] [HMR] connected
+[2026-05-30T04:29:16.380Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:16.380Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:16.385Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:16.452Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:16.532Z] [log] [HMR] connected
+[2026-05-30T04:29:16.572Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:16.572Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:16.577Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:16.642Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:16.714Z] [log] [HMR] connected
+[2026-05-30T04:29:16.739Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:16.739Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:16.745Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:16.813Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:16.884Z] [log] [HMR] connected
+[2026-05-30T04:29:16.922Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:16.922Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:16.926Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:16.990Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:17.060Z] [log] [HMR] connected
+[2026-05-30T04:29:17.087Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:17.087Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:17.090Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:17.159Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:17.239Z] [log] [HMR] connected
+[2026-05-30T04:29:17.272Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:17.272Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:17.278Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:17.344Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:17.420Z] [log] [HMR] connected
+[2026-05-30T04:29:17.444Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:17.444Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:17.448Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:17.517Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:17.589Z] [log] [HMR] connected
+[2026-05-30T04:29:17.622Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:17.622Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:17.628Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:17.705Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:17.778Z] [log] [HMR] connected
+[2026-05-30T04:29:17.803Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:17.803Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:17.806Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:17.874Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:17.946Z] [log] [HMR] connected
+[2026-05-30T04:29:17.976Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:17.976Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:17.983Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:18.056Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:18.127Z] [log] [HMR] connected
+[2026-05-30T04:29:18.154Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:18.154Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:18.158Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:18.224Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:18.297Z] [log] [HMR] connected
+[2026-05-30T04:29:18.324Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:18.324Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:18.329Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:18.405Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:18.479Z] [log] [HMR] connected
+[2026-05-30T04:29:18.505Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:18.505Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:18.509Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:18.576Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:18.648Z] [log] [HMR] connected
+[2026-05-30T04:29:18.680Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:18.680Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:18.691Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:18.761Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:18.838Z] [log] [HMR] connected
+[2026-05-30T04:29:18.862Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:18.862Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:18.868Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:18.933Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:19.009Z] [log] [HMR] connected
+[2026-05-30T04:29:19.057Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:19.057Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:19.061Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:19.141Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:19.214Z] [log] [HMR] connected
+[2026-05-30T04:29:19.243Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:19.243Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:19.247Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:19.322Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:19.403Z] [log] [HMR] connected
+[2026-05-30T04:29:19.443Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:19.443Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:19.446Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:19.603Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:19.680Z] [log] [HMR] connected
+[2026-05-30T04:29:19.722Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:19.722Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:19.735Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:19.818Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:19.889Z] [log] [HMR] connected
+[2026-05-30T04:29:19.923Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:19.923Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:19.930Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:20.014Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:20.090Z] [log] [HMR] connected
+[2026-05-30T04:29:20.124Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:20.124Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:20.128Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:20.204Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:20.279Z] [log] [HMR] connected
+[2026-05-30T04:29:20.309Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:20.309Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:20.318Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:20.394Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:20.467Z] [log] [HMR] connected
+[2026-05-30T04:29:20.498Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:20.498Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:20.504Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:20.577Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:20.653Z] [log] [HMR] connected
+[2026-05-30T04:29:20.681Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:20.681Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:20.690Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:20.770Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:20.847Z] [log] [HMR] connected
+[2026-05-30T04:29:20.878Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:20.878Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:20.882Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:20.951Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:21.027Z] [log] [HMR] connected
+[2026-05-30T04:29:21.056Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:21.056Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:21.063Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:21.143Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:21.218Z] [log] [HMR] connected
+[2026-05-30T04:29:21.245Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:21.245Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:21.249Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:21.321Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:21.396Z] [log] [HMR] connected
+[2026-05-30T04:29:21.428Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:21.428Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:21.436Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:21.528Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:21.606Z] [log] [HMR] connected
+[2026-05-30T04:29:21.636Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:21.636Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:21.640Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:21.708Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:21.783Z] [log] [HMR] connected
+[2026-05-30T04:29:21.812Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:21.812Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:21.815Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:21.887Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:21.961Z] [log] [HMR] connected
+[2026-05-30T04:29:22.004Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:22.004Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:22.007Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:22.077Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:22.148Z] [log] [HMR] connected
+[2026-05-30T04:29:22.172Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:22.173Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:22.178Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:22.242Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:22.312Z] [log] [HMR] connected
+[2026-05-30T04:29:22.344Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:22.344Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:22.347Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:22.414Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:22.488Z] [log] [HMR] connected
+[2026-05-30T04:29:22.512Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:22.512Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:22.520Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:22.581Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:22.653Z] [log] [HMR] connected
+[2026-05-30T04:29:22.692Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:22.692Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:22.696Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:22.763Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:22.837Z] [log] [HMR] connected
+[2026-05-30T04:29:22.863Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:22.863Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:22.867Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:22.929Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:23.001Z] [log] [HMR] connected
+[2026-05-30T04:29:23.036Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:23.036Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:23.040Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:23.122Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:23.197Z] [log] [HMR] connected
+[2026-05-30T04:29:23.223Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:23.223Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:23.228Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:23.293Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:23.366Z] [log] [HMR] connected
+[2026-05-30T04:29:23.401Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:23.401Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:23.405Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:23.470Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:23.543Z] [log] [HMR] connected
+[2026-05-30T04:29:23.565Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:23.565Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:23.570Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:23.633Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:23.706Z] [log] [HMR] connected
+[2026-05-30T04:29:23.750Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:23.750Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:23.755Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:23.818Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:23.888Z] [log] [HMR] connected
+[2026-05-30T04:29:23.914Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:23.914Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:23.918Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:23.980Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:24.051Z] [log] [HMR] connected
+[2026-05-30T04:29:24.090Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:24.090Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:24.094Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:24.155Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:24.225Z] [log] [HMR] connected
+[2026-05-30T04:29:24.247Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:24.247Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:24.252Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:24.313Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:24.380Z] [log] [HMR] connected
+[2026-05-30T04:29:24.422Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:24.422Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:24.426Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:24.486Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:24.554Z] [log] [HMR] connected
+[2026-05-30T04:29:24.578Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:24.578Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:24.581Z] [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[2026-05-30T04:29:24.642Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:24.715Z] [log] [HMR] connected
+[2026-05-30T04:29:24.715Z] [log] [Fast Refresh] rebuilding
+[2026-05-30T04:29:24.833Z] [log] [Fast Refresh] rebuilding
+[2026-05-30T04:29:24.932Z] [error] Failed to load resource: the server responded with a status of 404 (Not Found)
+[2026-05-30T04:29:24.932Z] [warning] [Fast Refresh] performing full reload because your application had an unrecoverable error
+[2026-05-30T04:29:24.947Z] [warning] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree.
+[2026-05-30T04:29:25.078Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:28.662Z] [log] [Fast Refresh] rebuilding
+[2026-05-30T04:29:28.718Z] [log] [Fast Refresh] done in 57ms
+[2026-05-30T04:29:41.775Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:29:44.099Z] [error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-05-30T04:30:51.877Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:30:54.198Z] [error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+[2026-05-30T04:31:37.378Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-05-30T04:31:40.112Z] [log] [Fast Refresh] rebuilding
+[2026-05-30T04:31:40.248Z] [log] [Fast Refresh] done in 137ms
