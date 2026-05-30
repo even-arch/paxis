@@ -199,9 +199,13 @@ model PO_Order {
 
   port          String?  // 裝運港
   shipVia       String?  // 運送方式
-  note          String?  
+  note          String?
 
-  createdBy     Int   
+  // Patisco 溯源：此採購單對應哪張 Patisco 訂單
+  patiscoOrderNo  String?  // Patisco ORD_Order.No
+  patiscoOrderId  Int?     // Patisco ORD_Order.ID
+
+  createdBy     Int
   creator       SYS_User  @relation(fields: [createdBy], references: [id])
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
