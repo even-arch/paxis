@@ -158,7 +158,7 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.sYS_User.findUnique({
     where: { id: Number(session.user.id) },
-    select: { aiProvider: true, encryptedAiKey: true },
+    select: { aiProvider: true, encryptedAiKey: true, aiParseModel: true },
   })
 
   if (!user?.aiProvider || !user?.encryptedAiKey) {
@@ -170,7 +170,9 @@ export async function POST(req: NextRequest) {
 
   const apiKey = decrypt(user.encryptedAiKey)
   const provider = user.aiProvider  // 'anthropic' | 'openai'
-  const model = provider === 'anthropic' ? 'claude-opus-4-8' : 'gpt-4o'
+  // 使用者選擇的模型，或預設值
+  const model = user.aiParseModel
+    || (provider === 'anthropic' ? 'claude-opus-4-8' : 'gpt-4o')
 
   const contentType = req.headers.get('content-type') ?? ''
   let inputMessages: { role: string; content: unknown }[]

@@ -73,8 +73,9 @@ model SYS_User {
   createdAt   DateTime  @default(now())
 
   // AI 功能：使用者自備 API Key，消耗自己的 token
-  aiProvider      String?   // 'claude' | 'openai'
+  aiProvider      String?   // 'anthropic' | 'openai'
   encryptedAiKey  String?   // AES-256-GCM 加密後的 API Key
+  aiParseModel    String?   // 文件解析模型（留空用預設）
 
   purchaseOrders  PO_Order[]
   costSheets      COST_Sheet[]
