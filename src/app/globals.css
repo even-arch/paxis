@@ -11,3 +11,10 @@
     @apply bg-gray-50 text-gray-900;
   }
 }
+
+@media print {
+  body { background: white; }
+  .print\:hidden { display: none !important; }
+  aside { display: none !important; }
+  main { padding: 0 !important; }
+}
