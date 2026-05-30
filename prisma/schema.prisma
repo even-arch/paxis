@@ -16,6 +16,23 @@ datasource db {
 // 系統設定 (SYS_)
 // =============================================================================
 
+// Patisco 連線設定（密碼 AES-256-GCM 加密儲存）
+model SYS_PatiscoConfig {
+  id             Int      @id @default(autoincrement())
+  mcpUrl         String   @default("https://mcp.patisco.com:9443")
+  username       String
+  encryptedPass  String   // AES-256-GCM 加密的密碼
+  webhookSecret  String?  // Webhook 簽名驗證密鑰（選用）
+  cronSecret     String?  // Cron 安全驗證密鑰（選用）
+  isActive       Boolean  @default(true)
+  lastTestedAt   DateTime?
+  lastTestStatus String?  // 'ok' | 'error'
+  lastTestMsg    String?
+  updatedAt      DateTime @updatedAt
+
+  @@map("SYS_PatiscoConfig")
+}
+
 // Patisco PI 同步紀錄（去重 + 稽核）
 // source: 'webhook' | 'cron'
 // status: 'ok' | 'partial' | 'skipped' | 'error'

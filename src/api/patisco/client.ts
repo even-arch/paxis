@@ -9,9 +9,8 @@
  *   2. Webhook（備用）：Patisco 未來支援時自動啟用
  */
 
-const MCP_BASE = process.env.PATISCO_MCP_URL ?? 'https://mcp.patisco.com:9443'
-const LOGIN_ID = process.env.PATISCO_USERNAME ?? ''
-const PASSWORD = process.env.PATISCO_PASSWORD ?? ''
+// 預設值（DB 設定優先，環境變數備援）
+const DEFAULT_MCP_URL = process.env.PATISCO_MCP_URL ?? 'https://mcp.patisco.com:9443'
 
 // ─── 型別定義 ─────────────────────────────────────────────────────────────────
 
@@ -46,20 +45,54 @@ export type PatiscoPIProduct = {
 // ─── 認證 ─────────────────────────────────────────────────────────────────────
 
 /**
+ * 讀取 Patisco 連線設定
+ * 優先順序：DB (SYS_PatiscoConfig) → 環境變數
+ */
+export async function getPatiscoConfig(): Promise<{
+  mcpUrl: string; username: string; password: string
+} | null> {
+  // 優先讀 DB
+  try {
+    const { prisma } = await import('@/lib/db')
+    const { decrypt } = await import('@/lib/crypto')
+    const config = await prisma.sYS_PatiscoConfig.findFirst({
+      where: { isActive: true },
+      orderBy: { id: 'desc' },
+    })
+    if (config?.username && config?.encryptedPass) {
+      return {
+        mcpUrl: config.mcpUrl,
+        username: config.username,
+        password: decrypt(config.encryptedPass),
+      }
+    }
+  } catch {
+    // DB 讀取失敗 → fallthrough
+  }
+
+  // fallback 到環境變數
+  const username = process.env.PATISCO_USERNAME ?? ''
+  const password = process.env.PATISCO_PASSWORD ?? ''
+  if (!username || !password) return null
+  return { mcpUrl: DEFAULT_MCP_URL, username, password }
+}
+
+/**
  * 登入取得 JWT + API Key
  * Vercel serverless 每次 invocation 都重新認證（無法持久化 in-memory token）
  */
 export async function patiscoLogin(): Promise<PatiscoCredentials | null> {
-  if (!LOGIN_ID || !PASSWORD) {
-    console.warn('[patisco] PATISCO_USERNAME / PATISCO_PASSWORD 未設定，跳過')
+  const config = await getPatiscoConfig()
+  if (!config) {
+    console.warn('[patisco] 未設定 Patisco 帳號，跳過')
     return null
   }
 
   try {
-    const res = await fetch(`${MCP_BASE}/auth/login`, {
+    const res = await fetch(`${config.mcpUrl}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ loginId: LOGIN_ID, password: PASSWORD }),
+      body: JSON.stringify({ loginId: config.username, password: config.password }),
       signal: AbortSignal.timeout(10_000),
     })
 
@@ -68,7 +101,9 @@ export async function patiscoLogin(): Promise<PatiscoCredentials | null> {
       return null
     }
 
-    return await res.json() as PatiscoCredentials
+    const creds = await res.json() as PatiscoCredentials
+    // 把 mcpUrl 也帶著，供後續呼叫使用
+    return { ...creds, _mcpUrl: config.mcpUrl } as PatiscoCredentials & { _mcpUrl: string }
   } catch (err) {
     console.error('[patisco] 登入錯誤', err)
     return null
@@ -80,12 +115,13 @@ export async function patiscoLogin(): Promise<PatiscoCredentials | null> {
 let _reqId = 1
 
 async function mcpCall<T>(
-  creds: PatiscoCredentials,
+  creds: PatiscoCredentials & { _mcpUrl?: string },
   tool: string,
   args: Record<string, unknown> = {},
 ): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
+  const base = creds._mcpUrl ?? DEFAULT_MCP_URL
   try {
-    const res = await fetch(`${MCP_BASE}/`, {
+    const res = await fetch(`${base}/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -183,9 +219,10 @@ export async function addBlankPIOrder(
 }
 
 /** 查詢所有工具清單（debug 用） */
-export async function listTools(creds: PatiscoCredentials) {
+export async function listTools(creds: PatiscoCredentials & { _mcpUrl?: string }) {
+  const base = creds._mcpUrl ?? DEFAULT_MCP_URL
   try {
-    const res = await fetch(`${MCP_BASE}/`, {
+    const res = await fetch(`${base}/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -193,6 +230,7 @@ export async function listTools(creds: PatiscoCredentials) {
         'X-API-Key': creds.apiKey,
       },
       body: JSON.stringify({ jsonrpc: '2.0', id: _reqId++, method: 'tools/list', params: {} }),
+      signal: AbortSignal.timeout(10_000),
     })
     return await res.json()
   } catch {
