@@ -68,8 +68,12 @@ model PRD_Product {
   countryOfOrigin String?// ISO 國碼
   unit          String?  // PCS, SET, KGS...
 
+  // 庫存行為
+  isMadeToOrder Boolean  @default(false) // true = 可接單無現貨（接單後才採購）
+  safetyStock   Int      @default(0)     // 安全庫存量（低於此值發出警告）
+
   // Patisco 介接
-  patiscoProductId Int?// 對應 Patisco PRD_Product.ID
+  patiscoProductId Int?  // 對應 Patisco PRD_Product.ID
 
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
@@ -201,7 +205,13 @@ model PO_Order {
   shipVia       String?  // 運送方式
   note          String?
 
-  // Patisco 溯源：此採購單對應哪張 Patisco 訂單
+  // 採購觸發來源
+  // 0 = 主動補貨（預測/季節/促銷）
+  // 1 = 接單後採購（isMadeToOrder=true，無現貨接單）
+  // 2 = 安全庫存觸發（INV_Stock.quantity < safetyStock）
+  sourceType      Int      @default(0)
+
+  // Patisco 溯源（sourceType=1 時填入）
   patiscoOrderNo  String?  // Patisco ORD_Order.No
   patiscoOrderId  Int?     // Patisco ORD_Order.ID
 
@@ -268,38 +278,72 @@ model PO_ReceiptItem {
 // =============================================================================
 // 庫存管理 (INV_)
 // =============================================================================
+//
+// 兩階段庫存模型：
+//   quantity     = 實際庫存（倉庫裡真正有的數量）
+//   reservedQty  = 預留量（已發 PI 正本給客戶、尚未出倉）
+//   availableQty = quantity - reservedQty（前端防超賣用這個數字）
+//
+// 四個觸發點：
+//   入庫：收到供應商 PI 副本確認       → quantity++
+//   預留：發出 PI 正本給客戶確認       → reservedQty++
+//   取消：PI 正本取消                 → reservedQty--
+//   出倉：發出裝箱單+商業發票確認      → quantity--, reservedQty--
 
 model INV_Stock {
-  id          Int    @id @default(autoincrement())
-  productId   Int    @unique
-  product     PRD_Product @relation(fields: [productId], references: [id])
+  id           Int    @id @default(autoincrement())
+  productId    Int    @unique
+  product      PRD_Product @relation(fields: [productId], references: [id])
 
-  quantity    Int       @default(0) // 現有庫存
-  safetyStock Int       @default(0) // 安全庫存量
-  updatedAt   DateTime  @updatedAt
+  quantity     Int    @default(0) // 實際庫存（含已預留）
+  reservedQty  Int    @default(0) // 已發 PI 正本預留量
+  safetyStock  Int    @default(0) // 安全庫存預警值
+  avgUnitCost  Decimal? @default(0) // 移動加權平均成本（TWD）
+  updatedAt    DateTime @updatedAt
+
+  // availableQty = quantity - reservedQty（在 application layer 計算，不存 DB）
 
   @@map("INV_Stock")
 }
 
-// 異動類型：1=進貨入庫, 2=銷售出庫, 3=手動調整, 4=盤點調整
+// 異動類型：
+//   1 = 入庫      供應商 PI 副本確認（quantity++）
+//   2 = 預留      客戶 PI 正本發出（reservedQty++）
+//   3 = 取消預留  客戶 PI 正本取消（reservedQty--）
+//   4 = 出倉      裝箱單+商業發票發出（quantity--, reservedQty--）
+//   5 = 手動調整入
+//   6 = 手動調整出
+//   7 = 盤點調整
 model INV_Movement {
-  id          Int      @id @default(autoincrement())
-  productId   Int     
-  type        Int        
-  quantity    Int         // 正數=入庫, 負數=出庫
-  balanceAfter Int        // 異動後庫存量
+  id           Int      @id @default(autoincrement())
+  productId    Int
+  type         Int      // 見上方說明
 
-  // 來源參考
-  receiptId         Int?
-  receipt           PO_Receipt? @relation(fields: [receiptId], references: [id])
-  patiscoOrderId    Int?// Patisco 訂單 ID
-  patiscoOrderNo    String?
+  // 數量變動（正數=增加, 負數=減少）
+  qtyDelta        Int   // quantity 的變動量
+  reservedDelta   Int   @default(0) // reservedQty 的變動量
 
-  note        String?  
-  createdAt   DateTime  @default(now())
+  // 異動後快照（方便查帳，不需要重算）
+  quantityAfter   Int
+  reservedAfter   Int
+  avgUnitCostAfter Decimal? // 異動後的移動加權平均成本
+
+  // 來源溯源（對應 Patisco 文件）
+  // patiscoDocType: PI_CONFIRMED, PI_CANCELLED, DELIVERY_ORDER, MANUAL
+  patiscoDocType  String?
+  patiscoDocId    Int?    // Patisco 單據 ID
+  patiscoDocNo    String? // Patisco 單據號碼（人讀用）
+
+  // 來源溯源（對應 PAXIS 內部）
+  receiptId       Int?
+  receipt         PO_Receipt? @relation(fields: [receiptId], references: [id])
+
+  note         String?
+  createdAt    DateTime @default(now())
 
   @@index([productId, createdAt])
   @@index([receiptId])
+  @@index([patiscoDocType, patiscoDocId])
   @@map("INV_Movement")
 }
 

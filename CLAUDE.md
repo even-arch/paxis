@@ -2,10 +2,28 @@
 
 ## 專案概述
 
-PAXIS 是錫諾系統內部使用的進銷存系統，設計為與 Patisco（Point Asia Trading Information System Cooperation）平行運作的配套工具。
+PAXIS 是錫諾系統**唯一用戶**的內部進銷存系統，單租戶設計，只服務我公司。
 
-- **Patisco** 負責對外：B2B 型錄、買家下單、出貨追蹤、數位貿易
-- **PAXIS** 負責對內：供應商管理、進貨採購、庫存控管、成本計算
+### PAXIS 在 Patisco 架構中的精確定位
+
+Patisco 是一個三層角色的貿易平台（客戶 ↔ 我公司 ↔ 供應商），每一層之間以正副本文件流通：
+- 客戶對我公司：客戶發訂單正本 / 我公司收訂單副本、發收據正本
+- 我公司對供應商：我公司發訂單正本 / 供應商收訂單副本、發收據正本
+
+**PAXIS 活在「我公司」這一格的內部，是 Patisco 正副本流向之間的倉庫帳本。**
+
+它只關心一件事：**貨物進出我公司倉庫的那個動作。**
+
+- **進（採購側）**：我公司對供應商發訂單正本 → PAXIS 建 `PO_Order`；貨到確認 → `PO_Receipt` → `INV_Stock` 加庫存
+- **出（銷售側）**：客戶在 Patisco 確認訂單 → webhook 觸發 PAXIS → `INV_Stock` 扣庫存、寫 `INV_Movement`
+
+PAXIS **不知道客戶是誰、不知道供應商說了什麼**，它只記錄「某時間點，倉庫因為某張單多了幾件或少了幾件」。
+
+### 邊界原則（絕對不要違反）
+- PAXIS 不管理客戶資料（那是 Patisco 的 `BU_Buyer`）
+- PAXIS 不產生對外報價或訂單（那是 Patisco 的 `QUO_` / `ORD_`）
+- PAXIS 不直接與客戶或供應商通訊（透過 Patisco 或外部管道）
+- PAXIS 只有一個觸發出庫的來源：Patisco 的訂單確認 webhook
 
 兩套系統透過 API（webhook / REST）銜接，各自獨立運作，不共用資料庫。
 
@@ -158,6 +176,39 @@ PATISCO_API_URL="https://api.patisco.com"
 PATISCO_API_KEY="your-api-key"
 PATISCO_WEBHOOK_SECRET="your-webhook-secret"
 ```
+
+---
+
+## 庫存兩階段模型（重要）
+
+### 三個數字
+```
+quantity     = 實際庫存（倉庫裡真正有的）
+reservedQty  = 預留量（已發 PI 正本、尚未出倉）
+availableQty = quantity - reservedQty  ← 前端顯示這個，防超賣
+```
+`availableQty` 不存資料庫，在 application layer 計算。
+
+### 四個觸發點（對應 Patisco 文件）
+
+| 事件 | Patisco 文件 | INV_Movement type | 庫存變化 |
+|------|------------|------------------|---------|
+| 供應商貨到 | 收到供應商 PI 副本確認 | 1 = 入庫 | quantity++ |
+| 客戶 PI 成立 | 發出 PI 正本確認 | 2 = 預留 | reservedQty++ |
+| 客戶 PI 取消 | PI 正本取消 | 3 = 取消預留 | reservedQty-- |
+| 真正出倉 | 裝箱單 + 商業發票發出 | 4 = 出倉 | quantity--, reservedQty-- |
+
+### 兩種銷售模式
+- `isMadeToOrder = false`（現貨）：先確認 availableQty 足夠才接單
+- `isMadeToOrder = true`（接單後採購）：無現貨也能接單，接單後建 PO_Order（sourceType=1）
+
+### 三種採購觸發（PO_Order.sourceType）
+- `0` = 主動補貨（預測、季節、促銷）
+- `1` = 接單後採購（isMadeToOrder=true 且無現貨）
+- `2` = 安全庫存觸發（quantity < safetyStock）
+
+### INV_Movement 是唯一真相來源
+所有庫存變動都必須透過 `INV_Movement` 寫入。未來若串接 WMS 或 RFID，只需將外部事件翻譯成 `INV_Movement`，不動業務邏輯。
 
 ---
 
