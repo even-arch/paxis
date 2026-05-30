@@ -16,6 +16,23 @@ datasource db {
 // 系統設定 (SYS_)
 // =============================================================================
 
+// Patisco PI 同步紀錄（去重 + 稽核）
+// source: 'webhook' | 'cron'
+// status: 'ok' | 'partial' | 'skipped' | 'error'
+model SYS_PatiscoSync {
+  id           Int      @id @default(autoincrement())
+  patiscoDocId Int      @unique  // Patisco PI ID，確保每張 PI 只處理一次
+  patiscoDocNo String            // Patisco PI 單號（人讀用）
+  syncedAt     DateTime @default(now())
+  source       String            // 觸發來源：webhook | cron
+  status       String            // 結果：ok | partial | skipped | error
+  result       Json?             // 處理細節（哪些商品扣了多少）
+  errorMsg     String?           // 錯誤訊息
+
+  @@index([syncedAt])
+  @@map("SYS_PatiscoSync")
+}
+
 model SYS_User {
   id          Int    @id @default(autoincrement())
   name        String   
