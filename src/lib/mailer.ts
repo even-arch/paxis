@@ -1,26 +1,63 @@
+import { Resend } from 'resend'
 import nodemailer from 'nodemailer'
+import { prisma } from '@/lib/db'
+import { decrypt } from '@/lib/crypto'
 
-function getTransport() {
+interface MailOptions {
+  to: string
+  subject: string
+  html: string
+}
+
+async function getResendConfig() {
+  const config = await prisma.sYS_EmailConfig.findFirst({ where: { isActive: true } })
+  if (!config?.encryptedApiKey) return null
+  return {
+    apiKey: decrypt(config.encryptedApiKey),
+    from: config.fromName
+      ? `${config.fromName} <${config.fromEmail}>`
+      : config.fromEmail,
+  }
+}
+
+async function sendViaResend(apiKey: string, from: string, opts: MailOptions) {
+  const resend = new Resend(apiKey)
+  const { error } = await resend.emails.send({
+    from,
+    to: opts.to,
+    subject: opts.subject,
+    html: opts.html,
+  })
+  if (error) throw new Error(error.message)
+}
+
+async function sendViaSMTP(opts: MailOptions) {
   const host = process.env.SMTP_HOST
-  if (!host) throw new Error('未設定 SMTP_HOST，無法寄送 Email')
+  if (!host) throw new Error('未設定 SMTP_HOST')
 
-  return nodemailer.createTransport({
+  const transporter = nodemailer.createTransport({
     host,
     port: Number(process.env.SMTP_PORT ?? 587),
     secure: process.env.SMTP_SECURE === 'true',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
   })
+
+  const from = process.env.SMTP_FROM ?? process.env.SMTP_USER ?? 'noreply@paxis.app'
+  await transporter.sendMail({ from, ...opts })
+}
+
+// 主要寄信函式：優先 Resend（用戶設定），fallback SMTP（系統環境變數）
+export async function sendMail(opts: MailOptions) {
+  const resend = await getResendConfig()
+  if (resend) {
+    await sendViaResend(resend.apiKey, resend.from, opts)
+    return
+  }
+  await sendViaSMTP(opts)
 }
 
 export async function sendPasswordResetEmail(to: string, resetUrl: string, companyName: string) {
-  const from = process.env.SMTP_FROM ?? process.env.SMTP_USER ?? 'noreply@paxis.app'
-  const transporter = getTransport()
-
-  await transporter.sendMail({
-    from: `"${companyName}" <${from}>`,
+  await sendMail({
     to,
     subject: `${companyName} — 重設您的密碼`,
     html: `

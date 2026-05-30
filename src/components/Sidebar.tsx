@@ -17,6 +17,7 @@ const navItems = [
 const settingsItems = [
   { label: '公司資料', href: '/settings/company', icon: '🏢' },
   { label: 'AI 功能', href: '/settings/ai', icon: '✨' },
+  { label: 'Email 寄信', href: '/settings/email', icon: '📧' },
   { label: 'Patisco 同步', href: '/settings/patisco', icon: '🔗' },
   { label: '個人設定', href: '/settings/profile', icon: '👤' },
 ]

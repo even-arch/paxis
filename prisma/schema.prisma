@@ -121,6 +121,22 @@ model SYS_Company {
   @@map("SYS_Company")
 }
 
+// Email 寄信設定（用戶自備 Resend API Key，消耗自己的額度）
+model SYS_EmailConfig {
+  id              Int      @id @default(autoincrement())
+  provider        String   @default("resend")  // 目前只支援 resend
+  encryptedApiKey String?  // AES-256-GCM 加密
+  fromEmail       String   @default("")         // 例：no-reply@yourdomain.com
+  fromName        String   @default("")         // 例：Point Asia
+  isActive        Boolean  @default(true)
+  lastTestedAt    DateTime?
+  lastTestStatus  String?  // 'ok' | 'error'
+  lastTestMsg     String?
+  updatedAt       DateTime @updatedAt
+
+  @@map("SYS_EmailConfig")
+}
+
 model SYS_PasswordReset {
   id        Int      @id @default(autoincrement())
   userId    Int
