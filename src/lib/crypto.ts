@@ -1,8 +1,9 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto'
 
 const ALGO = 'aes-256-gcm'
-// 32-byte key，從環境變數讀取，dev 用預設值
-const SECRET = (process.env.ENCRYPTION_SECRET ?? 'paxis-dev-secret-key-32-bytes!!').slice(0, 32)
+// 必須是 32 bytes；prod 請設 ENCRYPTION_SECRET 環境變數
+const RAW = process.env.ENCRYPTION_SECRET ?? 'paxis-dev-secret-key-32-bytes--x'
+const SECRET = RAW.length >= 32 ? RAW.slice(0, 32) : RAW.padEnd(32, '0')
 
 export function encrypt(plaintext: string): string {
   const iv = randomBytes(12)
