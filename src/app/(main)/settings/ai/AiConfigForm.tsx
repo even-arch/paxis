@@ -201,7 +201,7 @@ export default function AiConfigForm() {
           <span className="text-xs text-blue-400">（外部連結，新分頁開啟）</span>
         </a>
 
-        {/* API Key 輸入 */}
+        {/* API Key 輸入 + 快速儲存 */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             API Key
@@ -209,17 +209,23 @@ export default function AiConfigForm() {
               <span className="ml-2 text-xs text-gray-400 font-normal">目前：{config.apiKeyHint}</span>
             )}
           </label>
-          <div className="relative">
-            <input
-              type={showKey ? 'text' : 'password'}
-              value={apiKey}
-              onChange={e => setApiKey(e.target.value)}
-              placeholder={config?.apiKeySet ? '輸入新 Key 以覆蓋，或留空保留現有 Key' : meta.keyPlaceholder}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 pr-10 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <button type="button" onClick={() => setShowKey(v => !v)}
-              className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 text-xs">
-              {showKey ? '隱藏' : '顯示'}
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <input
+                type={showKey ? 'text' : 'password'}
+                value={apiKey}
+                onChange={e => setApiKey(e.target.value)}
+                placeholder={config?.apiKeySet ? '輸入新 Key 以覆蓋，或留空保留現有 Key' : meta.keyPlaceholder}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 pr-10 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button type="button" onClick={() => setShowKey(v => !v)}
+                className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 text-xs">
+                {showKey ? '隱藏' : '顯示'}
+              </button>
+            </div>
+            <button onClick={save} disabled={saving}
+              className="shrink-0 bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+              {saving ? '儲存中…' : '儲存'}
             </button>
           </div>
           <p className="text-xs text-gray-400 mt-1">API Key 以 AES-256-GCM 加密儲存，員工無法看到明文。</p>
@@ -244,13 +250,14 @@ export default function AiConfigForm() {
         </div>
 
         {msg && (
-          <p className={`text-sm ${msg.type === 'ok' ? 'text-green-600' : 'text-red-600'}`}>{msg.text}</p>
+          <div className={`rounded-md px-4 py-3 text-sm font-medium ${
+            msg.type === 'ok'
+              ? 'bg-green-50 border border-green-200 text-green-700'
+              : 'bg-red-50 border border-red-200 text-red-700'
+          }`}>
+            {msg.type === 'ok' ? '✓ ' : '✗ '}{msg.text}
+          </div>
         )}
-
-        <button onClick={save} disabled={saving}
-          className="bg-blue-600 text-white px-5 py-2 rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-          {saving ? '儲存中…' : '儲存設定'}
-        </button>
       </section>
 
       {/* ── 計費說明 ─────────────────────────────────────────── */}
