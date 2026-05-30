@@ -78,6 +78,7 @@ model SYS_User {
 
   purchaseOrders  PO_Order[]
   costSheets      COST_Sheet[]
+  passwordResets  SYS_PasswordReset[]
 
   @@map("SYS_User")
 }
@@ -118,6 +119,19 @@ model SYS_Company {
   updatedAt     DateTime @updatedAt
 
   @@map("SYS_Company")
+}
+
+model SYS_PasswordReset {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user      SYS_User @relation(fields: [userId], references: [id])
+
+  @@map("SYS_PasswordReset")
 }
 
 model SYS_Currency {
