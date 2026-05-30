@@ -4,6 +4,8 @@ import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { SHIP_VIA, CURRENCIES } from '@/modules/purchase/poUtils'
 import type { ParsedInvoice } from '@/app/api/ai/parse-invoice/route'
+import type { AppliedInvoice } from '@/app/api/ai/apply-invoice/route'
+import ProductPicker from '@/components/ProductPicker'
 
 type Supplier = { id: number; name: string; shortName: string | null; currencyCode: string | null }
 type Product = { id: number; name: string; sku: string | null; unit: string | null }
@@ -11,8 +13,10 @@ type LineItem = { productId: string; quantity: string; unitPrice: string; unit: 
 
 const emptyLine = (): LineItem => ({ productId: '', quantity: '', unitPrice: '', unit: '', note: '' })
 
-export default function PurchaseForm({ suppliers, products }: { suppliers: Supplier[]; products: Product[] }) {
+export default function PurchaseForm({ suppliers: initSuppliers, products: initProducts }: { suppliers: Supplier[]; products: Product[] }) {
   const router = useRouter()
+  const [suppliers, setSuppliers] = useState(initSuppliers)
+  const [products, setProducts] = useState(initProducts)
   const [supplierId, setSupplierId] = useState('')
   const [sourceType, setSourceType] = useState('0')
   const [currencyCode, setCurrencyCode] = useState('USD')
@@ -31,6 +35,7 @@ export default function PurchaseForm({ suppliers, products }: { suppliers: Suppl
   const [aiParsing, setAiParsing] = useState(false)
   const [aiMsg, setAiMsg] = useState<{ type: 'ok' | 'err' | 'info'; text: string } | null>(null)
   const [parsedPreview, setParsedPreview] = useState<ParsedInvoice | null>(null)
+  const [applyLog, setApplyLog] = useState<string[]>([])
 
   function handleSupplierChange(id: string) {
     setSupplierId(id)
@@ -54,68 +59,77 @@ export default function PurchaseForm({ suppliers, products }: { suppliers: Suppl
     const file = e.target.files?.[0]
     if (!file) return
     setAiParsing(true)
-    setAiMsg({ type: 'info', text: `AI 解析中：${file.name}…` })
+    setAiMsg({ type: 'info', text: `步驟 1/2：AI 解析中：${file.name}…` })
     setParsedPreview(null)
+    setApplyLog([])
+    e.target.value = ''
 
-    const fd = new FormData()
-    fd.append('file', file)
-    const res = await fetch('/api/ai/parse-invoice', { method: 'POST', body: fd })
-    setAiParsing(false)
-    e.target.value = ''   // 允許重新上傳同一檔
+    try {
+      // Step 1: parse file
+      const fd = new FormData()
+      fd.append('file', file)
+      const parseRes = await fetch('/api/ai/parse-invoice', { method: 'POST', body: fd })
+      const parseData = await parseRes.json() as { data?: ParsedInvoice; error?: string }
+      if (!parseRes.ok) throw new Error(parseData.error ?? '解析失敗')
 
-    if (!res.ok) {
-      const d = await res.json()
-      setAiMsg({ type: 'err', text: d.error ?? 'AI 解析失敗' })
-      return
-    }
+      setAiMsg({ type: 'info', text: '步驟 2/2：自動建立供應商與產品…' })
 
-    const { data } = await res.json() as { data: ParsedInvoice }
-    setParsedPreview(data)
-    setAiMsg({ type: 'ok', text: '解析完成，請確認後套用' })
-  }
-
-  function applyParsed() {
-    if (!parsedPreview) return
-
-    // 帶入供應商（模糊比對）
-    if (parsedPreview.supplierName) {
-      const name = parsedPreview.supplierName.toLowerCase()
-      const match = suppliers.find(s =>
-        s.name.toLowerCase().includes(name) || name.includes(s.name.toLowerCase())
-      )
-      if (match) setSupplierId(String(match.id))
-    }
-
-    // 帶入幣別
-    if (parsedPreview.currency) setCurrencyCode(parsedPreview.currency)
-
-    // 帶入備註（發票號）
-    if (parsedPreview.invoiceNo) setNote(prev =>
-      prev ? prev : `Ref: ${parsedPreview!.invoiceNo}`
-    )
-
-    // 帶入明細（商品描述模糊比對）
-    const validItems = parsedPreview.items.filter(pi => pi && (pi.description || pi.sku))
-    if (validItems.length > 0) {
-      const newLines: LineItem[] = validItems.map(pi => {
-        const desc = (pi.description ?? '').toLowerCase()
-        const matched = products.find(p =>
-          (desc && (p.name.toLowerCase().includes(desc) || desc.includes(p.name.toLowerCase()))) ||
-          (p.sku && pi.sku && p.sku.toLowerCase() === pi.sku.toLowerCase())
-        )
-        return {
-          productId: matched ? String(matched.id) : '',
-          quantity: String(pi.qty),
-          unitPrice: String(pi.unitPrice),
-          unit: pi.unit ?? matched?.unit ?? 'PCS',
-          note: matched ? '' : pi.description,  // 未比對到的保留原始描述
-        }
+      // Step 2: apply (auto-create missing supplier/products)
+      const applyRes = await fetch('/api/ai/apply-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(parseData.data),
       })
-      setItems(newLines)
-    }
+      const applyData = await applyRes.json() as { data?: AppliedInvoice; error?: string }
+      if (!applyRes.ok) throw new Error(applyData.error ?? '建立失敗')
 
-    setParsedPreview(null)
-    setAiMsg({ type: 'ok', text: '已套用。未能自動比對的商品欄位以空白顯示，請手動選擇。' })
+      const applied = applyData.data!
+      const log: string[] = []
+
+      // Fill supplier
+      if (applied.supplierId) {
+        setSupplierId(String(applied.supplierId))
+        if (applied.supplierCreated) {
+          log.push(`✦ 新建供應商：${applied.supplierName}`)
+          // refresh suppliers list
+          const r = await fetch('/api/suppliers')
+          if (r.ok) setSuppliers(await r.json() as Supplier[])
+        }
+      }
+
+      // Fill currency
+      if (applied.currency) setCurrencyCode(applied.currency)
+
+      // Fill note
+      if (applied.invoiceNo) setNote(prev => prev || `Ref: ${applied.invoiceNo}`)
+
+      // Fill line items
+      if (applied.items.length > 0) {
+        setItems(applied.items.map(it => ({
+          productId: String(it.productId),
+          quantity: String(it.qty),
+          unitPrice: String(it.unitPrice),
+          unit: it.unit,
+          note: '',
+        })))
+        // refresh products list if any were created
+        if (applied.items.some(it => it.productCreated)) {
+          const r = await fetch('/api/products')
+          if (r.ok) setProducts(await r.json() as Product[])
+          applied.items.filter(it => it.productCreated).forEach(it => {
+            log.push(`✦ 新建產品：${it.productName}${it.sku ? ` (${it.sku})` : ''}`)
+          })
+        }
+      }
+
+      setApplyLog(log)
+      setAiMsg({ type: 'ok', text: `完成！解析到 ${applied.items.length} 項產品。${log.length > 0 ? '（見下方新建清單）' : ''}` })
+
+    } catch (err) {
+      setAiMsg({ type: 'err', text: err instanceof Error ? err.message : String(err) })
+    } finally {
+      setAiParsing(false)
+    }
   }
 
   const subtotal = items.reduce((sum, item) => {
@@ -242,47 +256,13 @@ export default function PurchaseForm({ suppliers, products }: { suppliers: Suppl
           </div>
         )}
 
-        {/* AI 解析預覽 */}
-        {parsedPreview && (
-          <div className="mb-4 border border-purple-200 rounded-lg p-4 bg-purple-50 space-y-2">
-            <p className="text-sm font-medium text-purple-800">AI 解析結果預覽</p>
-            {parsedPreview.supplierName && (
-              <p className="text-xs text-purple-700">供應商：{parsedPreview.supplierName}</p>
-            )}
-            {parsedPreview.invoiceNo && (
-              <p className="text-xs text-purple-700">單號：{parsedPreview.invoiceNo}</p>
-            )}
-            {parsedPreview.currency && (
-              <p className="text-xs text-purple-700">幣別：{parsedPreview.currency}</p>
-            )}
-            <table className="w-full text-xs mt-2">
-              <thead>
-                <tr className="text-purple-600 border-b border-purple-200">
-                  <th className="text-left pb-1">品名</th>
-                  <th className="text-right pb-1">數量</th>
-                  <th className="text-right pb-1">單價</th>
-                </tr>
-              </thead>
-              <tbody>
-                {parsedPreview.items.filter(it => it).map((it, i) => (
-                  <tr key={i} className="border-b border-purple-100">
-                    <td className="py-0.5">{it.description ?? '—'}{it.sku ? ` (${it.sku})` : ''}</td>
-                    <td className="text-right py-0.5">{it.qty ?? 0} {it.unit ?? ''}</td>
-                    <td className="text-right py-0.5">{it.unitPrice ?? 0}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="flex gap-2 pt-1">
-              <button type="button" onClick={applyParsed}
-                className="text-sm bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700">
-                套用到表單
-              </button>
-              <button type="button" onClick={() => { setParsedPreview(null); setAiMsg(null) }}
-                className="text-sm border border-purple-300 text-purple-600 px-3 py-1 rounded hover:bg-purple-100">
-                捨棄
-              </button>
-            </div>
+        {/* AI 新建清單 */}
+        {applyLog.length > 0 && (
+          <div className="mb-4 border border-purple-200 rounded-lg p-3 bg-purple-50">
+            <p className="text-xs font-medium text-purple-700 mb-1">自動建立的資料：</p>
+            {applyLog.map((l, i) => (
+              <p key={i} className="text-xs text-purple-600">{l}</p>
+            ))}
           </div>
         )}
         <div className="space-y-3">
@@ -290,12 +270,16 @@ export default function PurchaseForm({ suppliers, products }: { suppliers: Suppl
             <div key={idx} className="grid grid-cols-12 gap-2 items-end border-b border-gray-50 pb-3">
               <div className="col-span-4">
                 {idx === 0 && <label className="block text-xs text-gray-500 mb-1">商品</label>}
-                <select value={item.productId} onChange={e => setItem(idx, 'productId', e.target.value)} className={inp}>
-                  <option value="">請選擇商品</option>
-                  {products.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''}</option>
-                  ))}
-                </select>
+                <ProductPicker
+                  products={products}
+                  value={item.productId}
+                  onChange={(id, unit) => {
+                    setItems(prev => prev.map((it, i) => i === idx
+                      ? { ...it, productId: id, unit: unit || it.unit }
+                      : it
+                    ))
+                  }}
+                />
               </div>
               <div className="col-span-2">
                 {idx === 0 && <label className="block text-xs text-gray-500 mb-1">數量</label>}

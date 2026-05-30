@@ -38,6 +38,12 @@ export default async function ProductsPage({ searchParams }: Props) {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">商品管理</h1>
         <Link
+          href="/products/import"
+          className="border border-purple-300 text-purple-700 bg-purple-50 px-4 py-2 rounded-md text-sm font-medium hover:bg-purple-100"
+        >
+          ✨ AI 匯入
+        </Link>
+        <Link
           href="/products/new"
           className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700"
         >
