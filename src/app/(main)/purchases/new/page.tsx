@@ -1,8 +1,5 @@
 import { prisma } from '@/lib/db'
-import dynamic from 'next/dynamic'
-
-// ssr: false 避免 useState('choose') 在 SSR 產生 hydration mismatch
-const PurchaseForm = dynamic(() => import('./PurchaseForm'), { ssr: false })
+import PurchaseForm from './PurchaseForm'
 
 export default async function NewPurchasePage() {
   const [suppliers, products] = await Promise.all([
@@ -20,7 +17,12 @@ export default async function NewPurchasePage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">新增採購單</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">新增採購單</h1>
+        <a href="/import" className="text-sm text-purple-600 hover:text-purple-800">
+          ✨ 改用 AI 匯入單據
+        </a>
+      </div>
       <PurchaseForm suppliers={suppliers} products={products} />
     </div>
   )

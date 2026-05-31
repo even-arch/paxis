@@ -5,25 +5,24 @@ import { prisma } from '@/lib/db'
 import { decrypt } from '@/lib/crypto'
 
 export interface ParsedInvoice {
-  // 文件類型偵測
-  // PO = Purchase Order（採購單正本，我方發給供應商）
-  // PI = Proforma Invoice（形式發票，供應商發給我方）
-  // QUOTE = 報價單
   documentType?: 'PO' | 'PI' | 'QUOTE' | null
-
-  supplierName?: string | null   // 解析完成後已確定的供應商名稱
+  supplierName?: string | null
   supplierEmail?: string | null
+  supplierPhone?: string | null
+  supplierAddress?: string | null
+  supplierCity?: string | null
+  supplierCountry?: string | null
   invoiceNo?: string | null
   invoiceDate?: string | null    // YYYY-MM-DD
   currency?: string | null       // USD / TWD / EUR …
   items: {
-    name: string                 // AI 猜測的簡短產品名稱（例如：自行車鏈條、腳踏車鏈條）
-    specification: string        // 完整原始描述文字（規格說明，原汁原味）
-    sku: string | null           // 型號/料號（必填，找不到填 null）
+    name: string
+    specification: string
+    sku: string | null
     qty: number
     unitPrice: number
-    unit: string                 // 單位（必填，找不到預設 PCS）
-    countryOfOrigin?: string | null  // 原產地 ISO 代碼或國家名（若文件中有提及）
+    unit: string
+    countryOfOrigin?: string | null
   }[]
   notes?: string | null
 }
@@ -32,39 +31,60 @@ const SYSTEM_PROMPT = `你是一個專業的貿易文件解析助理。
 用戶提供採購單（PO）、形式發票（PI/Proforma Invoice）或報價單的內容（文字或圖片）。
 
 ## 文件類型判斷規則
-- 如果文件抬頭/主位是「我方公司」（通常是發行方 Issued by / From），且文件是發給某個供應商的，則這是 PO（採購單正本）。供應商 = 收件方（To / Attention）。
-- 如果文件抬頭/主位是某個供應商（他們是發行方），而我們的公司名稱是在收件方、Bill to、Attention 等次位，則這是 PI（形式發票副本）。供應商 = 發行方（From / Issued by）。
-- 如果是報價單（Quotation），documentType = "QUOTE"，供應商是發行方。
-- 如果無法判斷，填 null。
+- 文件是「我方公司」發給供應商的 → PO。供應商 = 收件方（To / Attention）。
+- 文件是供應商發給我方的 → PI。供應商 = 發行方（From / Issued by）。
+- 報價單 → QUOTE，供應商是發行方。
+- 無法判斷 → null。
+
+## 供應商資訊
+根據文件類型確定誰是「供應商」後，盡量找出以下資訊（找不到填 null）：
+- supplierName: 供應商公司全名
+- supplierEmail: 供應商 Email
+- supplierPhone: 供應商電話/傳真
+- supplierAddress: 供應商街道地址
+- supplierCity: 供應商城市
+- supplierCountry: 供應商國家（英文）
+
+## 商品名稱語言規則（極重要，必須嚴格遵守）
+"name" 欄位的語言必須與 "specification" 欄位的主要語言完全一致：
+- specification 主要是英文 → name 用英文（如 "Bicycle Chain"、"LED Light Bulb"）
+- specification 主要是中文 → name 用中文（如「自行車鏈條」、「LED 燈泡」）
+- specification 主要是日文 → name 用日文
+- 絕對不可以英文 specification 配中文 name，或中文 specification 配英文 name
+- name 只用 2-6 個字，推斷商品的通用類別名稱，不包含型號、顏色、規格
 
 ## 品項解析規則
-- "name"：根據完整描述，用 2-6 個字猜出這個商品的**簡短通用名稱**。語言必須與文件描述的語言一致——文件用中文描述就用中文命名（如「自行車鏈條」），文件用英文描述就用英文命名（如「Bicycle Chain」）。不要把型號、規格、顏色塞進去，不要混用語言。
-- "specification"：完整原始描述文字，**原汁原味保留所有細節**，包括型號、顏色、尺寸、材質、包裝方式、認證等。語言與原始文件相同，不做翻譯。
-- "sku"：型號/料號（從原始文件抓取，找不到填 null）。
-- "unit"：單位（PCS / SET / CTN / KGS 等，找不到預設 "PCS"）。
-- "countryOfOrigin"：原產地（若文件中有提及，例如 TAIWAN、CHINA、TW、CN 等，找不到填 null）。
+- "name"：2-6 個字的**簡短通用類別名稱**，語言與 specification 一致（見上）
+- "specification"：**原汁原味**保留完整原始描述，包含型號、顏色、尺寸、材質、包裝、認證等
+- "sku"：型號/料號（直接從文件抓取，找不到填 null）
+- "unit"：PCS / SET / CTN / KGS 等（找不到預設 "PCS"）
+- "countryOfOrigin"：原產地（TAIWAN、CHINA、TW、CN 等，找不到填 null）
 
 請回傳以下 JSON 格式，不要有任何其他文字：
 
 {
   "documentType": "PO" 或 "PI" 或 "QUOTE" 或 null,
-  "supplierName": "已確認的供應商名稱（根據文件類型判斷後的結果）",
-  "supplierEmail": "供應商 Email（若有）",
-  "invoiceNo": "單據編號",
-  "invoiceDate": "日期 YYYY-MM-DD 格式",
-  "currency": "幣別代碼，例如 USD",
+  "supplierName": "供應商全名",
+  "supplierEmail": "供應商 Email 或 null",
+  "supplierPhone": "供應商電話或 null",
+  "supplierAddress": "供應商街道地址或 null",
+  "supplierCity": "供應商城市或 null",
+  "supplierCountry": "供應商國家或 null",
+  "invoiceNo": "單據編號或 null",
+  "invoiceDate": "YYYY-MM-DD 或 null",
+  "currency": "USD / TWD / EUR 等或 null",
   "items": [
     {
-      "name": "簡短商品名稱（2-6 字）",
-      "specification": "完整原始描述（保留所有細節）",
-      "sku": "型號或料號（找不到填 null）",
-      "qty": 數量（數字）,
-      "unitPrice": 單價（數字）,
-      "unit": "單位（找不到填 PCS）",
-      "countryOfOrigin": "原產地（找不到填 null）"
+      "name": "2-6字通用名稱（語言與specification一致）",
+      "specification": "完整原始描述",
+      "sku": "型號或料號或 null",
+      "qty": 數量,
+      "unitPrice": 單價,
+      "unit": "單位",
+      "countryOfOrigin": "原產地或 null"
     }
   ],
-  "notes": "備註（若有）"
+  "notes": "備註或 null"
 }
 
 若某欄位無法從文件中找到，填 null。items 至少要有一筆。`

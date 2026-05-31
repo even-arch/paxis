@@ -36,6 +36,19 @@ export default async function DashboardPage() {
         ))}
       </div>
 
+      {/* AI 匯入單據 */}
+      <a href="/import"
+        className="block mb-4 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg p-6 hover:border-purple-400 hover:shadow-md transition-all">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 bg-purple-100 rounded-xl flex items-center justify-center text-2xl shrink-0">✨</div>
+          <div className="flex-1">
+            <p className="font-semibold text-gray-800 text-base">AI 匯入單據</p>
+            <p className="text-sm text-gray-500 mt-0.5">上傳採購單或形式發票（PI），AI 自動建立產品與供應商資料，再幫你預填採購單。</p>
+          </div>
+          <span className="text-gray-400 text-lg shrink-0">→</span>
+        </div>
+      </a>
+
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-semibold text-gray-700 mb-3">快速連結</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -45,11 +58,8 @@ export default async function DashboardPage() {
             { label: '建立採購單', href: '/purchases/new' },
             { label: '成本試算', href: '/cost/new' },
           ].map(link => (
-            <a
-              key={link.href}
-              href={link.href}
-              className="border border-gray-200 rounded-md px-4 py-3 text-sm text-center text-gray-600 hover:bg-gray-50 hover:text-blue-600"
-            >
+            <a key={link.href} href={link.href}
+              className="border border-gray-200 rounded-md px-4 py-3 text-sm text-center text-gray-600 hover:bg-gray-50 hover:text-blue-600">
               {link.label}
             </a>
           ))}

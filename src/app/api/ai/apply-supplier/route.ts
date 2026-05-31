@@ -10,6 +10,10 @@ export interface ApplySupplierInput {
   contactPerson?: string | null
   paymentTerms?: string | null
   currencyCode?: string | null
+  phone?: string | null
+  address?: string | null
+  city?: string | null
+  country?: string | null
 }
 
 export interface AppliedSupplier {
@@ -23,7 +27,7 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions)
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { supplierName, supplierEmail, supplierShortName, contactPerson, paymentTerms, currencyCode } = await req.json() as ApplySupplierInput
+    const { supplierName, supplierEmail, supplierShortName, contactPerson, paymentTerms, currencyCode, phone, address, city, country } = await req.json() as ApplySupplierInput
     const name = supplierName?.trim() ?? ''
     if (!name) return NextResponse.json({ error: '供應商名稱不能為空' }, { status: 400 })
 
@@ -42,11 +46,15 @@ export async function POST(req: NextRequest) {
       supplier = await prisma.sUP_Supplier.create({
         data: {
           name,
-          shortName: supplierShortName?.trim() || (name.length > 20 ? name.slice(0, 20) : null),
-          email: supplierEmail ?? null,
+          shortName:     supplierShortName?.trim() || (name.length > 20 ? name.slice(0, 20) : null),
+          email:         supplierEmail ?? null,
           contactPerson: contactPerson ?? null,
-          paymentTerms: paymentTerms ?? null,
-          currencyCode: currencyCode ?? null,
+          paymentTerms:  paymentTerms ?? null,
+          currencyCode:  currencyCode ?? null,
+          phoneNo:       phone ?? null,
+          address:       address ?? null,
+          city:          city ?? null,
+          countryCode:   country ?? null,
         },
       })
       supplierCreated = true
