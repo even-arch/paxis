@@ -148,10 +148,6 @@ export default function ProductsClient({
           </button>
           <input ref={fileRef} type="file" className="hidden"
             accept=".xlsx,.xls" onChange={handleExcelImport} />
-          <a href="/products/import"
-            className="border border-purple-300 text-purple-700 bg-purple-50 px-3 py-2 rounded-md text-sm font-medium hover:bg-purple-100">
-            ✨ AI 匯入
-          </a>
           {!archived && (
             <a href="/products/new"
               className="bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700">

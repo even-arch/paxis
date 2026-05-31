@@ -30,6 +30,9 @@ export default function PurchaseForm({ suppliers: initSuppliers, products: initP
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // 進入模式：'choose' = 選擇方式, 'form' = 顯示表單
+  const [mode, setMode] = useState<'choose' | 'form'>('choose')
+
   // AI 解析
   const fileRef = useRef<HTMLInputElement>(null)
   const [aiParsing, setAiParsing] = useState(false)
@@ -123,7 +126,8 @@ export default function PurchaseForm({ suppliers: initSuppliers, products: initP
       }
 
       setApplyLog(log)
-      setAiMsg({ type: 'ok', text: `完成！解析到 ${applied.items.length} 項產品。${log.length > 0 ? '（見下方新建清單）' : ''}` })
+      setAiMsg({ type: 'ok', text: `解析完成，共 ${applied.items.length} 項。${log.length > 0 ? '（已自動建立新供應商/產品）' : ''}` })
+      setMode('form')
 
     } catch (err) {
       setAiMsg({ type: 'err', text: err instanceof Error ? err.message : String(err) })
@@ -168,6 +172,64 @@ export default function PurchaseForm({ suppliers: initSuppliers, products: initP
     const data = await res.json()
     router.push(`/purchases/${data.id}`)
     router.refresh()
+  }
+
+  // 選擇進入方式的畫面
+  if (mode === 'choose') {
+    return (
+      <div className="max-w-2xl">
+        <input ref={fileRef} type="file"
+          accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.txt"
+          className="hidden" onChange={handleAiParse} />
+
+        {/* AI 解析中的覆蓋層 */}
+        {aiParsing && (
+          <div className="mb-6 bg-purple-50 border border-purple-200 rounded-xl p-6 text-center">
+            <p className="text-2xl mb-2">⏳</p>
+            <p className="text-purple-700 font-medium">{aiMsg?.text}</p>
+          </div>
+        )}
+
+        {/* 錯誤訊息 */}
+        {aiMsg?.type === 'err' && (
+          <div className="mb-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+            {aiMsg.text}
+            <button onClick={() => setAiMsg(null)} className="ml-2 underline text-xs">關閉</button>
+          </div>
+        )}
+
+        {!aiParsing && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* AI 自動填寫（主要路徑） */}
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="group flex flex-col items-center justify-center gap-3 bg-white border-2 border-purple-300 rounded-xl p-8 hover:border-purple-500 hover:bg-purple-50 transition-all text-center"
+            >
+              <span className="text-4xl">✨</span>
+              <div>
+                <p className="font-semibold text-gray-800 text-base">上傳單據，AI 自動填寫</p>
+                <p className="text-xs text-gray-500 mt-1">支援 PDF、Excel、圖片</p>
+                <p className="text-xs text-purple-600 mt-2">AI 自動識別供應商、產品、數量、單價</p>
+              </div>
+            </button>
+
+            {/* 手動輸入（次要路徑） */}
+            <button
+              type="button"
+              onClick={() => setMode('form')}
+              className="flex flex-col items-center justify-center gap-3 bg-white border-2 border-gray-200 rounded-xl p-8 hover:border-gray-400 hover:bg-gray-50 transition-all text-center"
+            >
+              <span className="text-4xl">📝</span>
+              <div>
+                <p className="font-semibold text-gray-800 text-base">手動輸入</p>
+                <p className="text-xs text-gray-500 mt-1">自行填寫所有欄位</p>
+              </div>
+            </button>
+          </div>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -233,30 +295,16 @@ export default function PurchaseForm({ suppliers: initSuppliers, products: initP
       <section className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-gray-700">採購明細</h2>
-          <div className="flex items-center gap-2">
-            <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.txt"
-              className="hidden" onChange={handleAiParse} />
-            <button type="button" disabled={aiParsing}
-              onClick={() => fileRef.current?.click()}
-              className="flex items-center gap-1.5 text-sm border border-purple-300 text-purple-700 bg-purple-50 px-3 py-1.5 rounded-md hover:bg-purple-100 disabled:opacity-50">
-              <span>{aiParsing ? '⏳' : '✨'}</span>
-              <span>{aiParsing ? 'AI 解析中…' : 'AI 解析發票/採購單'}</span>
-            </button>
-          </div>
+          <button type="button" onClick={() => { setMode('choose'); setAiMsg(null) }}
+            className="text-xs text-gray-400 hover:text-purple-600">
+            ✨ 重新上傳單據
+          </button>
         </div>
 
-        {/* AI 訊息 */}
-        {aiMsg && (
-          <div className={`mb-4 p-3 rounded-md text-sm ${
-            aiMsg.type === 'ok' ? 'bg-green-50 text-green-700' :
-            aiMsg.type === 'err' ? 'bg-red-50 text-red-700' :
-            'bg-blue-50 text-blue-700'
-          }`}>
-            {aiMsg.text}
-          </div>
+        {/* AI 結果 */}
+        {aiMsg?.type === 'ok' && (
+          <div className="mb-4 p-3 rounded-md text-sm bg-green-50 text-green-700">{aiMsg.text}</div>
         )}
-
-        {/* AI 新建清單 */}
         {applyLog.length > 0 && (
           <div className="mb-4 border border-purple-200 rounded-lg p-3 bg-purple-50">
             <p className="text-xs font-medium text-purple-700 mb-1">自動建立的資料：</p>
