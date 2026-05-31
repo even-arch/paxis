@@ -20,6 +20,7 @@ type Props = {
   status: number
   items: Item[]
   defaultCurrency: string
+  hasReceipts: boolean
 }
 
 interface ReceiveRow {
@@ -28,15 +29,16 @@ interface ReceiveRow {
   currency: string
 }
 
-export default function PurchaseActions({ orderId, status, items, defaultCurrency }: Props) {
+export default function PurchaseActions({ orderId, status, items, defaultCurrency, hasReceipts }: Props) {
   const router = useRouter()
   const [showReceive, setShowReceive] = useState(false)
   const [rows, setRows] = useState<Record<number, ReceiveRow>>({})
   const [receiveNote, setReceiveNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  const isDraft = status === 0
+  const isDraft    = status === 0
   const canReceive = status === 1 || status === 2
+  const canDelete  = !hasReceipts  // 有入庫紀錄就不能刪
   const pendingItems = items.filter(i => i.receivedQty < i.quantity)
 
   function initRows() {
@@ -54,6 +56,21 @@ export default function PurchaseActions({ orderId, status, items, defaultCurrenc
 
   function setRow(id: number, field: keyof ReceiveRow, value: string) {
     setRows(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }))
+  }
+
+  async function handleDelete() {
+    const label = isDraft ? '刪除此草稿' : '取消此採購單'
+    if (!confirm(`確定要${label}？此操作無法復原。`)) return
+    setSubmitting(true)
+    const res = await fetch(`/api/purchases/${orderId}`, { method: 'DELETE' })
+    setSubmitting(false)
+    if (res.ok) {
+      router.push('/purchases')
+      router.refresh()
+    } else {
+      const err = await res.json() as { error?: string }
+      alert(err.error || '刪除失敗')
+    }
   }
 
   async function handleSubmit() {
@@ -105,11 +122,21 @@ export default function PurchaseActions({ orderId, status, items, defaultCurrenc
               className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm hover:bg-gray-50">
               編輯
             </Link>
+            <button onClick={handleDelete} disabled={submitting}
+              className="border border-red-300 text-red-600 px-4 py-2 rounded-md text-sm hover:bg-red-50 disabled:opacity-50">
+              刪除草稿
+            </button>
             <button onClick={handleSubmit} disabled={submitting}
               className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
               {submitting ? '送出中...' : '送出採購單'}
             </button>
           </>
+        )}
+        {!isDraft && canDelete && (
+          <button onClick={handleDelete} disabled={submitting}
+            className="border border-red-300 text-red-600 px-4 py-2 rounded-md text-sm hover:bg-red-50 disabled:opacity-50">
+            取消採購單
+          </button>
         )}
         {canReceive && pendingItems.length > 0 && (
           <button onClick={showReceive ? () => setShowReceive(false) : initRows}

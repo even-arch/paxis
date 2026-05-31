@@ -59,6 +59,7 @@ export default async function PurchaseDetailPage({ params }: Props) {
           orderId={params.id}
           status={order.status}
           defaultCurrency={order.currencyCode}
+          hasReceipts={order.receipts.length > 0}
           items={order.items.map(i => ({
             id: i.id,
             productName: i.product.name,

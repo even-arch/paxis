@@ -28,6 +28,29 @@ export async function GET(_req: NextRequest, { params }: Params) {
   return NextResponse.json(order)
 }
 
+export async function DELETE(_req: NextRequest, { params }: Params) {
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const id = Number(params.id)
+  const order = await prisma.pO_Order.findUnique({
+    where: { id },
+    include: { receipts: { select: { id: true } } },
+  })
+  if (!order) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  // 已有入庫紀錄：不允許刪除（庫存已異動）
+  if (order.receipts.length > 0) {
+    return NextResponse.json({ error: '此採購單已有入庫紀錄，無法刪除' }, { status: 400 })
+  }
+
+  // 草稿直接刪，已送出視同「取消」
+  await prisma.pO_Item.deleteMany({ where: { orderId: id } })
+  await prisma.pO_Order.delete({ where: { id } })
+
+  return NextResponse.json({ ok: true })
+}
+
 export async function PUT(req: NextRequest, { params }: Params) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
