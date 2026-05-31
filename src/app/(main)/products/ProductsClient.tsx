@@ -1,0 +1,351 @@
+'use client'
+import { useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+
+export type ProductRow = {
+  id: number
+  name: string
+  sku: string | null
+  modelNo: string | null
+  unit: string | null
+  isArchived: boolean
+  stock: number
+  createdAt: string
+}
+
+type Props = {
+  products: ProductRow[]
+  total: number
+  page: number
+  totalPages: number
+  search: string
+  supplierId: number | null
+  archived: boolean
+  filterSupplierName?: string
+}
+
+export default function ProductsClient({
+  products, total, page, totalPages,
+  search, supplierId, archived, filterSupplierName,
+}: Props) {
+  const router = useRouter()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [working, setWorking] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deleteError, setDeleteError] = useState('')
+  const [showExcelImportResult, setShowExcelImportResult] = useState<null | { updated: number; skipped: number; results: { sku: string; name: string; action: string; changes?: string[]; reason?: string }[] }>(null)
+
+  const allIds = products.map(p => p.id)
+  const allSelected = allIds.length > 0 && allIds.every(id => selected.has(id))
+
+  function toggleAll() {
+    if (allSelected) setSelected(new Set())
+    else setSelected(new Set(allIds))
+  }
+
+  function toggle(id: number) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function buildUrl(overrides: Record<string, string | number | null>) {
+    const params = new URLSearchParams()
+    if ((overrides.search ?? search)) params.set('search', String(overrides.search ?? search))
+    if (Number(overrides.page ?? page) > 1) params.set('page', String(overrides.page ?? page))
+    if ((overrides.supplierId ?? supplierId)) params.set('supplierId', String(overrides.supplierId ?? supplierId))
+    if (overrides.archived ?? archived) params.set('archived', 'true')
+    return `/products?${params.toString()}`
+  }
+
+  async function handleBatch(action: 'archive' | 'unarchive') {
+    if (!selected.size) return
+    setWorking(true)
+    await fetch('/api/products/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: Array.from(selected), action }),
+    })
+    setSelected(new Set())
+    setWorking(false)
+    router.refresh()
+  }
+
+  async function handleDelete() {
+    setDeleteError('')
+    setWorking(true)
+    const res = await fetch('/api/products/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: Array.from(selected), action: 'delete', password: deletePassword }),
+    })
+    setWorking(false)
+    if (res.ok) {
+      setShowDeleteModal(false)
+      setDeletePassword('')
+      setSelected(new Set())
+      router.refresh()
+    } else {
+      const err = await res.json()
+      setDeleteError(err.error ?? '刪除失敗')
+    }
+  }
+
+  function handleExport() {
+    const ids = selected.size > 0 ? Array.from(selected) : []
+    const params = new URLSearchParams()
+    if (ids.length) params.set('ids', ids.join(','))
+    if (archived) params.set('archived', 'true')
+    window.open(`/api/products/export?${params.toString()}`, '_blank')
+  }
+
+  async function handleExcelImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    setWorking(true)
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await fetch('/api/products/excel-import', { method: 'POST', body: fd })
+    const data = await res.json()
+    setWorking(false)
+    if (res.ok) {
+      setShowExcelImportResult(data)
+      router.refresh()
+    } else {
+      alert(data.error ?? '匯入失敗')
+    }
+  }
+
+  const pageBase = buildUrl({})
+
+  return (
+    <div>
+      {/* 標題列 */}
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
+        <h1 className="text-2xl font-bold text-gray-800">商品管理</h1>
+        <div className="flex gap-2 flex-wrap">
+          {/* 封存/現有切換 */}
+          <a href={archived ? '/products' : '/products?archived=true'}
+            className={`px-3 py-2 rounded-md text-sm font-medium border ${archived
+              ? 'bg-amber-100 border-amber-300 text-amber-800'
+              : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+            {archived ? '查看現有產品' : '查看封存產品'}
+          </a>
+          <button onClick={handleExport}
+            className="border border-green-300 text-green-700 bg-green-50 px-3 py-2 rounded-md text-sm font-medium hover:bg-green-100">
+            ↓ 匯出 Excel{selected.size > 0 ? ` (${selected.size})` : ''}
+          </button>
+          <button onClick={() => fileRef.current?.click()} disabled={working}
+            className="border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+            ↑ Excel 更新
+          </button>
+          <input ref={fileRef} type="file" className="hidden"
+            accept=".xlsx,.xls" onChange={handleExcelImport} />
+          <a href="/products/import"
+            className="border border-purple-300 text-purple-700 bg-purple-50 px-3 py-2 rounded-md text-sm font-medium hover:bg-purple-100">
+            ✨ AI 匯入
+          </a>
+          {!archived && (
+            <a href="/products/new"
+              className="bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+              + 新增商品
+            </a>
+          )}
+        </div>
+      </div>
+
+      {/* 供應商過濾提示 */}
+      {filterSupplierName && (
+        <div className="mb-3 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-sm">
+          <span className="text-blue-700">供應商篩選：<strong>{filterSupplierName}</strong></span>
+          <a href={archived ? '/products?archived=true' : '/products'} className="ml-auto text-xs text-blue-500 hover:underline">清除篩選</a>
+        </div>
+      )}
+
+      {/* 封存模式提示 */}
+      {archived && (
+        <div className="mb-3 flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 text-sm">
+          <span className="text-amber-700">目前顯示封存產品</span>
+        </div>
+      )}
+
+      {/* Excel 匯入結果 */}
+      {showExcelImportResult && (
+        <div className="mb-4 bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-semibold text-gray-700">
+              Excel 更新完成：更新 {showExcelImportResult.updated} 筆，略過 {showExcelImportResult.skipped} 筆
+            </span>
+            <button onClick={() => setShowExcelImportResult(null)} className="text-gray-400 hover:text-gray-600 text-lg">×</button>
+          </div>
+          <div className="max-h-40 overflow-y-auto text-xs space-y-1">
+            {showExcelImportResult.results.filter(r => r.action === 'updated').map((r, i) => (
+              <div key={i} className="text-green-700">✓ {r.sku} {r.name} — 更新欄位：{r.changes?.join(', ')}</div>
+            ))}
+            {showExcelImportResult.results.filter(r => r.action === 'skipped' && r.reason !== '無變更').map((r, i) => (
+              <div key={i} className="text-amber-600">⚠ {r.sku} — {r.reason}</div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 批次操作工具列 */}
+      {selected.size > 0 && (
+        <div className="mb-3 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
+          <span className="text-sm text-blue-700 font-medium">已選 {selected.size} 項</span>
+          <div className="ml-auto flex gap-2">
+            {!archived && (
+              <button onClick={() => handleBatch('archive')} disabled={working}
+                className="text-xs px-3 py-1.5 border border-amber-300 text-amber-700 bg-amber-50 rounded hover:bg-amber-100 disabled:opacity-50">
+                封存
+              </button>
+            )}
+            {archived && (
+              <button onClick={() => handleBatch('unarchive')} disabled={working}
+                className="text-xs px-3 py-1.5 border border-green-300 text-green-700 bg-green-50 rounded hover:bg-green-100 disabled:opacity-50">
+                取消封存
+              </button>
+            )}
+            <button onClick={() => setShowDeleteModal(true)} disabled={working}
+              className="text-xs px-3 py-1.5 border border-red-300 text-red-700 bg-red-50 rounded hover:bg-red-100 disabled:opacity-50">
+              刪除
+            </button>
+            <button onClick={() => setSelected(new Set())}
+              className="text-xs px-3 py-1.5 border border-gray-300 text-gray-600 rounded hover:bg-gray-50">
+              取消選取
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 搜尋列 */}
+      <form method="GET" className="mb-4 flex gap-2">
+        {supplierId && <input type="hidden" name="supplierId" value={supplierId} />}
+        {archived && <input type="hidden" name="archived" value="true" />}
+        <input name="search" defaultValue={search}
+          placeholder="搜尋商品名稱、SKU、型號..."
+          className="border border-gray-300 rounded-md px-3 py-2 text-sm w-80 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <button type="submit" className="bg-gray-100 border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-200">
+          搜尋
+        </button>
+        {search && (
+          <a href={buildUrl({ search: '', page: 1 })}
+            className="border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-50 text-gray-500">
+            清除
+          </a>
+        )}
+      </form>
+
+      {/* 表格 */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="px-3 py-3 w-8">
+                <input type="checkbox" checked={allSelected} onChange={toggleAll}
+                  className="rounded border-gray-300" />
+              </th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">商品名稱</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">SKU</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">型號</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">單位</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-600">庫存</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">建立日期</th>
+              <th className="px-4 py-3" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {products.length === 0 && (
+              <tr>
+                <td colSpan={8} className="text-center py-12 text-gray-400">
+                  {search ? `找不到「${search}」相關商品` : archived ? '無封存商品' : '尚無商品，請新增'}
+                </td>
+              </tr>
+            )}
+            {products.map(p => (
+              <tr key={p.id} className={`hover:bg-gray-50 ${selected.has(p.id) ? 'bg-blue-50' : ''}`}>
+                <td className="px-3 py-3">
+                  <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggle(p.id)}
+                    className="rounded border-gray-300" />
+                </td>
+                <td className="px-4 py-3">
+                  <Link href={`/products/${p.id}`} className="font-medium text-blue-600 hover:underline">
+                    {p.name}
+                  </Link>
+                </td>
+                <td className="px-4 py-3 text-gray-500 font-mono text-xs">{p.sku ?? '-'}</td>
+                <td className="px-4 py-3 text-gray-500">{p.modelNo ?? '-'}</td>
+                <td className="px-4 py-3 text-gray-500">{p.unit ?? '-'}</td>
+                <td className="px-4 py-3 text-right">{p.stock}</td>
+                <td className="px-4 py-3 text-gray-400 text-xs">{p.createdAt}</td>
+                <td className="px-4 py-3 text-right">
+                  <Link href={`/products/${p.id}/edit`} className="text-gray-400 hover:text-blue-600 text-xs">編輯</Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 分頁 */}
+      {totalPages > 1 && (
+        <div className="flex items-center gap-2 mt-4 text-sm">
+          <span className="text-gray-500">共 {total} 筆</span>
+          <div className="flex gap-1 ml-auto">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+              <a key={p} href={buildUrl({ page: p })}
+                className={`px-3 py-1 rounded-md ${p === page ? 'bg-blue-600 text-white' : 'border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+                {p}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 刪除確認 Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-red-500 text-2xl">⚠</span>
+              <h3 className="text-base font-semibold">確認刪除 {selected.size} 項產品</h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              刪除後所有歷史記錄將一併消失且無法復原。請輸入您的登入密碼以確認執行。
+            </p>
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-gray-600 mb-1">登入密碼</label>
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={e => setDeletePassword(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleDelete()}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                placeholder="輸入密碼..."
+                autoFocus
+              />
+              {deleteError && <p className="text-xs text-red-600 mt-1">{deleteError}</p>}
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => { setShowDeleteModal(false); setDeletePassword(''); setDeleteError('') }}
+                className="text-sm px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50">
+                取消
+              </button>
+              <button onClick={handleDelete} disabled={!deletePassword || working}
+                className="text-sm px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50">
+                {working ? '刪除中...' : '確認刪除'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

@@ -222,6 +222,7 @@ model PRD_Product {
   posProductId      String?  // 對應 POS 系統的產品 ID（對接後填入）
 
   isActive      Boolean   @default(true)
+  isArchived    Boolean   @default(false) // 封存（不刪資料，只從主列表隱藏）
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
