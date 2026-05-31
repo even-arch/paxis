@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { PRODUCT_COLUMNS } from '../export/route'
+import { PRODUCT_COLUMNS } from '@/lib/productColumns'
 
 function parseBool(v: string): boolean {
   return v?.trim().toUpperCase() === 'Y'
