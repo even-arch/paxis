@@ -1,5 +1,8 @@
 import { prisma } from '@/lib/db'
-import PurchaseForm from './PurchaseForm'
+import dynamic from 'next/dynamic'
+
+// ssr: false 避免 useState('choose') 在 SSR 產生 hydration mismatch
+const PurchaseForm = dynamic(() => import('./PurchaseForm'), { ssr: false })
 
 export default async function NewPurchasePage() {
   const [suppliers, products] = await Promise.all([
@@ -9,9 +12,9 @@ export default async function NewPurchasePage() {
       orderBy: { name: 'asc' },
     }),
     prisma.pRD_Product.findMany({
-      where: { isActive: true },
+      where: { isActive: true, isArchived: false },
       select: { id: true, name: true, sku: true, unit: true },
-      orderBy: { name: 'asc' },
+      orderBy: [{ sku: 'asc' }, { name: 'asc' }],
     }),
   ])
 
