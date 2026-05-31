@@ -16,7 +16,15 @@ export default async function PurchaseDetailPage({ params }: Props) {
         include: { product: { select: { id: true, name: true, sku: true, unit: true } } },
       },
       receipts: {
-        include: { items: { include: { poItem: true } } },
+        include: {
+          items: {
+            include: {
+              poItem: {
+                include: { product: { select: { id: true, name: true, sku: true } } },
+              },
+            },
+          },
+        },
         orderBy: { receivedAt: 'desc' },
       },
     },
@@ -146,23 +154,73 @@ export default async function PurchaseDetailPage({ params }: Props) {
 
         {/* 入庫紀錄 */}
         {order.receipts.length > 0 && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-base font-semibold text-gray-700 mb-3">入庫紀錄</h2>
-            <div className="space-y-3">
-              {order.receipts.map(receipt => (
-                <div key={receipt.id} className="border border-gray-100 rounded-md p-4">
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="font-mono font-medium text-gray-700">{receipt.receiptNo}</span>
-                    <span className="text-gray-400">{formatDate(receipt.receivedAt)}</span>
-                  </div>
-                  {receipt.items.map(ri => (
-                    <div key={ri.id} className="text-sm text-gray-600 flex justify-between">
-                      <span>入庫 {ri.quantity.toLocaleString()} 件</span>
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <h2 className="text-base font-semibold text-gray-700">入庫紀錄</h2>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {order.receipts.map(receipt => {
+                const receiptTotal = receipt.items.reduce((sum, ri) => {
+                  const price = parseFloat(ri.poItem.unitPrice.toString())
+                  return sum + price * ri.quantity
+                }, 0)
+                return (
+                  <div key={receipt.id} className="p-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono font-medium text-gray-800">{receipt.receiptNo}</span>
+                        <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded">已入庫</span>
+                      </div>
+                      <span className="text-sm text-gray-500">
+                        入庫日期：<span className="text-gray-700 font-medium">{formatDate(receipt.receivedAt)}</span>
+                      </span>
                     </div>
-                  ))}
-                  {receipt.note && <p className="text-xs text-gray-400 mt-1">{receipt.note}</p>}
-                </div>
-              ))}
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+                          <th className="pb-1.5 font-normal">商品</th>
+                          <th className="pb-1.5 font-normal text-right">入庫數量</th>
+                          <th className="pb-1.5 font-normal text-right">採購單價</th>
+                          <th className="pb-1.5 font-normal text-right">實際成本</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {receipt.items.map(ri => {
+                          const lineTotal = parseFloat(ri.poItem.unitPrice.toString()) * ri.quantity
+                          return (
+                            <tr key={ri.id} className="border-b border-gray-50 last:border-0">
+                              <td className="py-2">
+                                <Link href={`/products/${ri.poItem.product.id}`} className="text-blue-600 hover:underline">
+                                  {ri.poItem.product.name}
+                                </Link>
+                                {ri.poItem.product.sku && (
+                                  <span className="text-gray-400 text-xs ml-1">({ri.poItem.product.sku})</span>
+                                )}
+                              </td>
+                              <td className="py-2 text-right">{ri.quantity.toLocaleString()}</td>
+                              <td className="py-2 text-right text-gray-500">
+                                {formatCurrency(ri.poItem.unitPrice.toString(), order.currencyCode)}
+                              </td>
+                              <td className="py-2 text-right font-medium">
+                                {formatCurrency(lineTotal, order.currencyCode)}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <td colSpan={3} className="pt-2 text-right text-xs text-gray-500">本次入庫成本合計</td>
+                          <td className="pt-2 text-right font-bold text-gray-800">
+                            {formatCurrency(receiptTotal, order.currencyCode)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                    {receipt.note && <p className="text-xs text-gray-400 mt-2">{receipt.note}</p>}
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}

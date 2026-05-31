@@ -10,7 +10,8 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const search = searchParams.get('search') ?? ''
   const page = Math.max(1, Number(searchParams.get('page') ?? 1))
-  const limit = 20
+  const limitParam = Number(searchParams.get('limit') ?? 20)
+  const limit = Math.min(limitParam, 1000)
 
   const where = search
     ? {
