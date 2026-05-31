@@ -13,7 +13,7 @@ export default async function NewPurchasePage() {
     }),
     prisma.pRD_Product.findMany({
       where: { isActive: true, isArchived: false },
-      select: { id: true, name: true, sku: true, unit: true },
+      select: { id: true, name: true, sku: true, unit: true, specification: true },
       orderBy: [{ sku: 'asc' }, { name: 'asc' }],
     }),
   ])
