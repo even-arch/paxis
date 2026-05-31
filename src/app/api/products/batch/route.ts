@@ -45,8 +45,16 @@ export async function POST(req: NextRequest) {
         }, { status: 400 })
       }
 
-      // 刪除（cascade 依 Prisma 關聯設定）
-      await prisma.pRD_Product.deleteMany({ where: { id: { in: ids } } })
+      // 依序刪除子資料再刪主資料（Prisma 不自動 cascade）
+      await prisma.$transaction([
+        prisma.pRD_ProductHistory.deleteMany({ where: { productId: { in: ids } } }),
+        prisma.pRD_CategoryMapping.deleteMany({ where: { productId: { in: ids } } }),
+        prisma.sUP_SupplierProduct.deleteMany({ where: { productId: { in: ids } } }),
+        prisma.iNV_Stock.deleteMany({ where: { productId: { in: ids } } }),
+        prisma.iNV_Movement.deleteMany({ where: { productId: { in: ids } } }),
+        prisma.cOST_Sheet.deleteMany({ where: { productId: { in: ids } } }),
+        prisma.pRD_Product.deleteMany({ where: { id: { in: ids } } }),
+      ])
       return NextResponse.json({ ok: true, affected: ids.length })
     }
 
