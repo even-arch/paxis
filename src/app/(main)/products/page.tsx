@@ -4,23 +4,34 @@ import { formatDate } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
-type Props = { searchParams: { search?: string; page?: string } }
+type Props = { searchParams: { search?: string; page?: string; supplierId?: string } }
 
 export default async function ProductsPage({ searchParams }: Props) {
   const search = searchParams.search ?? ''
   const page = Math.max(1, Number(searchParams.page ?? 1))
+  const supplierId = searchParams.supplierId ? Number(searchParams.supplierId) : null
   const limit = 20
+
+  // 若有 supplierId，載入供應商名稱用於顯示
+  const filterSupplier = supplierId
+    ? await prisma.sUP_Supplier.findUnique({ where: { id: supplierId }, select: { id: true, name: true } })
+    : null
+
+  const baseWhere = {
+    isActive: true,
+    ...(supplierId ? { supplierProducts: { some: { supplierId } } } : {}),
+  }
 
   const where = search
     ? {
-        isActive: true,
+        ...baseWhere,
         OR: [
           { name: { contains: search } },
           { sku: { contains: search } },
           { modelNo: { contains: search } },
         ],
       }
-    : { isActive: true }
+    : baseWhere
 
   const [total, products] = await Promise.all([
     prisma.pRD_Product.count({ where }),
@@ -53,8 +64,17 @@ export default async function ProductsPage({ searchParams }: Props) {
         </Link>
       </div>
 
+      {/* 供應商過濾提示 */}
+      {filterSupplier && (
+        <div className="mb-3 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-sm">
+          <span className="text-blue-700">供應商篩選：<strong>{filterSupplier.name}</strong></span>
+          <Link href="/products" className="ml-auto text-xs text-blue-500 hover:underline">清除篩選</Link>
+        </div>
+      )}
+
       {/* 搜尋列 */}
       <form method="GET" className="mb-4 flex gap-2">
+        {supplierId && <input type="hidden" name="supplierId" value={supplierId} />}
         <input
           name="search"
           defaultValue={search}
@@ -65,7 +85,8 @@ export default async function ProductsPage({ searchParams }: Props) {
           搜尋
         </button>
         {search && (
-          <Link href="/products" className="border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-50 text-gray-500">
+          <Link href={supplierId ? `/products?supplierId=${supplierId}` : '/products'}
+            className="border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-50 text-gray-500">
             清除
           </Link>
         )}

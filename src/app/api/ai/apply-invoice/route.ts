@@ -65,10 +65,13 @@ export async function POST(req: NextRequest) {
     const items: AppliedInvoice['items'] = []
 
     for (const pi of parsed.items ?? []) {
-      if (!pi || (!pi.description && !pi.sku)) continue
+      if (!pi || (!pi.name && !pi.specification && !pi.sku)) continue
 
       const sku = pi.sku?.trim() || null
-      const name = pi.description?.trim() || sku || '未命名商品'
+      const name = pi.name?.trim() || sku || '未命名商品'
+      const specification = pi.specification?.trim() || null
+      const unit = pi.unit?.trim() || 'PCS'
+      const countryOfOrigin = pi.countryOfOrigin?.trim() || null
 
       let product = null
       let productCreated = false
@@ -89,32 +92,31 @@ export async function POST(req: NextRequest) {
 
       // 都找不到 → 自動建立
       if (!product) {
-        // SKU 重複保護：若同名 SKU 已存在但大小寫不同，加後綴
         let finalSku = sku
         if (finalSku) {
           const existing = await prisma.pRD_Product.findUnique({ where: { sku: finalSku } })
-          if (existing) finalSku = null  // SKU 衝突時放棄 SKU，讓使用者手動設定
+          if (existing) finalSku = null
         }
 
         product = await prisma.pRD_Product.create({
           data: {
             name,
             sku: finalSku,
-            unit: pi.unit ?? 'PCS',
+            specification,
+            unit,
+            countryOfOrigin,
           },
         })
         productCreated = true
+      }
 
-        // 如果有供應商，建立供應商-商品關聯
-        if (supplierId) {
-          await prisma.sUP_SupplierProduct.create({
-            data: {
-              supplierId,
-              productId: product.id,
-              isPreferred: true,
-            },
-          }).catch(() => {})  // 已存在則忽略
-        }
+      // 確保供應商-商品關聯存在（不論是新建或已存在的產品）
+      if (supplierId) {
+        await prisma.sUP_SupplierProduct.upsert({
+          where: { supplierId_productId: { supplierId, productId: product.id } },
+          create: { supplierId, productId: product.id, isPreferred: true },
+          update: {},  // 已存在則不覆蓋
+        }).catch(() => {})
       }
 
       items.push({
@@ -124,7 +126,7 @@ export async function POST(req: NextRequest) {
         productCreated,
         qty: pi.qty ?? 1,
         unitPrice: pi.unitPrice ?? 0,
-        unit: pi.unit ?? product.unit ?? 'PCS',
+        unit: unit,
       })
     }
 

@@ -170,7 +170,10 @@ export default function ProductImportPage() {
                 <tbody>
                   {decisions.filter(d => !d.conflict).map(d => (
                     <tr key={d.index} className="border-t">
-                      <td className="px-4 py-2">{d.incoming.description ?? '—'}</td>
+                      <td className="px-4 py-2">
+                        <div className="font-medium">{d.incoming.name ?? '—'}</div>
+                        {d.incoming.specification && <div className="text-xs text-gray-400 truncate max-w-[240px]">{d.incoming.specification}</div>}
+                      </td>
                       <td className="px-4 py-2 font-mono text-xs text-gray-500">{d.incoming.sku ?? '—'}</td>
                       <td className="px-4 py-2 text-right">{d.incoming.unitPrice ?? '—'}</td>
                       <td className="px-4 py-2 text-gray-500">{d.incoming.unit ?? 'PCS'}</td>
@@ -228,9 +231,9 @@ export default function ProductImportPage() {
                       </div>
                       <div className={`rounded p-3 ${d.action === 'update' ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50'}`}>
                         <div className="text-xs font-medium text-gray-500 mb-2">匯入資料</div>
-                        <CompareRow label="品名" value={d.incoming.description} highlight={d.action === 'update' && d.incoming.description !== d.existing?.name} />
+                        <CompareRow label="品名" value={d.incoming.name} highlight={d.action === 'update' && d.incoming.name !== d.existing?.name} />
                         <CompareRow label="SKU" value={d.incoming.sku} mono highlight={d.action === 'update' && d.incoming.sku !== d.existing?.sku} />
-                        <CompareRow label="規格" value={null} />
+                        <CompareRow label="規格" value={d.incoming.specification} highlight={d.action === 'update' && d.incoming.specification !== d.existing?.specification} />
                         <CompareRow label="單位" value={d.incoming.unit} highlight={d.action === 'update' && d.incoming.unit !== d.existing?.unit} />
                         <CompareRow label="單價" value={d.incoming.unitPrice?.toString()} highlight={d.action === 'update'} />
                       </div>

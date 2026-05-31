@@ -81,7 +81,12 @@ export default async function SuppliersPage({ searchParams }: Props) {
                 <td className="px-4 py-3 text-gray-500">{s.countryCode ?? '-'}</td>
                 <td className="px-4 py-3 text-gray-500">{s.paymentTerms ?? '-'}</td>
                 <td className="px-4 py-3 text-gray-500">{s.currencyCode ?? '-'}</td>
-                <td className="px-4 py-3 text-right">{s._count.products}</td>
+                <td className="px-4 py-3 text-right">
+                  {s._count.products > 0
+                    ? <Link href={`/products?supplierId=${s.id}`} className="text-blue-600 hover:underline">{s._count.products} 項</Link>
+                    : <span className="text-gray-400">0</span>
+                  }
+                </td>
                 <td className="px-4 py-3 text-right">
                   <Link href={`/suppliers/${s.id}/edit`} className="text-gray-400 hover:text-blue-600 text-xs">編輯</Link>
                 </td>

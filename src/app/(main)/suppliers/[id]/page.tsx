@@ -74,7 +74,13 @@ export default async function SupplierDetailPage({ params }: Props) {
           </Card>
         )}
 
-        {/* 供應商商品對應（含 Patisco 介接說明） */}
+        {/* 供應商商品對應 */}
+        <div className="flex items-center justify-end mb-1">
+          <Link href={`/products?supplierId=${params.id}`}
+            className="text-xs text-blue-600 hover:underline">
+            在商品管理中查看此供應商所有產品 →
+          </Link>
+        </div>
         <SupplierProductPanel
           supplierId={params.id}
           supplierProducts={supplier.products}

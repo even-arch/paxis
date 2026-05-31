@@ -24,10 +24,10 @@ export async function POST(req: NextRequest) {
 
   for (let i = 0; i < (items ?? []).length; i++) {
     const item = items[i]
-    if (!item || (!item.description && !item.sku)) continue
+    if (!item || (!item.name && !item.sku)) continue
 
     const sku = item.sku?.trim() || null
-    const name = item.description?.trim() || sku || '未命名商品'
+    const name = (item.name?.trim() || sku || '未命名商品')
 
     let existing = null
     let conflictType: PreviewItem['conflictType'] = null
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
 
     results.push({
       index: i,
-      incoming: { ...item, description: name },
+      incoming: { ...item, name },
       existing,
       conflict: existing !== null,
       conflictType,

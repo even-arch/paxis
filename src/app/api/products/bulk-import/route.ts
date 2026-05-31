@@ -26,14 +26,17 @@ export async function POST(req: NextRequest) {
     const results = []
 
     for (const { item, action, existingId } of body.items ?? []) {
-      if (!item || (!item.description && !item.sku)) continue
+      if (!item || (!item.name && !item.sku)) continue
       if (action === 'skip') {
-        results.push({ name: item.description ?? item.sku, sku: item.sku, action: 'skip', reason: '使用者略過' })
+        results.push({ name: item.name ?? item.sku, sku: item.sku, action: 'skip', reason: '使用者略過' })
         continue
       }
 
       const sku = item.sku?.trim() || null
-      const name = item.description?.trim() || sku || '未命名商品'
+      const name = (item.name?.trim() || sku || '未命名商品')
+      const specification = item.specification?.trim() || null
+      const unit = item.unit?.trim() || 'PCS'
+      const countryOfOrigin = item.countryOfOrigin?.trim() || null
 
       if (action === 'create') {
         // 雙重保護：確認沒有衝突
@@ -47,7 +50,7 @@ export async function POST(req: NextRequest) {
         }
 
         const product = await prisma.pRD_Product.create({
-          data: { name, sku, unit: item.unit ?? 'PCS' },
+          data: { name, sku, specification, unit, countryOfOrigin },
         })
 
         await prisma.pRD_ProductHistory.create({
@@ -77,7 +80,9 @@ export async function POST(req: NextRequest) {
             data: {
               name,
               ...(sku ? { sku } : {}),
-              unit: item.unit ?? existing.unit,
+              ...(specification ? { specification } : {}),
+              unit: unit || existing.unit,
+              ...(countryOfOrigin ? { countryOfOrigin } : {}),
             },
           })
         }

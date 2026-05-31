@@ -5,38 +5,63 @@ import { prisma } from '@/lib/db'
 import { decrypt } from '@/lib/crypto'
 
 export interface ParsedInvoice {
-  supplierName?: string | null
+  // 文件類型偵測
+  // PO = Purchase Order（採購單正本，我方發給供應商）
+  // PI = Proforma Invoice（形式發票，供應商發給我方）
+  // QUOTE = 報價單
+  documentType?: 'PO' | 'PI' | 'QUOTE' | null
+
+  supplierName?: string | null   // 解析完成後已確定的供應商名稱
   supplierEmail?: string | null
   invoiceNo?: string | null
-  invoiceDate?: string | null   // YYYY-MM-DD
-  currency?: string | null      // USD / TWD / EUR …
+  invoiceDate?: string | null    // YYYY-MM-DD
+  currency?: string | null       // USD / TWD / EUR …
   items: {
-    description: string
-    sku?: string | null
+    name: string                 // AI 猜測的簡短產品名稱（例如：自行車鏈條、腳踏車鏈條）
+    specification: string        // 完整原始描述文字（規格說明，原汁原味）
+    sku: string | null           // 型號/料號（必填，找不到填 null）
     qty: number
     unitPrice: number
-    unit?: string | null        // PCS / SET / CTN …
+    unit: string                 // 單位（必填，找不到預設 PCS）
+    countryOfOrigin?: string | null  // 原產地 ISO 代碼或國家名（若文件中有提及）
   }[]
   notes?: string | null
 }
 
 const SYSTEM_PROMPT = `你是一個專業的貿易文件解析助理。
-用戶提供採購單、發票或 Proforma Invoice 的內容（文字或圖片）。
-請解析出以下資訊，以 JSON 格式回傳，不要有任何其他文字：
+用戶提供採購單（PO）、形式發票（PI/Proforma Invoice）或報價單的內容（文字或圖片）。
+
+## 文件類型判斷規則
+- 如果文件抬頭/主位是「我方公司」（通常是發行方 Issued by / From），且文件是發給某個供應商的，則這是 PO（採購單正本）。供應商 = 收件方（To / Attention）。
+- 如果文件抬頭/主位是某個供應商（他們是發行方），而我們的公司名稱是在收件方、Bill to、Attention 等次位，則這是 PI（形式發票副本）。供應商 = 發行方（From / Issued by）。
+- 如果是報價單（Quotation），documentType = "QUOTE"，供應商是發行方。
+- 如果無法判斷，填 null。
+
+## 品項解析規則
+- "name"：根據完整描述，用 2-6 個字猜出這個商品的**簡短通用名稱**（中文或英文皆可），例如：「自行車鏈條」、「Bicycle Chain」、「LED 燈泡」。不要把型號、規格、顏色塞進去。
+- "specification"：完整原始描述文字，**原汁原味保留所有細節**，包括型號、顏色、尺寸、材質、包裝方式、認證等。
+- "sku"：型號/料號（從原始文件抓取，找不到填 null）。
+- "unit"：單位（PCS / SET / CTN / KGS 等，找不到預設 "PCS"）。
+- "countryOfOrigin"：原產地（若文件中有提及，例如 TAIWAN、CHINA、TW、CN 等，找不到填 null）。
+
+請回傳以下 JSON 格式，不要有任何其他文字：
 
 {
-  "supplierName": "供應商名稱",
+  "documentType": "PO" 或 "PI" 或 "QUOTE" 或 null,
+  "supplierName": "已確認的供應商名稱（根據文件類型判斷後的結果）",
   "supplierEmail": "供應商 Email（若有）",
-  "invoiceNo": "發票/採購單號",
+  "invoiceNo": "單據編號",
   "invoiceDate": "日期 YYYY-MM-DD 格式",
   "currency": "幣別代碼，例如 USD",
   "items": [
     {
-      "description": "商品名稱",
-      "sku": "型號或料號（若有）",
+      "name": "簡短商品名稱（2-6 字）",
+      "specification": "完整原始描述（保留所有細節）",
+      "sku": "型號或料號（找不到填 null）",
       "qty": 數量（數字）,
       "unitPrice": 單價（數字）,
-      "unit": "單位，例如 PCS"
+      "unit": "單位（找不到填 PCS）",
+      "countryOfOrigin": "原產地（找不到填 null）"
     }
   ],
   "notes": "備註（若有）"
