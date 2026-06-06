@@ -31,6 +31,7 @@ export default async function PatiscoSyncPage() {
     jwtExpired: config.jwtExpiresAt ? config.jwtExpiresAt < new Date() : false,
     webhookSecretSet: !!config.webhookSecret,
     cronSecretSet: !!config.cronSecret,
+    syncEnabled: config.syncEnabled,
     lastTestedAt: config.lastTestedAt?.toISOString() ?? null,
     lastTestStatus: config.lastTestStatus ?? null,
     lastTestMsg: config.lastTestMsg ?? null,

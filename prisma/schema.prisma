@@ -33,6 +33,7 @@ model SYS_PatiscoConfig {
   webhookSecret  String?  // Webhook HMAC 簽名驗證密鑰
   cronSecret     String?  // Cron 安全驗證密鑰
   isActive       Boolean  @default(true)
+  syncEnabled    Boolean  @default(true)  // false = 暫停從 Patisco MCP Server 撈資料（不影響 webhook 接收）
   lastTestedAt   DateTime?
   lastTestStatus String?  // 'ok' | 'error'
   lastTestMsg    String?

@@ -30,6 +30,8 @@ export async function GET(_req: NextRequest) {
     // 安全
     webhookSecretSet: !!config.webhookSecret,
     cronSecretSet: !!config.cronSecret,
+    // Sync 開關
+    syncEnabled: config.syncEnabled,
     // 狀態
     lastTestedAt: config.lastTestedAt?.toISOString() ?? null,
     lastTestStatus: config.lastTestStatus ?? null,
@@ -48,6 +50,7 @@ export async function PUT(req: NextRequest) {
   const data: Record<string, unknown> = {
     mcpUrl: body.mcpUrl || 'https://mcp.patisco.com',
     isActive: true,
+    syncEnabled: body.syncEnabled !== undefined ? Boolean(body.syncEnabled) : (existing?.syncEnabled ?? true),
   }
 
   // ── 帳密模式 ──────────────────────────────────────────────────────────────

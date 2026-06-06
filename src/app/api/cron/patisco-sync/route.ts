@@ -26,6 +26,17 @@ export async function GET(req: NextRequest) {
   const start = Date.now()
 
   try {
+    // 檢查 sync 開關：關閉時直接回傳，不執行任何 MCP 呼叫
+    const config = await prisma.sYS_PatiscoConfig.findFirst({ where: { isActive: true } })
+    if (config && config.syncEnabled === false) {
+      return NextResponse.json({
+        ok: false,
+        skipped: true,
+        reason: 'Patisco sync 已暫停（syncEnabled = false）。請至設定 → Patisco 連結開啟。',
+        durationMs: Date.now() - start,
+      })
+    }
+
     const creds = await patiscoLogin(prisma)
     const dbUrl = process.env.DATABASE_URL!
 

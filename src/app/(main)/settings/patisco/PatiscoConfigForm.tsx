@@ -14,6 +14,7 @@ type Config = {
   jwtExpired: boolean
   webhookSecretSet: boolean
   cronSecretSet: boolean
+  syncEnabled: boolean
   lastTestedAt: string | null
   lastTestStatus: string | null
   lastTestMsg: string | null
@@ -36,6 +37,9 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
   // 帳密模式
   const [username, setUsername] = useState(initialConfig?.username ?? '')
   const [password, setPassword] = useState('')
+
+  // Sync 開關
+  const [syncEnabled, setSyncEnabled] = useState(initialConfig?.syncEnabled ?? true)
 
   // 安全設定
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -67,10 +71,11 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
     e.preventDefault()
     setMsg(null)
 
-    const body: Record<string, string> = {
+    const body: Record<string, unknown> = {
       mcpUrl,
       webhookSecret,
       cronSecret,
+      syncEnabled,
     }
 
     if (mode === 'token') {
@@ -295,6 +300,34 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
       )}
 
       <form onSubmit={handleSave} className="p-6 space-y-5">
+
+        {/* Sync 開關 */}
+        <div className={`flex items-center justify-between p-4 rounded-lg border-2 transition-colors ${
+          syncEnabled ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
+        }`}>
+          <div>
+            <p className={`text-sm font-semibold ${syncEnabled ? 'text-green-800' : 'text-red-800'}`}>
+              {syncEnabled ? '✓ Patisco 資料同步：開啟中' : '⏸ Patisco 資料同步：已暫停'}
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {syncEnabled
+                ? '系統會定期從 Patisco MCP Server 拉取訂單、PI、採購副本資料。'
+                : '已停止從 Patisco MCP Server 撈資料。Webhook 接收不受影響。'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSyncEnabled(v => !v)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+              syncEnabled ? 'bg-green-500' : 'bg-gray-300'
+            }`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+              syncEnabled ? 'translate-x-6' : 'translate-x-1'
+            }`} />
+          </button>
+        </div>
+
         {/* MCP URL */}
         <div>
           <label className={lbl}>MCP Gateway URL</label>
