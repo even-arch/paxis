@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import SalesPIPanel from './SalesPIPanel'
 import SalesShipmentPanel from './SalesShipmentPanel'
+import SalesChainPanel from './SalesChainPanel'
 
 type Props = { params: { id: string } }
 
@@ -44,15 +45,59 @@ export default async function SalesDetailPage({
 
   if (!order) notFound()
 
-  // 以單號比對關聯採購單
+  // 關聯採購單：優先用 salesOrderId FK，fallback 用單號前綴比對
   const linkedPurchaseOrders = await prisma.pO_Order.findMany({
-    where: { poNo: order.orderNo },
-    select: { id: true, poNo: true, status: true, supplier: { select: { name: true } }, createdAt: true },
+    where: {
+      OR: [
+        { salesOrderId: order.id },
+        { poNo: order.orderNo },                          // 完全相同
+        { poNo: { startsWith: `${order.orderNo}-` } },   // 拆單後綴（ABC-001-1…）
+      ],
+    },
+    include: {
+      supplier: { select: { name: true } },
+      items: {
+        include: { product: { select: { id: true } } },
+      },
+      receipts: { select: { id: true } },
+      supplierPIs: {
+        select: { estimatedShipDate: true },
+        orderBy: { performedAt: 'desc' },
+        take: 1,
+      },
+    },
+    orderBy: { poNo: 'asc' },
   })
 
   const badge = STATUS_LABELS[order.status] ?? STATUS_LABELS[0]
   const customerName = order.customer?.name ?? order.patiscoBuyerName ?? '（未關聯客戶）'
   const totalAmount = order.items.reduce((s, i) => s + parseFloat(i.unitPrice.toString()) * i.quantity, 0)
+
+  // 組裝 SalesChainPanel 所需資料
+  const chainSLSItems = order.items.map(i => ({
+    productId:   i.product.id,
+    productName: i.product.name,
+    productSku:  i.product.sku,
+    sellQty:     i.quantity,
+    sellPrice:   parseFloat(i.unitPrice.toString()),
+    sellCurrency: order.currencyCode,
+  }))
+
+  const chainLinkedPOs = linkedPurchaseOrders.map(po => ({
+    id:          po.id,
+    poNo:        po.poNo,
+    status:      po.status,
+    supplierName: po.supplier.name,
+    createdAt:   po.createdAt,
+    hasReceipt:  po.receipts.length > 0,
+    estimatedShipDate: po.supplierPIs[0]?.estimatedShipDate ?? null,
+    items: po.items.map(i => ({
+      productId:   i.product.id,
+      buyQty:      i.quantity,
+      buyPrice:    parseFloat(i.unitPrice.toString()),
+      buyCurrency: po.currencyCode,
+    })),
+  }))
 
   return (
     <div className="max-w-4xl">
@@ -86,21 +131,14 @@ export default async function SalesDetailPage({
           {order.note && <div className="col-span-3"><Row label="備註" value={order.note} /></div>}
         </div>
 
-        {/* 關聯採購單 */}
-        {linkedPurchaseOrders.length > 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg px-5 py-4">
-            <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-2">關聯採購單（單號相同）</p>
-            <div className="flex flex-wrap gap-3">
-              {linkedPurchaseOrders.map(p => (
-                <Link key={p.id} href={`/purchases/${p.id}`}
-                  className="flex items-center gap-2 bg-white border border-amber-200 rounded px-3 py-2 text-sm hover:border-amber-400 transition-colors">
-                  <span className="font-mono font-medium text-amber-700">{p.poNo}</span>
-                  {p.supplier && <span className="text-gray-500">{p.supplier.name}</span>}
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* 交易鏈視圖 */}
+        <SalesChainPanel
+          salesOrderId={order.id}
+          salesOrderNo={order.orderNo}
+          sellCurrency={order.currencyCode}
+          slsItems={chainSLSItems}
+          linkedPOs={chainLinkedPOs}
+        />
 
         {/* 訂單明細 */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
