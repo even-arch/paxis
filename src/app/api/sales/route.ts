@@ -109,5 +109,36 @@ export async function POST(req: NextRequest) {
     },
   })
 
+  // 自動維護客戶-商品關係（訂單已成立 = 確認此客戶有購買這些 SKU）
+  if (body.customerId && body.items.length > 0) {
+    const now = new Date()
+    // 先取建立後的 items（含 id），批次 upsert
+    const createdItems = await prisma.sLS_Item.findMany({
+      where: { orderId: order.id },
+    })
+    await Promise.allSettled(
+      createdItems.map(item =>
+        prisma.cUS_CustomerProduct.upsert({
+          where: { customerId_productId: { customerId: body.customerId!, productId: item.productId } },
+          create: {
+            customerId: body.customerId!,
+            productId: item.productId,
+            lastUnitPrice: item.unitPrice,
+            currencyCode: body.currencyCode ?? null,
+            lastOrderDate: now,
+            orderCount: 1,
+          },
+          update: {
+            lastUnitPrice: item.unitPrice,
+            currencyCode: body.currencyCode ?? null,
+            lastOrderDate: now,
+            orderCount: { increment: 1 },
+            updatedAt: now,
+          },
+        })
+      )
+    )
+  }
+
   return NextResponse.json(order, { status: 201 })
 }

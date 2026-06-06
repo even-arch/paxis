@@ -82,5 +82,27 @@ export async function POST(req: NextRequest) {
     include: { items: true },
   })
 
+  // 自動維護供應商-商品關係（訂單已成立 = 確認此供應商有供應這些 SKU）
+  if (order.items.length > 0 && order.supplierId) {
+    await Promise.allSettled(
+      order.items.map(item =>
+        prisma.sUP_SupplierProduct.upsert({
+          where: { supplierId_productId: { supplierId: order.supplierId, productId: item.productId } },
+          create: {
+            supplierId: order.supplierId,
+            productId: item.productId,
+            unitPrice: item.unitPrice,
+            currencyCode: order.currencyCode ?? null,
+          },
+          update: {
+            unitPrice: item.unitPrice,
+            currencyCode: order.currencyCode ?? null,
+            updatedAt: new Date(),
+          },
+        })
+      )
+    )
+  }
+
   return NextResponse.json(order, { status: 201 })
 }

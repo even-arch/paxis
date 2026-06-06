@@ -3,12 +3,13 @@ import Link from 'next/link'
 import { prisma } from '@/lib/db'
 import { formatDate } from '@/lib/utils'
 import DeleteCustomerButton from './DeleteCustomerButton'
+import CustomerProductPanel from './CustomerProductPanel'
 
 type Props = { params: { id: string } }
 
 export default async function CustomerDetailPage({
   params }: Props) {
-    const [customer, recentOrders] = await Promise.all([
+    const [customer, recentOrders, customerProducts] = await Promise.all([
     prisma.cUS_Customer.findUnique({
       where: { id: Number(params.id) },
       include: { contacts: true },
@@ -18,6 +19,11 @@ export default async function CustomerDetailPage({
       orderBy: { createdAt: 'desc' },
       take: 20,
       include: { _count: { select: { items: true } } },
+    }),
+    prisma.cUS_CustomerProduct.findMany({
+      where: { customerId: Number(params.id) },
+      include: { product: { select: { id: true, name: true, sku: true } } },
+      orderBy: { lastOrderDate: 'desc' },
     }),
   ])
 
@@ -122,6 +128,18 @@ export default async function CustomerDetailPage({
               查看全部 →
             </Link>
           )}
+        </Card>
+
+        {/* 曾購商品 */}
+        <Card title={`曾購商品（${customerProducts.length} 項）`}>
+          <CustomerProductPanel
+            customerId={customer.id}
+            products={customerProducts.map(p => ({
+              ...p,
+              lastUnitPrice: p.lastUnitPrice ? String(p.lastUnitPrice) : null,
+              lastOrderDate: p.lastOrderDate ? p.lastOrderDate.toISOString() : null,
+            }))}
+          />
         </Card>
 
         <p className="text-xs text-gray-400">建立時間：{formatDate(customer.createdAt)}</p>

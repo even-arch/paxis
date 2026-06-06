@@ -229,6 +229,7 @@ model PRD_Product {
   updatedAt     DateTime  @updatedAt
 
   supplierProducts  SUP_SupplierProduct[]
+  customerProducts  CUS_CustomerProduct[]
   inventoryItems    INV_Stock[]
   purchaseItems     PO_Item[]
   salesItems        SLS_Item[]
@@ -371,6 +372,26 @@ model SUP_SupplierProduct {
   @@map("SUP_SupplierProduct")
 }
 
+// 客戶-商品關係（從客戶訂單自動推導，記錄這個客人買過哪些 SKU）
+model CUS_CustomerProduct {
+  id           Int      @id @default(autoincrement())
+  customerId   Int
+  productId    Int
+  customer     CUS_Customer @relation(fields: [customerId], references: [id])
+  product      PRD_Product  @relation(fields: [productId], references: [id])
+
+  lastUnitPrice  Decimal?   // 最近一次成交價
+  currencyCode   String?
+  lastOrderDate  DateTime?  // 最近下單日期
+  orderCount     Int        @default(1)  // 累計下單次數
+  note           String?
+  updatedAt      DateTime   @updatedAt
+
+  @@unique([customerId, productId])
+  @@index([productId])
+  @@map("CUS_CustomerProduct")
+}
+
 // =============================================================================
 // 客戶管理 (CUS_)
 // PAXIS 的客戶主檔，不直接對應 Patisco BU_Buyer。
@@ -407,9 +428,10 @@ model CUS_Customer {
   // 收款週期（天數，null 表示未設定）
   collectionCycleDays Int?
 
-  salesOrders   SLS_Order[]
-  contacts      CUS_Contact[]
-  receivables   FIN_Receivable[]
+  salesOrders       SLS_Order[]
+  contacts          CUS_Contact[]
+  receivables       FIN_Receivable[]
+  customerProducts  CUS_CustomerProduct[]
 
   @@index([name])
   @@map("CUS_Customer")

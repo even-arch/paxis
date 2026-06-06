@@ -77,6 +77,19 @@ export async function GET(req: NextRequest) {
       `ALTER TABLE "SLS_ShipmentItem" ADD COLUMN IF NOT EXISTS "cbm" NUMERIC`,
       `ALTER TABLE "SLS_Shipment" ADD COLUMN IF NOT EXISTS "packingListNo" TEXT`,
       `ALTER TABLE "SLS_Shipment" ADD COLUMN IF NOT EXISTS "commercialInvNo" TEXT`,
+      `CREATE TABLE IF NOT EXISTS "CUS_CustomerProduct" (
+        "id" SERIAL PRIMARY KEY,
+        "customerId" INTEGER NOT NULL REFERENCES "CUS_Customer"("id") ON DELETE CASCADE,
+        "productId" INTEGER NOT NULL REFERENCES "PRD_Product"("id") ON DELETE CASCADE,
+        "lastUnitPrice" NUMERIC,
+        "currencyCode" TEXT,
+        "lastOrderDate" TIMESTAMP WITH TIME ZONE,
+        "orderCount" INTEGER NOT NULL DEFAULT 1,
+        "note" TEXT,
+        "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        CONSTRAINT "CUS_CustomerProduct_customerId_productId_key" UNIQUE ("customerId", "productId")
+      )`,
+      `CREATE INDEX IF NOT EXISTS "CUS_CustomerProduct_productId_idx" ON "CUS_CustomerProduct"("productId")`,
     ]
     const migResult: string[] = []
     for (const stmt of stmts) {
