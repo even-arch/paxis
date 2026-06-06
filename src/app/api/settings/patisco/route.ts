@@ -48,7 +48,7 @@ export async function PUT(req: NextRequest) {
   const existing = await prisma.sYS_PatiscoConfig.findFirst({ where: { isActive: true } })
 
   const data: Record<string, unknown> = {
-    mcpUrl: body.mcpUrl || 'https://mcp.patisco.com',
+    mcpUrl: body.mcpUrl || existing?.mcpUrl || 'https://mcp.patisco.com',
     isActive: true,
     syncEnabled: body.syncEnabled !== undefined ? Boolean(body.syncEnabled) : (existing?.syncEnabled ?? true),
   }
@@ -73,15 +73,20 @@ export async function PUT(req: NextRequest) {
   if (body.webhookSecret !== undefined) data.webhookSecret = body.webhookSecret || null
   if (body.cronSecret !== undefined) data.cronSecret = body.cronSecret || null
 
-  // 必須至少有一種登入方式
-  const hasPassword = body.password || existing?.encryptedPass
-  const hasToken = body.jwt || existing?.encryptedJwt
-  const hasUsername = body.username || existing?.username
-  if (!hasPassword && !hasToken) {
-    return NextResponse.json({ error: '請填入密碼或直接貼上 JWT Token' }, { status: 400 })
-  }
-  if (hasPassword && !hasUsername && !body.username) {
-    return NextResponse.json({ error: '使用帳密模式時，帳號為必填' }, { status: 400 })
+  // 若只更新 syncEnabled（開關切換），跳過登入方式驗證
+  const syncOnlyUpdate = Object.keys(body).length === 1 && body.syncEnabled !== undefined
+
+  if (!syncOnlyUpdate) {
+    // 必須至少有一種登入方式
+    const hasPassword = body.password || existing?.encryptedPass
+    const hasToken = body.jwt || existing?.encryptedJwt
+    const hasUsername = body.username || existing?.username
+    if (!hasPassword && !hasToken) {
+      return NextResponse.json({ error: '請填入密碼或直接貼上 JWT Token' }, { status: 400 })
+    }
+    if (hasPassword && !hasUsername && !body.username) {
+      return NextResponse.json({ error: '使用帳密模式時，帳號為必填' }, { status: 400 })
+    }
   }
 
   if (existing) {

@@ -40,6 +40,23 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
 
   // Sync 開關
   const [syncEnabled, setSyncEnabled] = useState(initialConfig?.syncEnabled ?? true)
+  const [syncToggling, setSyncToggling] = useState(false)
+
+  async function handleToggleSync() {
+    const next = !syncEnabled
+    setSyncEnabled(next)
+    setSyncToggling(true)
+    try {
+      await fetch('/api/settings/patisco', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ syncEnabled: next }),
+      })
+      router.refresh()
+    } finally {
+      setSyncToggling(false)
+    }
+  }
 
   // 安全設定
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -317,8 +334,9 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
           </div>
           <button
             type="button"
-            onClick={() => setSyncEnabled(v => !v)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+            onClick={handleToggleSync}
+            disabled={syncToggling}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-60 ${
               syncEnabled ? 'bg-green-500' : 'bg-gray-300'
             }`}
           >
