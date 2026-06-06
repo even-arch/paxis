@@ -21,8 +21,10 @@ export async function GET() {
     select: {
       id: true,
       piNo: true,
+      orderId: true,
       order: {
         select: {
+          id: true,
           totalAmount: true,
           currencyCode: true,
           customer: {
@@ -37,6 +39,7 @@ export async function GET() {
           },
           items: {
             select: {
+              id: true,
               quantity: true,
               unitPrice: true,
               unit: true,
@@ -58,6 +61,7 @@ export async function GET() {
   const result = pis.map(pi => ({
     id: pi.id,
     piNo: pi.piNo,
+    orderId: pi.orderId,
     customerName: pi.order.customer?.name ?? null,
     totalAmount: pi.order.totalAmount ? Number(pi.order.totalAmount) : null,
     currencyCode: pi.order.currencyCode,
@@ -67,6 +71,7 @@ export async function GET() {
     customerPostal: pi.order.customer?.postalCode ?? null,
     customerTaxId: pi.order.customer?.taxId ?? null,
     items: pi.order.items.map(it => ({
+      slsItemId: it.id,
       sku: it.product.sku ?? '',
       modelNo: it.product.modelNo ?? '',
       name: it.product.name,

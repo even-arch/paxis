@@ -31,7 +31,7 @@ type CustomerDraft = {
 type SavedProduct = { productId: number; productName: string; sku: string | null; qty: number; unitPrice: number; unit: string; isNew: boolean }
 type SavedCustomer = { customerId: number; customerName: string; isNew: boolean }
 
-type Mode = 'upload' | 'products' | 'customer' | 'order'
+type Mode = 'upload' | 'products' | 'customer' | 'order' | 'success'
 
 export default function SalesImportWizard({
   customers: initCustomers,
@@ -64,13 +64,18 @@ export default function SalesImportWizard({
     productId: number; productName: string; sku: string | null; qty: string; unitPrice: string; unit: string
   }[]>([])
 
+  const [createdOrderId, setCreatedOrderId] = useState<number | null>(null)
+  const [creatingPi, setCreatingPi] = useState(false)
+  const [createdPiNo, setCreatedPiNo] = useState<string | null>(null)
+  const [piError, setPiError] = useState('')
+
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   const stepLabels = ['上傳訂單', '確認產品', '確認客戶', '建立銷售訂單']
-  const stepIdx = { upload: 0, products: 1, customer: 2, order: 3 }[mode]
+  const stepIdx = ({ upload: 0, products: 1, customer: 2, order: 3, success: 3 } as Record<Mode, number>)[mode]
 
   // ─── 步驟 0：上傳 & AI 解析 ─────────────────────────────────────────────────
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -250,12 +255,42 @@ export default function SalesImportWizard({
       })
       const json = await res.json() as { id?: number; error?: string }
       if (!res.ok) throw new Error(json.error ?? `建立失敗 (HTTP ${res.status})`)
-      router.push(`/sales/${json.id}`)
-      router.refresh()
+      setCreatedOrderId(json.id!)
+      setMode('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setSaving(false)
+    }
+  }
+
+  // ─── 步驟 3 完成後：選擇性建立 PI ──────────────────────────────────────────
+  async function handleCreatePi() {
+    if (!createdOrderId) return
+    setCreatingPi(true); setPiError('')
+    try {
+      // 先取訂單品項（含 slsItemId）
+      const orderRes = await fetch(`/api/sales/${createdOrderId}`)
+      const orderData = await orderRes.json()
+      if (!orderRes.ok) throw new Error(orderData.error ?? '無法取得訂單資料')
+      const items = (orderData.items ?? []).map((it: { id: number; quantity: number }) => ({
+        slsItemId: it.id,
+        quantity: it.quantity,
+      }))
+      if (!items.length) throw new Error('訂單無品項')
+
+      const piRes = await fetch(`/api/sales/${createdOrderId}/pi`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items }),
+      })
+      const piData = await piRes.json()
+      if (!piRes.ok) throw new Error(piData.error ?? 'PI 建立失敗')
+      setCreatedPiNo(piData.piNo)
+    } catch (err) {
+      setPiError(err instanceof Error ? err.message : 'PI 建立失敗')
+    } finally {
+      setCreatingPi(false)
     }
   }
 
@@ -509,6 +544,54 @@ export default function SalesImportWizard({
             </button>
           </div>
         </div>
+      </div>
+    )
+  }
+
+  // ══ 完成畫面 ══
+  if (mode === 'success' && createdOrderId) {
+    return (
+      <div className="max-w-lg space-y-5">
+        <div className="bg-green-50 border border-green-300 rounded-xl p-6 text-center space-y-2">
+          <div className="text-4xl">✅</div>
+          <h2 className="text-lg font-semibold text-green-800">銷售訂單已建立</h2>
+          <p className="text-sm text-gray-600">
+            訂單號：<span className="font-mono font-bold">{orderRefNo || `#${createdOrderId}`}</span>
+          </p>
+        </div>
+
+        {!createdPiNo ? (
+          <div className="bg-white rounded-xl border p-5 space-y-3">
+            <h3 className="text-sm font-semibold text-gray-800">同時建立 PI 給客戶？</h3>
+            <p className="text-xs text-gray-500">
+              PI 將包含全部訂單品項，並自動預留庫存（reservedQty++）。
+              若稍後再建立，請到訂單頁面操作。
+            </p>
+            {piError && (
+              <p className="text-sm text-red-600 bg-red-50 rounded px-3 py-1.5">❌ {piError}</p>
+            )}
+            <div className="flex gap-3">
+              <button type="button" onClick={handleCreatePi} disabled={creatingPi}
+                className="flex-1 bg-teal-600 text-white py-2 rounded-md text-sm font-medium hover:bg-teal-700 disabled:opacity-50">
+                {creatingPi ? '建立中…' : '✓ 是，建立 PI'}
+              </button>
+              <button type="button"
+                onClick={() => { router.push(`/sales/${createdOrderId}`); router.refresh() }}
+                className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-md text-sm hover:bg-gray-50">
+                稍後再建立，前往訂單
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-teal-50 border border-teal-200 rounded-xl p-5 space-y-2">
+            <p className="text-sm font-semibold text-teal-800">✓ PI 已建立</p>
+            <p className="text-xs text-gray-600">PI 號：<span className="font-mono font-bold">{createdPiNo}</span></p>
+            <p className="text-xs text-gray-500">庫存已預留（reservedQty++）</p>
+            <button type="button"
+              onClick={() => { router.push(`/sales/${createdOrderId}`); router.refresh() }}
+              className="mt-2 text-teal-700 text-sm underline">→ 前往訂單</button>
+          </div>
+        )}
       </div>
     )
   }

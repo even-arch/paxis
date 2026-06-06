@@ -71,6 +71,12 @@ export async function GET(req: NextRequest) {
       `ALTER TABLE "PO_Order" ADD COLUMN IF NOT EXISTS "salesOrderId" INTEGER REFERENCES "SLS_Order"("id") ON DELETE SET NULL`,
       `CREATE INDEX IF NOT EXISTS "PO_Order_salesOrderId_idx" ON "PO_Order"("salesOrderId")`,
       `ALTER TABLE "SYS_PatiscoConfig" ADD COLUMN IF NOT EXISTS "syncEnabled" BOOLEAN NOT NULL DEFAULT true`,
+      `ALTER TABLE "SLS_ShipmentItem" ADD COLUMN IF NOT EXISTS "cartons" INTEGER`,
+      `ALTER TABLE "SLS_ShipmentItem" ADD COLUMN IF NOT EXISTS "grossWeightKg" NUMERIC`,
+      `ALTER TABLE "SLS_ShipmentItem" ADD COLUMN IF NOT EXISTS "netWeightKg" NUMERIC`,
+      `ALTER TABLE "SLS_ShipmentItem" ADD COLUMN IF NOT EXISTS "cbm" NUMERIC`,
+      `ALTER TABLE "SLS_Shipment" ADD COLUMN IF NOT EXISTS "packingListNo" TEXT`,
+      `ALTER TABLE "SLS_Shipment" ADD COLUMN IF NOT EXISTS "commercialInvNo" TEXT`,
     ]
     const migResult: string[] = []
     for (const stmt of stmts) {

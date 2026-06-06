@@ -763,6 +763,10 @@ model SLS_Shipment {
   patiscoDocId  String?
   patiscoDocNo  String?
 
+  // 出貨文件號（Packing List / Commercial Invoice 上的編號，供核對用）
+  packingListNo     String?
+  commercialInvNo   String?
+
   note        String?
 
   items          SLS_ShipmentItem[]
@@ -781,6 +785,12 @@ model SLS_ShipmentItem {
   slsItem       SLS_Item     @relation(fields: [slsItemId], references: [id])
 
   quantity      Int
+
+  // 裝箱資料（Packing List 必要欄位）
+  cartons       Int?       // 箱數
+  grossWeightKg Decimal?  // 毛重（kg）
+  netWeightKg   Decimal?  // 淨重（kg）
+  cbm           Decimal?  // 材積（m³）
 
   @@index([shipmentId])
   @@map("SLS_ShipmentItem")

@@ -9,6 +9,10 @@ type Params = { params: { id: string } }
 interface ShipItem {
   slsItemId: number
   quantity: number
+  cartons?: number | null
+  grossWeightKg?: number | null
+  netWeightKg?: number | null
+  cbm?: number | null
 }
 
 export async function POST(req: NextRequest, {
@@ -27,6 +31,8 @@ export async function POST(req: NextRequest, {
     portOfLoading?: string | null
     portOfDischarge?: string | null
     trackingNo?: string | null
+    packingListNo?: string | null
+    commercialInvNo?: string | null
     note?: string | null
     items: ShipItem[]
   }
@@ -74,6 +80,8 @@ export async function POST(req: NextRequest, {
       portOfLoading: body.portOfLoading ?? null,
       portOfDischarge: body.portOfDischarge ?? null,
       trackingNo: body.trackingNo ?? null,
+      packingListNo: body.packingListNo ?? null,
+      commercialInvNo: body.commercialInvNo ?? null,
       note: body.note ?? null,
       source: 'MANUAL',
       performedBy: userId,
@@ -82,6 +90,10 @@ export async function POST(req: NextRequest, {
         create: body.items.map(i => ({
           slsItemId: i.slsItemId,
           quantity: i.quantity,
+          cartons: i.cartons ?? null,
+          grossWeightKg: i.grossWeightKg != null ? String(i.grossWeightKg) : null,
+          netWeightKg: i.netWeightKg != null ? String(i.netWeightKg) : null,
+          cbm: i.cbm != null ? String(i.cbm) : null,
         })),
       },
     },

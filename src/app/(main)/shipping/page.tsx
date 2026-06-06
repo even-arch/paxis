@@ -62,6 +62,7 @@ interface ShippingOption {
 }
 
 interface PiItem {
+  slsItemId: number
   sku: string
   modelNo: string
   name: string
@@ -75,6 +76,7 @@ interface PiItem {
 interface PiSummary {
   id: number
   piNo: string
+  orderId: number
   customerName: string | null
   totalAmount: number | null
   currencyCode: string
@@ -312,6 +314,14 @@ export default function ShippingPage() {
   const [pickupReady, setPickupReady] = useState('1400')
   const [pickupClose, setPickupClose] = useState('1800')
   const [pickupPhone, setPickupPhone] = useState('')
+
+  // Save to PAXIS
+  const [paxisSaving, setPaxisSaving] = useState(false)
+  const [paxisSaved, setPaxisSaved] = useState<{ shipmentNo: string; shipmentId: number } | null>(null)
+  const [paxisError, setPaxisError] = useState('')
+  const [paxisActualShipDate, setPaxisActualShipDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [paxisPackingListNo, setPaxisPackingListNo] = useState('')
+  const [paxisCommercialInvNo, setPaxisCommercialInvNo] = useState('')
 
   // 建提單（確認後才執行）
   const [creatingShipment, setCreatingShipment] = useState(false)
@@ -552,6 +562,74 @@ export default function ShippingPage() {
       setShipmentError(err instanceof Error ? err.message : '建提單失敗')
     } finally {
       setCreatingShipment(false)
+    }
+  }
+
+  // ── Save to PAXIS ────────────────────────────────────────────────────────────
+
+  async function handleSaveToPaxis() {
+    const pi = piList.find(p => p.id === selectedPiId)
+    if (!pi) { setPaxisError('請先選擇一份 PI'); return }
+    if (!paxisActualShipDate) { setPaxisError('請填寫實際出貨日'); return }
+
+    setPaxisSaving(true); setPaxisError(''); setPaxisSaved(null)
+    try {
+      // 整合所有箱子的品項（按 sku 合算數量、毛重、cbm）
+      const skuMap: Record<string, { qty: number; gw: number; nw: number; cbm: number; boxes: number }> = {}
+      packages.forEach(pkg => {
+        const boxes = parseInt(pkg.quantity) || 1
+        const gwPerBox = parseFloat(pkg.grossWeightKg) || 0
+        const nwPerBox = parseFloat(pkg.netWeightKg) || 0
+        const cbmPerBox = parseFloat(pkg.cbmStr) || 0
+        pkg.items.forEach(it => {
+          const sku = it.sku || it.modelNo
+          if (!sku) return
+          const qty = (parseFloat(it.qty) || 0) * boxes
+          if (!skuMap[sku]) skuMap[sku] = { qty: 0, gw: 0, nw: 0, cbm: 0, boxes: 0 }
+          skuMap[sku].qty += qty
+          skuMap[sku].gw += gwPerBox * boxes
+          skuMap[sku].nw += nwPerBox * boxes
+          skuMap[sku].cbm += cbmPerBox * boxes
+          skuMap[sku].boxes += boxes
+        })
+      })
+
+      // 比對 PI 品項的 slsItemId
+      const items = pi.items
+        .filter(it => it.slsItemId)
+        .map(it => {
+          const sku = it.sku || it.modelNo
+          const packed = skuMap[sku]
+          return {
+            slsItemId: it.slsItemId,
+            quantity: packed?.qty ?? it.quantity,
+            cartons: packed?.boxes ?? null,
+            grossWeightKg: packed?.gw ?? null,
+            netWeightKg: packed?.nw ?? null,
+            cbm: packed?.cbm ?? null,
+          }
+        })
+
+      const res = await fetch(`/api/sales/${pi.orderId}/shipment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          piId: pi.id,
+          actualShipDate: paxisActualShipDate,
+          packingListNo: paxisPackingListNo || null,
+          commercialInvNo: paxisCommercialInvNo || null,
+          shippingMethod: selectedOption ? `UPS ${selectedOption.serviceName}` : null,
+          trackingNo: shipmentResult?.trackingNumber ?? null,
+          items,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? '儲存失敗')
+      setPaxisSaved({ shipmentNo: data.shipmentNo, shipmentId: data.shipmentId })
+    } catch (err) {
+      setPaxisError(err instanceof Error ? err.message : '儲存失敗')
+    } finally {
+      setPaxisSaving(false)
     }
   }
 
@@ -1290,6 +1368,68 @@ export default function ShippingPage() {
           {shipmentError && (
             <p className="text-sm text-amber-700 bg-amber-50 rounded p-2">⚠️ {shipmentError}</p>
           )}
+        </div>
+      )}
+
+      {/* ── Section F: Save to PAXIS ── */}
+      {selectedPiId && !paxisSaved && (
+        <div className="bg-white rounded-lg border border-indigo-200 p-5 space-y-4">
+          <div>
+            <h2 className="text-sm font-semibold text-indigo-800">記錄出貨到 PAXIS</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              將本次出貨資料（箱數、毛重、材積）儲存為 SLS_Shipment，
+              並自動扣減庫存及建立應收帳款。
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs text-gray-500">實際出貨日 *</label>
+              <input type="date" value={paxisActualShipDate}
+                onChange={e => setPaxisActualShipDate(e.target.value)}
+                className="mt-1 w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">裝箱單號 P/L No.</label>
+              <input value={paxisPackingListNo}
+                onChange={e => setPaxisPackingListNo(e.target.value)}
+                placeholder="選填"
+                className="mt-1 w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">商業發票號 C/I No.</label>
+              <input value={paxisCommercialInvNo}
+                onChange={e => setPaxisCommercialInvNo(e.target.value)}
+                placeholder="選填"
+                className="mt-1 w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+            </div>
+          </div>
+          {shipmentResult?.trackingNumber && (
+            <p className="text-xs text-green-600 bg-green-50 rounded px-3 py-1.5">
+              ✓ UPS Tracking No. <span className="font-mono font-bold">{shipmentResult.trackingNumber}</span> 將一併記錄
+            </p>
+          )}
+          {paxisError && (
+            <p className="text-sm text-red-600 bg-red-50 rounded px-2 py-1.5">❌ {paxisError}</p>
+          )}
+          <button type="button" onClick={handleSaveToPaxis} disabled={paxisSaving}
+            className="w-full bg-indigo-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
+            {paxisSaving ? '儲存中…' : '✓ 確認記錄出貨到 PAXIS'}
+          </button>
+        </div>
+      )}
+
+      {/* PAXIS 儲存成功 */}
+      {paxisSaved && (
+        <div className="bg-white rounded-lg border border-green-300 p-5">
+          <h2 className="text-sm font-semibold text-green-700">✓ 已記錄到 PAXIS</h2>
+          <div className="mt-2 space-y-1 text-xs text-gray-600">
+            <p>出貨單號：<span className="font-mono font-bold">{paxisSaved.shipmentNo}</span></p>
+            <p className="text-gray-400">庫存已扣減，應收帳款已建立</p>
+          </div>
+          <a href={`/sales`}
+            className="mt-3 inline-block text-xs text-indigo-600 hover:underline">
+            → 前往銷售訂單查看
+          </a>
         </div>
       )}
 
