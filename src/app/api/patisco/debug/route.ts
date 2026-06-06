@@ -58,6 +58,32 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl
   const tool = searchParams.get('tool') ?? ''
 
+  // migration 和 aiConfig 不需要 Patisco 連線，提前處理
+  if (tool === 'migration') {
+    const { neon } = await import('@neondatabase/serverless')
+    const sql = neon(process.env.DATABASE_URL!)
+    const execRaw = (q: string) => {
+      const t = Object.assign([q], { raw: [q] }) as unknown as TemplateStringsArray
+      return (sql as unknown as (t: TemplateStringsArray) => Promise<unknown[]>)(t)
+    }
+    const stmts = [
+      `ALTER TABLE "PO_SupplierPI" ADD COLUMN IF NOT EXISTS "patiscoCreatedAt" TIMESTAMP WITH TIME ZONE`,
+      `ALTER TABLE "PO_Order" ADD COLUMN IF NOT EXISTS "salesOrderId" INTEGER REFERENCES "SLS_Order"("id") ON DELETE SET NULL`,
+      `CREATE INDEX IF NOT EXISTS "PO_Order_salesOrderId_idx" ON "PO_Order"("salesOrderId")`,
+      `ALTER TABLE "SYS_PatiscoConfig" ADD COLUMN IF NOT EXISTS "syncEnabled" BOOLEAN NOT NULL DEFAULT true`,
+    ]
+    const migResult: string[] = []
+    for (const stmt of stmts) {
+      try {
+        await execRaw(stmt)
+        migResult.push(`OK: ${stmt.substring(0, 80)}`)
+      } catch (e) {
+        migResult.push(`ERR: ${(e as Error).message}`)
+      }
+    }
+    return NextResponse.json({ migration: migResult })
+  }
+
   const creds = await patiscoLogin(prisma)
   if (!creds) {
     return NextResponse.json({ error: 'Patisco login failed — 請確認租戶 Patisco 設定是否完整' }, { status: 503 })
@@ -178,32 +204,6 @@ export async function GET(req: NextRequest) {
         products: { total: totalProducts, namedUnnamed, nameIsModelNo, noHts },
         actionNeeded: nameIsModelNo + namedUnnamed + noHts > 0,
       }
-      break
-    }
-    // ── migration：補欄位（一次性，僅 admin 使用）────────────────────────────
-    case 'migration': {
-      const { neon } = await import('@neondatabase/serverless')
-      const sql = neon(process.env.DATABASE_URL!)
-      const execRaw = (q: string) => {
-        const t = Object.assign([q], { raw: [q] }) as unknown as TemplateStringsArray
-        return (sql as unknown as (t: TemplateStringsArray) => Promise<unknown[]>)(t)
-      }
-      const stmts = [
-        `ALTER TABLE "PO_SupplierPI" ADD COLUMN IF NOT EXISTS "patiscoCreatedAt" TIMESTAMP WITH TIME ZONE`,
-        `ALTER TABLE "PO_Order" ADD COLUMN IF NOT EXISTS "salesOrderId" INTEGER REFERENCES "SLS_Order"("id") ON DELETE SET NULL`,
-        `CREATE INDEX IF NOT EXISTS "PO_Order_salesOrderId_idx" ON "PO_Order"("salesOrderId")`,
-        `ALTER TABLE "SYS_PatiscoConfig" ADD COLUMN IF NOT EXISTS "syncEnabled" BOOLEAN NOT NULL DEFAULT true`,
-      ]
-      const migResult: string[] = []
-      for (const stmt of stmts) {
-        try {
-          await execRaw(stmt)
-          migResult.push(`OK: ${stmt.substring(0, 80)}`)
-        } catch (e) {
-          migResult.push(`ERR: ${(e as Error).message}`)
-        }
-      }
-      result = { migration: migResult }
       break
     }
     default:
