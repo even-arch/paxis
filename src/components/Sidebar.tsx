@@ -15,6 +15,7 @@ const navItems = [
   { label: '庫存管理', href: '/inventory', icon: '🗃️' },
   { label: '對帳 / 付款', href: '/finance', icon: '💳' },
   { label: '到岸成本試算', href: '/cost', icon: '🧮' },
+  { label: '匯入出貨文件', href: '/sales/shipment-import', icon: '📥' },
   { label: 'UPS 出貨查詢', href: '/shipping', icon: '🚚' },
 ]
 
