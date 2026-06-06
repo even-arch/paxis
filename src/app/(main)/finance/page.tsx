@@ -178,7 +178,7 @@ export default function FinancePage() {
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">供應商</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">採購單</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">供應商訂單</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">入庫日</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">到期日</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-600">應付 (TWD)</th>
@@ -245,7 +245,7 @@ export default function FinancePage() {
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">客戶</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">銷售訂單</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">客戶訂單</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">出貨日</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">到期日</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-600">應收 (EUR)</th>

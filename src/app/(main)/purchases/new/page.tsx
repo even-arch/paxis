@@ -13,7 +13,7 @@ export default async function NewPurchasePage() {
       select: { id: true, name: true, sku: true, unit: true, specification: true },
       orderBy: [{ sku: 'asc' }, { name: 'asc' }],
     }),
-    // 進行中的銷售訂單（排除已完成/取消），供接單後採購選擇
+    // 進行中的客戶訂單（排除已完成/取消），供接單後採購選擇
     prisma.sLS_Order.findMany({
       where: { status: { in: [0, 1, 2, 3] } },
       select: {
@@ -31,7 +31,7 @@ export default async function NewPurchasePage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">新增採購單</h1>
+        <h1 className="text-2xl font-bold text-gray-800">新增供應商訂單</h1>
         <a href="/import" className="text-sm text-purple-600 hover:text-purple-800">
           ✨ 改用 AI 匯入單據
         </a>

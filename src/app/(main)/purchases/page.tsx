@@ -50,16 +50,16 @@ export default async function PurchasesPage({
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">採購單</h1>
+        <h1 className="text-2xl font-bold text-gray-800">供應商訂單</h1>
         <Link href="/purchases/new"
           className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
-          + 新增採購單
+          + 新增供應商訂單
         </Link>
       </div>
 
       <form method="GET" className="mb-4 flex gap-2 flex-wrap">
         <input name="search" defaultValue={search}
-          placeholder="搜尋採購單號、Patisco 訂單號、供應商..."
+          placeholder="搜尋供應商訂單號、Patisco 訂單號、供應商..."
           className="border border-gray-300 rounded-md px-3 py-2 text-sm w-80 focus:outline-none focus:ring-2 focus:ring-blue-500" />
         <select name="status" defaultValue={statusFilter}
           className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -75,7 +75,7 @@ export default async function PurchasesPage({
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">採購單號</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">供應商訂單號</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Patisco 訂單</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">供應商</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">狀態</th>
@@ -87,7 +87,7 @@ export default async function PurchasesPage({
           <tbody className="divide-y divide-gray-100">
             {orders.length === 0 && (
               <tr><td colSpan={7} className="text-center py-12 text-gray-400">
-                尚無採購單
+                尚無供應商訂單
               </td></tr>
             )}
             {orders.map((o: typeof orders[0]) => {

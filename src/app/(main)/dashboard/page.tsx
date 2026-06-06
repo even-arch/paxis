@@ -197,7 +197,7 @@ export default async function DashboardPage() {
           <div className="flex items-center gap-3">
             <span className="text-xl">📄</span>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-gray-800 text-sm">AI 匯入採購單</p>
+              <p className="font-semibold text-gray-800 text-sm">AI 匯入供應商訂單</p>
               <p className="text-xs text-gray-500 mt-0.5 truncate">上傳供應商 PI，AI 自動建立</p>
             </div>
             <span className="text-gray-400">→</span>
@@ -229,9 +229,9 @@ export default async function DashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        {/* 待處理：銷售訂單待發 PI */}
+        {/* 待處理：客戶訂單待發 PI */}
         <Section
-          title="銷售訂單待發 PI"
+          title="客戶訂單待發 PI"
           count={ordersNeedingPI.length}
           href="/sales?status=1"
           accentColor="text-blue-600"
@@ -288,7 +288,7 @@ export default async function DashboardPage() {
           count={pendingPOs.length}
           href="/purchases"
           accentColor="text-teal-600"
-          emptyText="目前沒有在途採購單"
+          emptyText="目前沒有在途供應商訂單"
         >
           {pendingPOs.map(po => (
             <ActionRow

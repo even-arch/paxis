@@ -30,7 +30,7 @@ export interface ImportPurchaseInput {
     paymentTerms?: string | null
     currencyCode?: string | null
   }
-  // 採購單基本資料
+  // 供應商訂單基本資料
   po: {
     sourceType: number
     docRefNo: string
@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
       resolvedItems.push({ productId, qty: item.qty, unitPrice: item.unitPrice, unit: item.unit })
     }
 
-    // ── 3. 建立採購單 ──────────────────────────────────────────────────────────
+    // ── 3. 建立供應商訂單 ──────────────────────────────────────────────────────────
     const po = body.po
     const poNo = `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 9000) + 1000}`
 

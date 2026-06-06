@@ -1428,7 +1428,7 @@ export default function ShippingPage() {
           </div>
           <a href={`/sales`}
             className="mt-3 inline-block text-xs text-indigo-600 hover:underline">
-            → 前往銷售訂單查看
+            → 前往客戶訂單查看
           </a>
         </div>
       )}

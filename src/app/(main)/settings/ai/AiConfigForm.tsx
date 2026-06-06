@@ -21,7 +21,7 @@ const PROVIDERS = {
       { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4（最快最省，簡單文件）' },
     ],
     defaultModel: 'claude-opus-4-8',
-    costNote: '採購單解析每次約 USD $0.01–0.05',
+    costNote: '供應商訂單解析每次約 USD $0.01–0.05',
   },
   openai: {
     label: 'ChatGPT (OpenAI)',
@@ -34,7 +34,7 @@ const PROVIDERS = {
       { value: 'gpt-4o-mini', label: 'GPT-4o mini（省錢，適合簡單文件）' },
     ],
     defaultModel: 'gpt-4o',
-    costNote: '採購單解析每次約 USD $0.01–0.03',
+    costNote: '供應商訂單解析每次約 USD $0.01–0.03',
   },
 } as const
 
@@ -114,7 +114,7 @@ export default function AiConfigForm() {
         <div className="space-y-3">
           <Feature
             icon="📄"
-            title="採購單自動解析"
+            title="供應商訂單自動解析"
             desc="上傳供應商寄來的 PDF、圖片或 Excel，AI 自動讀取品名、料號、數量、單價、供應商名稱，一鍵填入採購表單，省去手動輸入。"
             tag="現已上線"
             tagColor="green"
@@ -269,7 +269,7 @@ export default function AiConfigForm() {
       <section className="border-t pt-5 text-xs text-gray-400 space-y-1">
         <p className="font-medium text-gray-500">關於計費（BYOK — Bring Your Own Key）</p>
         <p>• 所有 AI 功能直接使用您的服務帳號，費用由您的帳單計費，PAXIS 不收取任何 AI 費用。</p>
-        <p>• Anthropic 免費試用額度：新帳號約 USD $5，足夠測試數百張採購單。</p>
+        <p>• Anthropic 免費試用額度：新帳號約 USD $5，足夠測試數百張供應商訂單。</p>
         <p>• OpenAI 免費試用額度：新帳號約 USD $5（到期後需付費）。</p>
         <p>• 建議選用較強的解析模型（Opus / GPT-4o）以確保複雜 PDF 的解析準確率。</p>
       </section>

@@ -6,7 +6,7 @@ import { notifyPurchaseCreated } from '@/api/patisco/client'
 
 type Params = { params: { id: string } }
 
-/** 送出採購單（草稿 → 已送出） */
+/** 送出供應商訂單（草稿 → 已送出） */
 export async function POST(_req: NextRequest, {
   params }: Params) {
     const session = await getServerSession(authOptions)
@@ -20,7 +20,7 @@ export async function POST(_req: NextRequest, {
 
   if (!order) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (order.status !== 0) return NextResponse.json({ error: '只有草稿可以送出' }, { status: 400 })
-  if (order.items.length === 0) return NextResponse.json({ error: '採購單沒有明細' }, { status: 400 })
+  if (order.items.length === 0) return NextResponse.json({ error: '供應商訂單沒有明細' }, { status: 400 })
 
   const updated = await prisma.pO_Order.update({
     where: { id },

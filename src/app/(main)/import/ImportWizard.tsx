@@ -58,7 +58,7 @@ export default function ImportWizard({
   // ★ 步驟 2 成功寫入 DB 後的結果
   const [savedSupplier, setSavedSupplier] = useState<SavedSupplier | null>(null)
 
-  // 採購單欄位
+  // 供應商訂單欄位
   const [sourceType,   setSourceType]   = useState('0')
   const [docRefNo,     setDocRefNo]     = useState('')
   const [currencyCode, setCurrencyCode] = useState('USD')
@@ -75,7 +75,7 @@ export default function ImportWizard({
   const [error,   setError]   = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const stepLabels = ['上傳單據', '存入產品', '存入供應商', '建立採購單']
+  const stepLabels = ['上傳單據', '存入產品', '存入供應商', '建立供應商訂單']
   const stepIdx = { upload: 0, products: 1, supplier: 2, po: 3 }[mode]
 
   // ─── 步驟 0：上傳 & AI 解析 ─────────────────────────────────────────────────
@@ -236,7 +236,7 @@ export default function ImportWizard({
     }
   }
 
-  // ─── 步驟 3：建立採購單（供應商 & 產品均已在 DB）──────────────────────────
+  // ─── 步驟 3：建立供應商訂單（供應商 & 產品均已在 DB）──────────────────────────
   async function submitPO(e: React.FormEvent) {
     e.preventDefault()
     if (!savedSupplier) { setError('供應商尚未確認'); return }
@@ -322,9 +322,9 @@ export default function ImportWizard({
             className="w-full flex flex-col items-center gap-4 bg-white border-2 border-dashed border-purple-300 rounded-xl p-12 hover:border-purple-500 hover:bg-purple-50 transition-all text-center">
             <span className="text-5xl">📄</span>
             <div>
-              <p className="font-semibold text-gray-800 text-lg">點擊上傳採購單或形式發票（PI）</p>
+              <p className="font-semibold text-gray-800 text-lg">點擊上傳供應商訂單或形式發票（PI）</p>
               <p className="text-sm text-gray-500 mt-1">支援 PDF、Excel、圖片（JPG / PNG）</p>
-              <p className="text-xs text-purple-600 mt-3">AI 自動識別產品與供應商資料，逐步確認後建立採購單</p>
+              <p className="text-xs text-purple-600 mt-3">AI 自動識別產品與供應商資料，逐步確認後建立供應商訂單</p>
             </div>
           </button>
         )}
@@ -549,7 +549,7 @@ export default function ImportWizard({
   }
 
   // ══════════════════════════════════════════════════════════════════════════════
-  // 步驟 3：建立採購單（產品與供應商均已在 DB）
+  // 步驟 3：建立供應商訂單（產品與供應商均已在 DB）
   // ══════════════════════════════════════════════════════════════════════════════
   const subtotal = poItems.reduce((s, i) => s + (parseFloat(i.qty) || 0) * (parseFloat(i.unitPrice) || 0), 0)
 
@@ -570,7 +570,7 @@ export default function ImportWizard({
       <ErrBar />
 
       <section className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-base font-semibold text-gray-700 mb-4">採購單資料</h2>
+        <h2 className="text-base font-semibold text-gray-700 mb-4">供應商訂單資料</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="採購觸發來源" required>
             <select value={sourceType} onChange={e => setSourceType(e.target.value)} className={inp}>
@@ -579,7 +579,7 @@ export default function ImportWizard({
               <option value="2">安全庫存觸發（低於警戒線）</option>
             </select>
           </Field>
-          <Field label="採購單號">
+          <Field label="供應商訂單號">
             <input type="text" value={docRefNo} onChange={e => setDocRefNo(e.target.value)} className={inp} placeholder="沿用原始文件號，空白則自動產生" />
           </Field>
           <div>
@@ -667,7 +667,7 @@ export default function ImportWizard({
       <div className="flex gap-3">
         <button type="submit" disabled={saving}
           className="bg-blue-600 text-white px-8 py-2.5 rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-          {saving ? '建立中…' : '✓ 確認，建立採購單'}
+          {saving ? '建立中…' : '✓ 確認，建立供應商訂單'}
         </button>
         <button type="button" onClick={() => { setError(''); setMode('supplier') }}
           className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm hover:bg-gray-50">← 修改供應商</button>

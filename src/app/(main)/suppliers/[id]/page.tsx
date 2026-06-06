@@ -92,10 +92,10 @@ export default async function SupplierDetailPage({
           </Card>
         )}
 
-        {/* 採購單歷史 */}
-        <Card title={`採購單記錄（${recentOrders.length} 筆）`}>
+        {/* 供應商訂單歷史 */}
+        <Card title={`供應商訂單記錄（${recentOrders.length} 筆）`}>
           {recentOrders.length === 0 ? (
-            <p className="text-sm text-gray-400">尚無採購單</p>
+            <p className="text-sm text-gray-400">尚無供應商訂單</p>
           ) : (
             <table className="w-full text-sm">
               <thead>

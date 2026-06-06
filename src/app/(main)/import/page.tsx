@@ -22,7 +22,7 @@ export default async function ImportPage() {
       <div className="mb-6">
         <a href="/dashboard" className="text-sm text-gray-400 hover:text-gray-600">← 返回總覽</a>
         <h1 className="text-2xl font-bold text-gray-800 mt-1">AI 匯入單據</h1>
-        <p className="text-sm text-gray-500 mt-1">上傳採購單或形式發票，系統自動建立產品、供應商，再幫你預填採購單。</p>
+        <p className="text-sm text-gray-500 mt-1">上傳供應商訂單或形式發票，系統自動建立產品、供應商，再幫你預填供應商訂單。</p>
       </div>
       <ImportWizard suppliers={suppliers} products={products} />
     </div>

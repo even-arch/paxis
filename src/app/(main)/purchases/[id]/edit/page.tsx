@@ -22,7 +22,7 @@ export default async function EditPurchasePage({
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">編輯採購單</h1>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">編輯供應商訂單</h1>
       <PurchaseEditForm order={order} suppliers={suppliers} />
     </div>
   )

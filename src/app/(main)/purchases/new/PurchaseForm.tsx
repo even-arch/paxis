@@ -25,7 +25,7 @@ export default function PurchaseForm({
 
   const [supplierId,    setSupplierId]    = useState('')
   const [sourceType,    setSourceType]    = useState('0')
-  const [salesOrderId,  setSalesOrderId]  = useState('')   // 來源銷售訂單 ID
+  const [salesOrderId,  setSalesOrderId]  = useState('')   // 來源客戶訂單 ID
   const [salesOrderNo,  setSalesOrderNo]  = useState('')   // 同步顯示用
   const [poNoOverride,  setPoNoOverride]  = useState('')   // 用戶可自訂後綴（空=沿用銷售單號）
   const [docRefNo,      setDocRefNo]      = useState('')
@@ -39,13 +39,13 @@ export default function PurchaseForm({
   const [error,         setError]         = useState('')
   const [saving,        setSaving]        = useState(false)
 
-  // sourceType 切換到「接單後採購」時，清除已選銷售訂單
+  // sourceType 切換到「接單後採購」時，清除已選客戶訂單
   function handleSourceTypeChange(val: string) {
     setSourceType(val)
     if (val !== '1') { setSalesOrderId(''); setSalesOrderNo(''); setPoNoOverride('') }
   }
 
-  // 選擇銷售訂單：同步填入採購單號預設值
+  // 選擇客戶訂單：同步填入供應商訂單號預設值
   function handleSalesOrderChange(id: string) {
     setSalesOrderId(id)
     const so = salesOrders.find(s => String(s.id) === id)
@@ -53,7 +53,7 @@ export default function PurchaseForm({
     setPoNoOverride('')   // 清空覆蓋，預設用原始單號
   }
 
-  // 最終採購單號：poNoOverride 有填用覆蓋值；否則用銷售單號；否則留空讓後端 generatePoNo()
+  // 最終供應商訂單號：poNoOverride 有填用覆蓋值；否則用銷售單號；否則留空讓後端 generatePoNo()
   const finalPoNo = poNoOverride.trim() || salesOrderNo || ''
 
   function handleSupplierChange(id: string) {
@@ -81,7 +81,7 @@ export default function PurchaseForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!supplierId) { setError('請選擇供應商'); return }
-    if (sourceType === '1' && !salesOrderId) { setError('接單後採購必須選擇來源銷售訂單'); return }
+    if (sourceType === '1' && !salesOrderId) { setError('接單後採購必須選擇來源客戶訂單'); return }
     const valid = items.filter(i => i.productId && i.quantity && i.unitPrice)
     if (!valid.length) { setError('請至少輸入一項採購明細'); return }
     setSaving(true); setError('')
@@ -119,11 +119,11 @@ export default function PurchaseForm({
             </select>
           </Field>
 
-          {/* 接單後採購：選擇來源銷售訂單 */}
+          {/* 接單後採購：選擇來源客戶訂單 */}
           {sourceType === '1' && (
-            <Field label="來源銷售訂單" required>
+            <Field label="來源客戶訂單" required>
               <select value={salesOrderId} onChange={e => handleSalesOrderChange(e.target.value)} className={inp} required>
-                <option value="">請選擇銷售訂單</option>
+                <option value="">請選擇客戶訂單</option>
                 {salesOrders.map(so => (
                   <option key={so.id} value={so.id}>
                     {so.orderNo}
@@ -137,7 +137,7 @@ export default function PurchaseForm({
               {salesOrderNo && (
                 <div className="mt-2 space-y-1">
                   <p className="text-xs text-gray-500">
-                    採購單號預設為：
+                    供應商訂單號預設為：
                     <span className="font-mono font-medium text-gray-700 ml-1">{finalPoNo}</span>
                     （拆單時請加後綴，如 <span className="font-mono">{salesOrderNo}-1</span>）
                   </p>

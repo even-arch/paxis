@@ -81,9 +81,9 @@ export default async function CustomerDetailPage({
           </Card>
         )}
 
-        <Card title={`銷售訂單記錄（${recentOrders.length} 筆）`}>
+        <Card title={`客戶訂單記錄（${recentOrders.length} 筆）`}>
           {recentOrders.length === 0 ? (
-            <p className="text-sm text-gray-400">尚無銷售訂單</p>
+            <p className="text-sm text-gray-400">尚無客戶訂單</p>
           ) : (
             <table className="w-full text-sm">
               <thead>

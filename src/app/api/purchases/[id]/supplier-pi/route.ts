@@ -32,7 +32,7 @@ export async function POST(req: NextRequest, {
 
   if (!order) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (order.status === 3 || order.status === 4) {
-    return NextResponse.json({ error: '採購單已完成或取消' }, { status: 400 })
+    return NextResponse.json({ error: '供應商訂單已完成或取消' }, { status: 400 })
   }
 
   const supplierPI = await prisma.pO_SupplierPI.create({

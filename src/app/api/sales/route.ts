@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 
-// 銷售訂單狀態：0=草稿, 1=已確認, 2=PI已發出, 3=部分出貨, 4=完成, 5=取消
+// 客戶訂單狀態：0=草稿, 1=已確認, 2=PI已發出, 3=部分出貨, 4=完成, 5=取消
 
 export async function GET(req: NextRequest) {
     const session = await getServerSession(authOptions)

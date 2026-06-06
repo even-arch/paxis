@@ -102,7 +102,7 @@ export default async function InventoryDetailPage({
             建議補貨 {Math.max(0, safetyStock * 2 - currentStock).toLocaleString()} {product.unit ?? 'PCS'} 以回到安全水位的 2 倍。
           </p>
           <a href="/purchases/new" className="inline-block mt-2 text-sm text-blue-600 hover:underline">
-            → 建立採購單
+            → 建立供應商訂單
           </a>
         </div>
       )}

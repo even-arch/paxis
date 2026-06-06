@@ -45,7 +45,7 @@ export default async function SalesDetailPage({
 
   if (!order) notFound()
 
-  // 關聯採購單：優先用 salesOrderId FK，fallback 用單號前綴比對
+  // 關聯供應商訂單：優先用 salesOrderId FK，fallback 用單號前綴比對
   const linkedPurchaseOrders = await prisma.pO_Order.findMany({
     where: {
       OR: [
@@ -103,7 +103,7 @@ export default async function SalesDetailPage({
     <div className="max-w-4xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <Link href="/sales" className="text-sm text-gray-400 hover:text-gray-600">← 銷售訂單</Link>
+          <Link href="/sales" className="text-sm text-gray-400 hover:text-gray-600">← 客戶訂單</Link>
           <div className="flex items-center gap-3 mt-1">
             <h1 className="text-2xl font-bold text-gray-800 font-mono">{order.orderNo}</h1>
             <span className={`px-2 py-0.5 rounded text-xs font-medium ${badge.color}`}>{badge.label}</span>

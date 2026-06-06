@@ -1,7 +1,7 @@
 /**
  * SalesChainPanel — 交易鏈視圖
  *
- * 以 SKU 為粒度，顯示這張銷售訂單底下的採購單狀態，
+ * 以 SKU 為粒度，顯示這張客戶訂單底下的供應商訂單狀態，
  * 以及每個品項的「買價 vs 賣價」毛利比對。
  */
 
@@ -61,7 +61,7 @@ export default function SalesChainPanel({
     return (
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-base font-semibold text-gray-700 mb-3">交易鏈</h2>
-        <p className="text-sm text-gray-400">尚無關聯採購單。建立採購單時請選擇此銷售訂單作為來源。</p>
+        <p className="text-sm text-gray-400">尚無關聯供應商訂單。建立供應商訂單時請選擇此客戶訂單作為來源。</p>
       </div>
     )
   }
@@ -88,12 +88,12 @@ export default function SalesChainPanel({
     <div className="bg-white rounded-lg shadow overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
         <h2 className="text-base font-semibold text-gray-700">交易鏈</h2>
-        <span className="text-xs text-gray-400">{linkedPOs.length} 張採購單</span>
+        <span className="text-xs text-gray-400">{linkedPOs.length} 張供應商訂單</span>
       </div>
 
-      {/* ── 採購單狀態列表 ─────────────────────────────────────────────────── */}
+      {/* ── 供應商訂單狀態列表 ─────────────────────────────────────────────────── */}
       <div className="px-6 py-4 border-b border-gray-100">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">採購單</p>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">供應商訂單</p>
         <div className="flex flex-wrap gap-3">
           {linkedPOs.map(po => {
             const st = PO_STATUS[po.status] ?? PO_STATUS[0]
@@ -182,7 +182,7 @@ export default function SalesChainPanel({
 
         {slsItems.some(i => !buyMap.has(i.productId)) && (
           <p className="text-xs text-gray-400 mt-3">
-            * 部分品項尚無關聯採購單，買價無法計算。請在採購單建立時選擇此銷售訂單作為來源。
+            * 部分品項尚無關聯供應商訂單，買價無法計算。請在供應商訂單建立時選擇此客戶訂單作為來源。
           </p>
         )}
       </div>

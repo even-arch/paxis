@@ -56,7 +56,7 @@ export default async function SalesPage({
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">銷售訂單</h1>
+        <h1 className="text-2xl font-bold text-gray-800">客戶訂單</h1>
         <div className="flex gap-2">
           <Link href="/sales/import"
             className="bg-teal-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-teal-700">
@@ -96,7 +96,7 @@ export default async function SalesPage({
           <tbody className="divide-y divide-gray-100">
             {orders.length === 0 && (
               <tr><td colSpan={8} className="text-center py-12 text-gray-400">
-                {search ? `找不到「${search}」相關訂單` : '尚無銷售訂單'}
+                {search ? `找不到「${search}」相關訂單` : '尚無客戶訂單'}
               </td></tr>
             )}
             {orders.map(o => {

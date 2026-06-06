@@ -42,7 +42,7 @@ export default async function PurchaseDetailPage({
 
   if (!order) notFound()
 
-  // 關聯銷售訂單：優先用 salesOrderId FK，fallback 用單號比對
+  // 關聯客戶訂單：優先用 salesOrderId FK，fallback 用單號比對
   const [linkedSalesOrder, openSalesOrders] = await Promise.all([
     order.salesOrderId
       ? prisma.sLS_Order.findUnique({
@@ -58,7 +58,7 @@ export default async function PurchaseDetailPage({
           },
           select: { id: true, orderNo: true, status: true, customer: { select: { name: true } }, patiscoBuyerName: true },
         }),
-    // 供「連結銷售訂單」選單用
+    // 供「連結客戶訂單」選單用
     prisma.sLS_Order.findMany({
       where: { status: { in: [0, 1, 2, 3] } },
       select: { id: true, orderNo: true, customer: { select: { name: true } }, patiscoBuyerName: true },
@@ -79,7 +79,7 @@ export default async function PurchaseDetailPage({
     <div className="max-w-4xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <Link href="/purchases" className="text-sm text-gray-400 hover:text-gray-600">← 採購單列表</Link>
+          <Link href="/purchases" className="text-sm text-gray-400 hover:text-gray-600">← 供應商訂單列表</Link>
           <div className="flex items-center gap-3 mt-1">
             <h1 className="text-2xl font-bold text-gray-800 font-mono">{order.poNo}</h1>
             <span className={`px-2 py-0.5 rounded text-xs font-medium ${badge.color}`}>{badge.label}</span>
@@ -136,10 +136,10 @@ export default async function PurchaseDetailPage({
           {order.note && <div className="col-span-3"><Row label="備註" value={order.note} /></div>}
         </div>
 
-        {/* 來源銷售訂單 */}
+        {/* 來源客戶訂單 */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg px-5 py-4">
           <div className="flex items-center justify-between mb-1">
-            <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">來源銷售訂單</p>
+            <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">來源客戶訂單</p>
             <LinkSalesOrderButton
               poId={order.id}
               currentSalesOrderId={linkedSalesOrder?.id ?? null}
@@ -162,7 +162,7 @@ export default async function PurchaseDetailPage({
               <span className="text-xs text-gray-400">→ 查看交易鏈</span>
             </Link>
           ) : (
-            <p className="text-sm text-gray-400 mt-1">尚未連結客戶訂單。點右上角「+ 連結銷售訂單」補上連結。</p>
+            <p className="text-sm text-gray-400 mt-1">尚未連結客戶訂單。點右上角「+ 連結客戶訂單」補上連結。</p>
           )}
         </div>
 
@@ -258,7 +258,7 @@ export default async function PurchaseDetailPage({
                         <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
                           <th className="pb-1.5 font-normal">商品</th>
                           <th className="pb-1.5 font-normal text-right">入庫數量</th>
-                          <th className="pb-1.5 font-normal text-right">採購單價</th>
+                          <th className="pb-1.5 font-normal text-right">供應商訂單價</th>
                           <th className="pb-1.5 font-normal text-right">實際成本</th>
                         </tr>
                       </thead>
@@ -304,10 +304,10 @@ export default async function PurchaseDetailPage({
         )}
 
         {isDraft && (
-          <p className="text-xs text-gray-400 text-center">草稿狀態，請點「送出採購單」後即可對工廠發出正式訂單</p>
+          <p className="text-xs text-gray-400 text-center">草稿狀態，請點「送出供應商訂單」後即可對工廠發出正式訂單</p>
         )}
         {canReceive && (
-          <p className="text-xs text-gray-400 text-center">採購單已送出，收到貨物後點「確認入庫」更新庫存</p>
+          <p className="text-xs text-gray-400 text-center">供應商訂單已送出，收到貨物後點「確認入庫」更新庫存</p>
         )}
       </div>
     </div>

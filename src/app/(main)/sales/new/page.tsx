@@ -21,8 +21,8 @@ export default async function SalesNewPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <Link href="/sales" className="text-sm text-gray-400 hover:text-gray-600">← 銷售訂單</Link>
-          <h1 className="text-2xl font-bold text-gray-800 mt-1">手動建立銷售訂單</h1>
+          <Link href="/sales" className="text-sm text-gray-400 hover:text-gray-600">← 客戶訂單</Link>
+          <h1 className="text-2xl font-bold text-gray-800 mt-1">手動建立客戶訂單</h1>
         </div>
         <Link href="/sales/import"
           className="border border-teal-400 text-teal-700 px-4 py-2 rounded-md text-sm hover:bg-teal-50">

@@ -43,7 +43,7 @@ export async function DELETE(_req: NextRequest, {
 
   // 已有入庫紀錄：不允許刪除（庫存已異動）
   if (order.receipts.length > 0) {
-    return NextResponse.json({ error: '此採購單已有入庫紀錄，無法刪除' }, { status: 400 })
+    return NextResponse.json({ error: '此供應商訂單已有入庫紀錄，無法刪除' }, { status: 400 })
   }
 
   // 草稿直接刪，已送出視同「取消」

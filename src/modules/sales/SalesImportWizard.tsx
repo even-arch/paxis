@@ -74,7 +74,7 @@ export default function SalesImportWizard({
   const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const stepLabels = ['上傳訂單', '確認產品', '確認客戶', '建立銷售訂單']
+  const stepLabels = ['上傳訂單', '確認產品', '確認客戶', '建立客戶訂單']
   const stepIdx = ({ upload: 0, products: 1, customer: 2, order: 3, success: 3 } as Record<Mode, number>)[mode]
 
   // ─── 步驟 0：上傳 & AI 解析 ─────────────────────────────────────────────────
@@ -226,7 +226,7 @@ export default function SalesImportWizard({
     }
   }
 
-  // ─── 步驟 3：建立銷售訂單 ───────────────────────────────────────────────────
+  // ─── 步驟 3：建立客戶訂單 ───────────────────────────────────────────────────
   async function submitOrder(e: React.FormEvent) {
     e.preventDefault()
     if (!savedCustomer) { setError('客戶尚未確認'); return }
@@ -339,7 +339,7 @@ export default function SalesImportWizard({
             <div>
               <p className="font-semibold text-gray-800 text-lg">點擊上傳客戶訂單文件</p>
               <p className="text-sm text-gray-500 mt-1">支援 PDF、Excel、圖片（JPG / PNG）</p>
-              <p className="text-xs text-teal-600 mt-3">AI 自動識別客戶資訊與訂購品項，逐步確認後建立銷售訂單</p>
+              <p className="text-xs text-teal-600 mt-3">AI 自動識別客戶資訊與訂購品項，逐步確認後建立客戶訂單</p>
             </div>
           </button>
         )}
@@ -554,7 +554,7 @@ export default function SalesImportWizard({
       <div className="max-w-lg space-y-5">
         <div className="bg-green-50 border border-green-300 rounded-xl p-6 text-center space-y-2">
           <div className="text-4xl">✅</div>
-          <h2 className="text-lg font-semibold text-green-800">銷售訂單已建立</h2>
+          <h2 className="text-lg font-semibold text-green-800">客戶訂單已建立</h2>
           <p className="text-sm text-gray-600">
             訂單號：<span className="font-mono font-bold">{orderRefNo || `#${createdOrderId}`}</span>
           </p>
@@ -596,7 +596,7 @@ export default function SalesImportWizard({
     )
   }
 
-  // ══ 步驟 3：建立銷售訂單 ══
+  // ══ 步驟 3：建立客戶訂單 ══
   const subtotal = orderItems.reduce((s, i) => s + (parseFloat(i.qty) || 0) * (parseFloat(i.unitPrice) || 0), 0)
 
   return (
@@ -615,7 +615,7 @@ export default function SalesImportWizard({
       <ErrBar />
 
       <section className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-base font-semibold text-gray-700 mb-4">銷售訂單資料</h2>
+        <h2 className="text-base font-semibold text-gray-700 mb-4">客戶訂單資料</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">客戶</label>
@@ -700,7 +700,7 @@ export default function SalesImportWizard({
       <div className="flex gap-3">
         <button type="submit" disabled={saving}
           className="bg-teal-600 text-white px-8 py-2.5 rounded-md text-sm font-medium hover:bg-teal-700 disabled:opacity-50">
-          {saving ? '建立中…' : '✓ 確認，建立銷售訂單'}
+          {saving ? '建立中…' : '✓ 確認，建立客戶訂單'}
         </button>
         <button type="button" onClick={() => { setError(''); setMode('customer') }}
           className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm hover:bg-gray-50">← 修改客戶</button>

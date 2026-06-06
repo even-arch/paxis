@@ -32,7 +32,7 @@ export async function POST(req: NextRequest, {
 
   if (!order) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (order.status === 3 || order.status === 4)
-    return NextResponse.json({ error: '此採購單已完成或取消' }, { status: 400 })
+    return NextResponse.json({ error: '此供應商訂單已完成或取消' }, { status: 400 })
 
   const receiveItems: ReceiveItem[] = body.items ?? []
   if (receiveItems.length === 0)
@@ -154,7 +154,7 @@ export async function POST(req: NextRequest, {
     }
   }
 
-  // 更新採購單狀態
+  // 更新供應商訂單狀態
   const updatedItems = await prisma.pO_Item.findMany({ where: { orderId } })
   const allReceived = updatedItems.every(i => i.receivedQty >= i.quantity)
   const anyReceived = updatedItems.some(i => i.receivedQty > 0)

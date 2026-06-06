@@ -21,7 +21,7 @@ export default async function SalesImportPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <Link href="/sales" className="text-sm text-gray-400 hover:text-gray-600">← 銷售訂單</Link>
+          <Link href="/sales" className="text-sm text-gray-400 hover:text-gray-600">← 客戶訂單</Link>
           <h1 className="text-2xl font-bold text-gray-800 mt-1">AI 匯入客戶訂單</h1>
           <p className="text-sm text-gray-500 mt-0.5">上傳客戶 PO 文件，AI 自動識別品項與客戶資訊</p>
         </div>

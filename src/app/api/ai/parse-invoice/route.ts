@@ -28,7 +28,7 @@ export interface ParsedInvoice {
 }
 
 const SYSTEM_PROMPT = `你是一個專業的貿易文件解析助理。
-用戶提供採購單（PO）、形式發票（PI/Proforma Invoice）或報價單的內容（文字或圖片）。
+用戶提供供應商訂單（PO）、形式發票（PI/Proforma Invoice）或報價單的內容（文字或圖片）。
 
 ## 文件類型判斷規則
 - 文件是「我方公司」發給供應商的 → PO。供應商 = 收件方（To / Attention）。

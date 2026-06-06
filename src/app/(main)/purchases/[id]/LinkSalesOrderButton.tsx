@@ -44,7 +44,7 @@ export default function LinkSalesOrderButton({
           onClick={() => setOpen(true)}
           className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
         >
-          {currentSalesOrderId ? '變更連結' : '+ 連結銷售訂單'}
+          {currentSalesOrderId ? '變更連結' : '+ 連結客戶訂單'}
         </button>
       ) : (
         <div className="flex items-center gap-2 mt-1">

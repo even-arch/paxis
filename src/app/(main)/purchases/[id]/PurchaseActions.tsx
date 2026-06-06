@@ -81,7 +81,7 @@ export default function PurchaseActions({ orderId, status, items, defaultCurrenc
   }
 
   async function handleDelete() {
-    const label = isDraft ? '刪除此草稿' : '取消此採購單'
+    const label = isDraft ? '刪除此草稿' : '取消此供應商訂單'
     if (!confirm(`確定要${label}？此操作無法復原。`)) return
     setSubmitting(true)
     const res = await fetch(`/api/purchases/${orderId}`, { method: 'DELETE' })
@@ -91,7 +91,7 @@ export default function PurchaseActions({ orderId, status, items, defaultCurrenc
   }
 
   async function handleSubmit() {
-    if (!confirm('確定送出採購單？送出後無法修改內容。')) return
+    if (!confirm('確定送出供應商訂單？送出後無法修改內容。')) return
     setSubmitting(true)
     const res = await fetch(`/api/purchases/${orderId}/submit`, { method: 'POST' })
     setSubmitting(false)
@@ -155,14 +155,14 @@ export default function PurchaseActions({ orderId, status, items, defaultCurrenc
             </button>
             <button onClick={handleSubmit} disabled={submitting}
               className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-              {submitting ? '送出中...' : '送出採購單'}
+              {submitting ? '送出中...' : '送出供應商訂單'}
             </button>
           </>
         )}
         {!isDraft && canDelete && (
           <button onClick={handleDelete} disabled={submitting}
             className="border border-red-300 text-red-600 px-4 py-2 rounded-md text-sm hover:bg-red-50 disabled:opacity-50">
-            取消採購單
+            取消供應商訂單
           </button>
         )}
         {canReceive && (

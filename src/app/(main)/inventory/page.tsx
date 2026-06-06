@@ -21,7 +21,7 @@ export default async function InventoryPage({
     where: { productId: { in: products.map(p => p.id) } },
   })
 
-  // 待入庫數量（採購單已送出但未完全入庫的品項）
+  // 待入庫數量（供應商訂單已送出但未完全入庫的品項）
   const pendingItems = await prisma.pO_Item.findMany({
     where: {
       productId: { in: products.map(p => p.id) },
@@ -204,7 +204,7 @@ export default async function InventoryPage({
       <div className="mt-4 flex flex-wrap gap-4 text-xs text-gray-400">
         <span><span className="text-blue-600 font-medium">可用庫存</span> = 實際庫存 − 預留中（供防超賣判斷）</span>
         <span><span className="text-purple-600 font-medium">預留中</span> = 已發 PI 正本、貨尚未出倉</span>
-        <span><span className="text-teal-600 font-medium">採購在途</span> = 採購單已送出、貨尚未到倉</span>
+        <span><span className="text-teal-600 font-medium">採購在途</span> = 供應商訂單已送出、貨尚未到倉</span>
       </div>
     </div>
   )

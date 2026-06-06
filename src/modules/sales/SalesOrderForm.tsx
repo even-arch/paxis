@@ -202,7 +202,7 @@ export default function SalesOrderForm({ customers, products }: Props) {
       <div className="flex gap-3">
         <button type="submit" disabled={saving}
           className="bg-teal-600 text-white px-8 py-2.5 rounded-md text-sm font-medium hover:bg-teal-700 disabled:opacity-50">
-          {saving ? '建立中…' : '建立銷售訂單'}
+          {saving ? '建立中…' : '建立客戶訂單'}
         </button>
         <button type="button" onClick={() => router.back()}
           className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm hover:bg-gray-50">
