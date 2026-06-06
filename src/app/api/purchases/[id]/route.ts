@@ -53,6 +53,30 @@ export async function DELETE(_req: NextRequest, {
   return NextResponse.json({ ok: true })
 }
 
+// PATCH：單一欄位更新（不限草稿狀態），目前支援 salesOrderId
+export async function PATCH(req: NextRequest, { params }: Params) {
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const body = await req.json()
+  const id = Number(params.id)
+
+  const existing = await prisma.pO_Order.findUnique({ where: { id } })
+  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  const data: Record<string, unknown> = {}
+  if ('salesOrderId' in body) {
+    data.salesOrderId = body.salesOrderId ? Number(body.salesOrderId) : null
+  }
+
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json({ error: '沒有可更新的欄位' }, { status: 400 })
+  }
+
+  const order = await prisma.pO_Order.update({ where: { id }, data })
+  return NextResponse.json(order)
+}
+
 export async function PUT(req: NextRequest, {
   params }: Params) {
     const session = await getServerSession(authOptions)

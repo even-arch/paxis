@@ -1,8 +1,10 @@
 import { notFound } from 'next/navigation'
+import Link from 'next/link'
 import { prisma } from '@/lib/db'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { statusBadge } from '@/modules/purchase/poUtils'
 import PurchaseActions from './PurchaseActions'
+import LinkSalesOrderButton from './LinkSalesOrderButton'
 
 type Props = { params: { id: string } }
 
@@ -40,11 +42,30 @@ export default async function PurchaseDetailPage({
 
   if (!order) notFound()
 
-  // 以單號比對關聯銷售訂單
-  const linkedSalesOrders = await prisma.sLS_Order.findMany({
-    where: { orderNo: order.poNo },
-    select: { id: true, orderNo: true, status: true, customer: { select: { name: true } }, createdAt: true },
-  })
+  // 關聯銷售訂單：優先用 salesOrderId FK，fallback 用單號比對
+  const [linkedSalesOrder, openSalesOrders] = await Promise.all([
+    order.salesOrderId
+      ? prisma.sLS_Order.findUnique({
+          where: { id: order.salesOrderId },
+          select: { id: true, orderNo: true, status: true, customer: { select: { name: true } }, patiscoBuyerName: true },
+        })
+      : prisma.sLS_Order.findFirst({
+          where: {
+            OR: [
+              { orderNo: order.poNo },
+              { orderNo: order.poNo.replace(/-\d+$/, '') }, // 去掉後綴（ABC-001-1 → ABC-001）
+            ],
+          },
+          select: { id: true, orderNo: true, status: true, customer: { select: { name: true } }, patiscoBuyerName: true },
+        }),
+    // 供「連結銷售訂單」選單用
+    prisma.sLS_Order.findMany({
+      where: { status: { in: [0, 1, 2, 3] } },
+      select: { id: true, orderNo: true, customer: { select: { name: true } }, patiscoBuyerName: true },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    }),
+  ])
 
   const badge = statusBadge(order.status)
   const isDraft = order.status === 0
@@ -115,21 +136,35 @@ export default async function PurchaseDetailPage({
           {order.note && <div className="col-span-3"><Row label="備註" value={order.note} /></div>}
         </div>
 
-        {/* 關聯銷售訂單 */}
-        {linkedSalesOrders.length > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg px-5 py-4">
-            <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2">關聯銷售訂單（單號相同）</p>
-            <div className="flex flex-wrap gap-3">
-              {linkedSalesOrders.map(s => (
-                <Link key={s.id} href={`/sales/${s.id}`}
-                  className="flex items-center gap-2 bg-white border border-blue-200 rounded px-3 py-2 text-sm hover:border-blue-400 transition-colors">
-                  <span className="font-mono font-medium text-blue-700">{s.orderNo}</span>
-                  {s.customer && <span className="text-gray-500">{s.customer.name}</span>}
-                </Link>
-              ))}
-            </div>
+        {/* 來源銷售訂單 */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-5 py-4">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">來源銷售訂單</p>
+            <LinkSalesOrderButton
+              poId={order.id}
+              currentSalesOrderId={linkedSalesOrder?.id ?? null}
+              salesOrders={openSalesOrders.map(s => ({
+                id: s.id,
+                orderNo: s.orderNo,
+                customerName: s.customer?.name ?? s.patiscoBuyerName ?? null,
+              }))}
+            />
           </div>
-        )}
+          {linkedSalesOrder ? (
+            <Link href={`/sales/${linkedSalesOrder.id}`}
+              className="inline-flex items-center gap-3 bg-white border border-blue-200 rounded-lg px-4 py-2.5 mt-2 hover:border-blue-400 transition-colors">
+              <span className="font-mono font-medium text-blue-700 text-sm">{linkedSalesOrder.orderNo}</span>
+              {(linkedSalesOrder.customer?.name || linkedSalesOrder.patiscoBuyerName) && (
+                <span className="text-gray-500 text-sm">
+                  {linkedSalesOrder.customer?.name ?? linkedSalesOrder.patiscoBuyerName}
+                </span>
+              )}
+              <span className="text-xs text-gray-400">→ 查看交易鏈</span>
+            </Link>
+          ) : (
+            <p className="text-sm text-gray-400 mt-1">尚未連結客戶訂單。點右上角「+ 連結銷售訂單」補上連結。</p>
+          )}
+        </div>
 
         {/* 採購明細 */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -288,6 +323,3 @@ function Row({ label, value }: { label: string; value?: string | null }) {
   )
 }
 
-function Link({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) {
-  return <a href={href} className={className}>{children}</a>
-}
