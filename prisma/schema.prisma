@@ -448,6 +448,14 @@ model PO_Order {
   supplierId    Int
   supplier      SUP_Supplier @relation(fields: [supplierId], references: [id])
 
+  // ── 交易鏈關聯（核心勾稽欄位）──────────────────────────────────────────
+  // 這張採購單是為了哪張客戶銷售訂單而發出的？
+  // sourceType=1（接單後採購）時必填；sourceType=0（主動補貨）時為 null。
+  // 一張 SLS_Order 可以對應多張 PO_Order（拆單給不同供應商時，
+  // poNo 會加上後綴：ABC-2025-001-1、ABC-2025-001-2…）
+  salesOrderId  Int?
+  salesOrder    SLS_Order? @relation("SLS_PO_OrderLink", fields: [salesOrderId], references: [id])
+
   status        Int       @default(0)
   currencyCode  String
   exchangeRate  Decimal
@@ -479,6 +487,7 @@ model PO_Order {
 
   @@index([supplierId, status])
   @@index([poNo])
+  @@index([salesOrderId])
   @@map("PO_Order")
 }
 
@@ -637,9 +646,10 @@ model SLS_Order {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  items       SLS_Item[]
-  pis         SLS_PI[]
-  shipments   SLS_Shipment[]
+  items          SLS_Item[]
+  pis            SLS_PI[]
+  shipments      SLS_Shipment[]
+  purchaseOrders PO_Order[]    @relation("SLS_PO_OrderLink") // 此銷售訂單衍生的採購單（可多張）
 
   @@index([customerId, status])
   @@index([orderNo])
