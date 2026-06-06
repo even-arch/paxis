@@ -5,33 +5,56 @@ import { useRouter } from 'next/navigation'
 import { SHIP_VIA, CURRENCIES } from '@/modules/purchase/poUtils'
 import ProductPicker from '@/components/ProductPicker'
 
-type Supplier = { id: number; name: string; shortName: string | null; currencyCode: string | null }
-type Product  = { id: number; name: string; sku: string | null; unit: string | null; specification: string | null }
-type LineItem = { productId: string; quantity: string; unitPrice: string; unit: string; note: string }
+type Supplier    = { id: number; name: string; shortName: string | null; currencyCode: string | null }
+type Product     = { id: number; name: string; sku: string | null; unit: string | null; specification: string | null }
+type SalesOrder  = { id: number; orderNo: string; patiscoBuyerName: string | null; customer: { name: string } | null; _count: { items: number } }
+type LineItem    = { productId: string; quantity: string; unitPrice: string; unit: string; note: string }
 
 const emptyLine = (): LineItem => ({ productId: '', quantity: '', unitPrice: '', unit: '', note: '' })
 
 export default function PurchaseForm({
   suppliers,
   products,
+  salesOrders,
 }: {
-  suppliers: Supplier[]
-  products:  Product[]
+  suppliers:   Supplier[]
+  products:    Product[]
+  salesOrders: SalesOrder[]
 }) {
   const router = useRouter()
 
-  const [supplierId,   setSupplierId]   = useState('')
-  const [sourceType,   setSourceType]   = useState('0')
-  const [docRefNo,     setDocRefNo]     = useState('')
-  const [currencyCode, setCurrencyCode] = useState('USD')
-  const [exchangeRate, setExchangeRate] = useState('')
-  const [expectedDate, setExpectedDate] = useState('')
-  const [port,         setPort]         = useState('')
-  const [shipVia,      setShipVia]      = useState('')
-  const [note,         setNote]         = useState('')
-  const [items,        setItems]        = useState<LineItem[]>([emptyLine()])
-  const [error,        setError]        = useState('')
-  const [saving,       setSaving]       = useState(false)
+  const [supplierId,    setSupplierId]    = useState('')
+  const [sourceType,    setSourceType]    = useState('0')
+  const [salesOrderId,  setSalesOrderId]  = useState('')   // 來源銷售訂單 ID
+  const [salesOrderNo,  setSalesOrderNo]  = useState('')   // 同步顯示用
+  const [poNoOverride,  setPoNoOverride]  = useState('')   // 用戶可自訂後綴（空=沿用銷售單號）
+  const [docRefNo,      setDocRefNo]      = useState('')
+  const [currencyCode,  setCurrencyCode]  = useState('USD')
+  const [exchangeRate,  setExchangeRate]  = useState('')
+  const [expectedDate,  setExpectedDate]  = useState('')
+  const [port,          setPort]          = useState('')
+  const [shipVia,       setShipVia]       = useState('')
+  const [note,          setNote]          = useState('')
+  const [items,         setItems]         = useState<LineItem[]>([emptyLine()])
+  const [error,         setError]         = useState('')
+  const [saving,        setSaving]        = useState(false)
+
+  // sourceType 切換到「接單後採購」時，清除已選銷售訂單
+  function handleSourceTypeChange(val: string) {
+    setSourceType(val)
+    if (val !== '1') { setSalesOrderId(''); setSalesOrderNo(''); setPoNoOverride('') }
+  }
+
+  // 選擇銷售訂單：同步填入採購單號預設值
+  function handleSalesOrderChange(id: string) {
+    setSalesOrderId(id)
+    const so = salesOrders.find(s => String(s.id) === id)
+    setSalesOrderNo(so?.orderNo ?? '')
+    setPoNoOverride('')   // 清空覆蓋，預設用原始單號
+  }
+
+  // 最終採購單號：poNoOverride 有填用覆蓋值；否則用銷售單號；否則留空讓後端 generatePoNo()
+  const finalPoNo = poNoOverride.trim() || salesOrderNo || ''
 
   function handleSupplierChange(id: string) {
     setSupplierId(id)
@@ -58,13 +81,16 @@ export default function PurchaseForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!supplierId) { setError('請選擇供應商'); return }
+    if (sourceType === '1' && !salesOrderId) { setError('接單後採購必須選擇來源銷售訂單'); return }
     const valid = items.filter(i => i.productId && i.quantity && i.unitPrice)
     if (!valid.length) { setError('請至少輸入一項採購明細'); return }
     setSaving(true); setError('')
     const res = await fetch('/api/purchases', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        poNo: finalPoNo || undefined,
         supplierId, sourceType: Number(sourceType),
+        salesOrderId: salesOrderId ? Number(salesOrderId) : null,
         currencyCode, exchangeRate: exchangeRate || '1',
         expectedDate, port, shipVia,
         note: [docRefNo ? `單據號：${docRefNo}` : '', note].filter(Boolean).join('\n'),
@@ -86,12 +112,46 @@ export default function PurchaseForm({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
           <Field label="採購觸發來源" required>
-            <select value={sourceType} onChange={e => setSourceType(e.target.value)} className={inp}>
+            <select value={sourceType} onChange={e => handleSourceTypeChange(e.target.value)} className={inp}>
               <option value="0">主動補貨（預測/季節/促銷）</option>
               <option value="1">接單後採購（Made to Order）</option>
               <option value="2">安全庫存觸發（低於警戒線）</option>
             </select>
           </Field>
+
+          {/* 接單後採購：選擇來源銷售訂單 */}
+          {sourceType === '1' && (
+            <Field label="來源銷售訂單" required>
+              <select value={salesOrderId} onChange={e => handleSalesOrderChange(e.target.value)} className={inp} required>
+                <option value="">請選擇銷售訂單</option>
+                {salesOrders.map(so => (
+                  <option key={so.id} value={so.id}>
+                    {so.orderNo}
+                    {so.customer?.name || so.patiscoBuyerName
+                      ? ` — ${so.customer?.name ?? so.patiscoBuyerName}`
+                      : ''}
+                    {` (${so._count.items} 項)`}
+                  </option>
+                ))}
+              </select>
+              {salesOrderNo && (
+                <div className="mt-2 space-y-1">
+                  <p className="text-xs text-gray-500">
+                    採購單號預設為：
+                    <span className="font-mono font-medium text-gray-700 ml-1">{finalPoNo}</span>
+                    （拆單時請加後綴，如 <span className="font-mono">{salesOrderNo}-1</span>）
+                  </p>
+                  <input
+                    type="text"
+                    value={poNoOverride}
+                    onChange={e => setPoNoOverride(e.target.value)}
+                    className={inp}
+                    placeholder={`預設：${salesOrderNo}（需要拆單時手動填入後綴）`}
+                  />
+                </div>
+              )}
+            </Field>
+          )}
 
           <Field label="原始單據號">
             <input type="text" value={docRefNo} onChange={e => setDocRefNo(e.target.value)}
