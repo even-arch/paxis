@@ -190,6 +190,8 @@ export async function GET(req: NextRequest) {
       }
       const stmts = [
         `ALTER TABLE "PO_SupplierPI" ADD COLUMN IF NOT EXISTS "patiscoCreatedAt" TIMESTAMP WITH TIME ZONE`,
+        `ALTER TABLE "PO_Order" ADD COLUMN IF NOT EXISTS "salesOrderId" INTEGER REFERENCES "SLS_Order"("id") ON DELETE SET NULL`,
+        `CREATE INDEX IF NOT EXISTS "PO_Order_salesOrderId_idx" ON "PO_Order"("salesOrderId")`,
       ]
       const migResult: string[] = []
       for (const stmt of stmts) {
