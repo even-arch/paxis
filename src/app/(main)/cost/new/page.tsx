@@ -2,7 +2,7 @@ import { prisma } from '@/lib/db'
 import CostForm from '@/modules/cost/CostForm'
 
 export default async function NewCostPage() {
-  const products = await prisma.pRD_Product.findMany({
+    const products = await prisma.pRD_Product.findMany({
     where: { isActive: true },
     select: {
       id: true, name: true, sku: true, modelNo: true, unit: true,

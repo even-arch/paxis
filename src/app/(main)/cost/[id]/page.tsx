@@ -5,8 +5,9 @@ import DeleteCostButton from './DeleteCostButton'
 
 type Props = { params: { id: string } }
 
-export default async function CostDetailPage({ params }: Props) {
-  const sheet = await prisma.cOST_Sheet.findUnique({
+export default async function CostDetailPage({
+  params }: Props) {
+    const sheet = await prisma.cOST_Sheet.findUnique({
     where: { id: Number(params.id) },
     include: {
       product: {

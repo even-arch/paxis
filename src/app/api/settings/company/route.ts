@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 
 export async function GET() {
-  const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   let company = await prisma.sYS_Company.findFirst({ where: { id: 1 } })
@@ -15,7 +15,7 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
-  const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const userId = parseInt((session.user as { id?: string })?.id ?? '', 10)

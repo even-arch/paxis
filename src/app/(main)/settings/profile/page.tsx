@@ -13,12 +13,41 @@ export default function ProfilePage() {
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [saving, setSaving] = useState(false)
 
+  // 清除所有資料
+  const [clearPw, setClearPw] = useState('')
+  const [clearMsg, setClearMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [clearing, setClearing] = useState(false)
+
+  async function clearAll() {
+    if (!clearPw) { setClearMsg({ type: 'err', text: '請輸入密碼' }); return }
+    setClearing(true); setClearMsg(null)
+    const res = await fetch('/api/dev/clear-all', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: clearPw }),
+    })
+    const d = await res.json() as { error?: string }
+    setClearing(false)
+    if (res.ok) {
+      setClearMsg({ type: 'ok', text: '✓ 所有資料已清除（使用者帳號保留）' })
+      setClearPw('')
+    } else {
+      setClearMsg({ type: 'err', text: d.error ?? '清除失敗' })
+    }
+  }
+
+  const [profileError, setProfileError] = useState<string | null>(null)
+
   useEffect(() => {
-    fetch('/api/profile').then(r => r.json()).then((d: Profile) => {
+    fetch('/api/profile').then(r => r.json()).then((d: Profile & { error?: string }) => {
+      if (d.error || !d.id) {
+        setProfileError(d.error ?? '無法載入使用者資料')
+        return
+      }
       setProfile(d)
       setName(d.name)
       setEmail(d.loginId)
-    })
+    }).catch(() => setProfileError('網路錯誤，請重新整理'))
   }, [])
 
   async function save(e: React.FormEvent) {
@@ -54,6 +83,7 @@ export default function ProfilePage() {
     }
   }
 
+  if (profileError) return <div className="p-6 text-sm text-red-500">錯誤：{profileError}</div>
   if (!profile) return <div className="p-6 text-sm text-gray-400">載入中…</div>
 
   return (
@@ -106,6 +136,23 @@ export default function ProfilePage() {
           {saving ? '儲存中…' : '儲存'}
         </button>
       </form>
+
+      {/* 開發工具 */}
+      <div className="mt-10 border border-red-200 rounded-lg p-5 bg-red-50">
+        <h2 className="text-sm font-semibold text-red-700 uppercase tracking-wide mb-1">開發工具</h2>
+        <p className="text-xs text-red-500 mb-4">清除所有產品、採購、銷售、庫存、供應商、客戶資料。使用者帳號保留。</p>
+        <div className="flex gap-2 items-start">
+          <input type="password" value={clearPw} onChange={e => setClearPw(e.target.value)}
+            placeholder="輸入登入密碼確認" className={`${inp} max-w-xs`} />
+          <button type="button" onClick={clearAll} disabled={clearing}
+            className="bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700 disabled:opacity-50 whitespace-nowrap">
+            {clearing ? '清除中…' : '清除所有資料'}
+          </button>
+        </div>
+        {clearMsg && (
+          <p className={`text-sm mt-2 ${clearMsg.type === 'ok' ? 'text-green-700' : 'text-red-700'}`}>{clearMsg.text}</p>
+        )}
+      </div>
     </div>
   )
 }

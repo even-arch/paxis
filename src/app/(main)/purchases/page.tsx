@@ -6,8 +6,9 @@ import { statusBadge } from '@/modules/purchase/poUtils'
 
 type Props = { searchParams: { search?: string; status?: string; page?: string } }
 
-export default async function PurchasesPage({ searchParams }: Props) {
-  const search = searchParams.search ?? ''
+export default async function PurchasesPage({
+  searchParams }: Props) {
+    const search = searchParams.search ?? ''
   const statusFilter = searchParams.status ?? ''
   const page = Math.max(1, Number(searchParams.page ?? 1))
   const limit = 20

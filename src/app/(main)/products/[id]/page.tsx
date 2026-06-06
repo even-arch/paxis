@@ -6,8 +6,9 @@ import DeleteProductButton from './DeleteProductButton'
 
 type Props = { params: { id: string } }
 
-export default async function ProductDetailPage({ params }: Props) {
-  const product = await prisma.pRD_Product.findUnique({
+export default async function ProductDetailPage({
+  params }: Props) {
+    const product = await prisma.pRD_Product.findUnique({
     where: { id: Number(params.id) },
     include: {
       inventoryItems: true,

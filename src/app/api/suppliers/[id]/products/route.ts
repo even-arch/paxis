@@ -6,8 +6,9 @@ import { prisma } from '@/lib/db'
 type Params = { params: { id: string } }
 
 /** 新增供應商與商品的對應關係 */
-export async function POST(req: NextRequest, { params }: Params) {
-  const session = await getServerSession(authOptions)
+export async function POST(req: NextRequest, {
+  params }: Params) {
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
@@ -52,8 +53,9 @@ export async function POST(req: NextRequest, { params }: Params) {
 }
 
 /** 移除供應商與商品的對應 */
-export async function DELETE(req: NextRequest, { params }: Params) {
-  const session = await getServerSession(authOptions)
+export async function DELETE(req: NextRequest, {
+  params }: Params) {
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { searchParams } = new URL(req.url)

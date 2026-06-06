@@ -139,6 +139,11 @@ export default function ImportWizard({
 
   // ─── 步驟 1：確認產品 → 立即寫入 DB ────────────────────────────────────────
   async function saveProducts() {
+    const unidentifiable = productDrafts.filter(d => !d.sku.trim() && !d.specification.trim())
+    if (unidentifiable.length > 0) {
+      setError(`有 ${unidentifiable.length} 項商品既無料號（SKU）也無規格說明，無法識別，請確認文件內容或改用手動建立。`)
+      return
+    }
     setLoading(true); setError('')
     try {
       const res = await fetch('/api/ai/apply-products', {
@@ -146,9 +151,9 @@ export default function ImportWizard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: productDrafts.map(d => ({
-            name:          d.action === 'use-existing' ? d.conflictName || d.name : d.name,
+            name:          d.name,
             specification: d.specification || null,
-            sku:           d.action === 'use-existing' ? null : (d.sku || null),
+            sku:           d.sku || null,
             qty:           Number(d.qty),
             unitPrice:     Number(d.unitPrice),
             unit:          d.unit,
@@ -198,34 +203,28 @@ export default function ImportWizard({
       let supplierName: string
       let isNew = false
 
-      if (supplierDraft.matchedId) {
-        // 已有供應商，直接使用
-        supplierId = supplierDraft.matchedId
-        supplierName = supplierDraft.matchedSupplier?.name ?? supplierDraft.name
-      } else {
-        // 新建供應商
-        const res = await fetch('/api/ai/apply-supplier', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            supplierName:      supplierDraft.name,
-            supplierShortName: supplierDraft.shortName || null,
-            supplierEmail:     supplierDraft.email || null,
-            phone:             supplierDraft.phone || null,
-            address:           supplierDraft.address || null,
-            city:              supplierDraft.city || null,
-            country:           supplierDraft.country || null,
-            contactPerson:     supplierDraft.contactPerson || null,
-            paymentTerms:      supplierDraft.paymentTerms || null,
-            currencyCode:      supplierDraft.currencyCode || null,
-          }),
-        })
-        const json = await res.json() as { data?: { supplierId: number; supplierName: string; supplierCreated: boolean }; error?: string }
-        if (!res.ok) throw new Error(json.error ?? `寫入失敗 (HTTP ${res.status})`)
-        supplierId   = json.data!.supplierId
-        supplierName = json.data!.supplierName
-        isNew        = json.data!.supplierCreated
-      }
+      // 永遠呼叫 API，由 API 決定是沿用現有還是新建（避免本地快取的 id 過期）
+      const res = await fetch('/api/ai/apply-supplier', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          supplierName:      supplierDraft.name,
+          supplierShortName: supplierDraft.shortName || null,
+          supplierEmail:     supplierDraft.email || null,
+          phone:             supplierDraft.phone || null,
+          address:           supplierDraft.address || null,
+          city:              supplierDraft.city || null,
+          country:           supplierDraft.country || null,
+          contactPerson:     supplierDraft.contactPerson || null,
+          paymentTerms:      supplierDraft.paymentTerms || null,
+          currencyCode:      supplierDraft.currencyCode || null,
+        }),
+      })
+      const json = await res.json() as { data?: { supplierId: number; supplierName: string; supplierCreated: boolean }; error?: string }
+      if (!res.ok) throw new Error(json.error ?? `寫入失敗 (HTTP ${res.status})`)
+      supplierId   = json.data!.supplierId
+      supplierName = json.data!.supplierName
+      isNew        = json.data!.supplierCreated
 
       // ★ 儲存供應商結果（含 DB supplierId）
       setSavedSupplier({ supplierId, supplierName, isNew })
@@ -250,13 +249,14 @@ export default function ImportWizard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           supplierId:   savedSupplier.supplierId,
+          poNo:         docRefNo || undefined,
           sourceType:   Number(sourceType),
           currencyCode,
           exchangeRate: exchangeRate || '1',
           expectedDate,
           port,
           shipVia,
-          note: [docRefNo ? `單據號：${docRefNo}` : '', note].filter(Boolean).join('\n'),
+          note: note || null,
           items: poItems.map(i => ({
             productId: i.productId,
             quantity:  Number(i.qty),
@@ -389,10 +389,13 @@ export default function ImportWizard({
                         className={inp} />
                     </div>
                     <div className="col-span-2">
-                      <label className="text-xs text-gray-500 mb-0.5 block">料號</label>
+                      <label className="text-xs text-gray-500 mb-0.5 block">
+                        料號 <span className="text-red-500">*</span>
+                      </label>
                       <input type="text" value={item.sku}
                         onChange={e => setProductDrafts(p => p.map((d, i) => i === idx ? { ...d, sku: e.target.value } : d))}
-                        className={`${inp} font-mono text-xs`} />
+                        className={`${inp} font-mono text-xs ${!item.sku.trim() && !item.specification.trim() ? 'border-red-400 bg-red-50' : ''}`}
+                        placeholder="建議填入" />
                     </div>
                     <div className="col-span-4">
                       <label className="text-xs text-gray-500 mb-0.5 block">規格說明</label>
@@ -453,7 +456,12 @@ export default function ImportWizard({
         <ErrBar />
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-base font-semibold text-gray-800 mb-1">步驟 2：確認供應商</h2>
-          <p className="text-xs text-gray-500 mb-5">確認後按「存入供應商資料庫」，系統立即寫入。</p>
+          <p className="text-xs text-gray-500 mb-3">確認後按「存入供應商資料庫」，系統立即寫入。</p>
+          {!supplierDraft.name.trim() && (
+            <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-700">
+              ⚠ AI 無法從文件中識別供應商名稱，請手動填入。
+            </div>
+          )}
 
           {ms && (
             <div className="mb-5 bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -571,8 +579,8 @@ export default function ImportWizard({
               <option value="2">安全庫存觸發（低於警戒線）</option>
             </select>
           </Field>
-          <Field label="原始單據號">
-            <input type="text" value={docRefNo} onChange={e => setDocRefNo(e.target.value)} className={inp} placeholder="供應商發票號 / PO 號" />
+          <Field label="採購單號">
+            <input type="text" value={docRefNo} onChange={e => setDocRefNo(e.target.value)} className={inp} placeholder="沿用原始文件號，空白則自動產生" />
           </Field>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">供應商</label>

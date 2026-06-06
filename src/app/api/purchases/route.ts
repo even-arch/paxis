@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db'
 import { generatePoNo } from '@/lib/utils'
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
@@ -42,16 +42,16 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
 
   const order = await prisma.pO_Order.create({
     data: {
-      poNo: generatePoNo(),
+      poNo: body.poNo?.trim() || generatePoNo(),
       supplierId: Number(body.supplierId),
-      status: 0, // 草稿
+      status: 0,
       sourceType: body.sourceType !== undefined ? Number(body.sourceType) : 0,
       currencyCode: body.currencyCode,
       exchangeRate: String(body.exchangeRate || '1'),
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
       shipVia: body.shipVia || null,
       note: body.note || null,
       patiscoOrderNo: body.patiscoOrderNo || null,
-      patiscoOrderId: body.patiscoOrderId ? Number(body.patiscoOrderId) : null,
+      patiscoOrderId: body.patiscoOrderId ? String(body.patiscoOrderId) : null,
       createdBy: Number(session.user.id),
       // 明細
       items: body.items?.length

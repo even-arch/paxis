@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db'
 import { encrypt, decrypt } from '@/lib/crypto'
 
 export async function GET() {
-  const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
@@ -33,7 +33,7 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
-  const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
@@ -47,8 +47,10 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid provider' }, { status: 400 })
     }
 
+    const uid = Number(session.user.id)
+    if (!uid) return NextResponse.json({ error: 'User not found' }, { status: 404 })
     await prisma.sYS_User.update({
-      where: { id: Number(session.user.id) },
+      where: { id: uid },
       data: {
         aiProvider,
         aiParseModel: aiParseModel || null,
@@ -64,12 +66,14 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE() {
-  const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
+    const uid = Number(session.user.id)
+    if (!uid) return NextResponse.json({ error: 'User not found' }, { status: 404 })
     await prisma.sYS_User.update({
-      where: { id: Number(session.user.id) },
+      where: { id: uid },
       data: { aiProvider: null, encryptedAiKey: null, aiParseModel: null },
     })
     return NextResponse.json({ ok: true })

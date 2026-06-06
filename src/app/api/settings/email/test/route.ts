@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db'
 import { sendMail } from '@/lib/mailer'
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { to } = await req.json() as { to?: string }

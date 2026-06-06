@@ -7,26 +7,44 @@ import SupplierProductPanel from './SupplierProductPanel'
 
 type Props = { params: { id: string } }
 
-export default async function SupplierDetailPage({ params }: Props) {
-  const supplier = await prisma.sUP_Supplier.findUnique({
-    where: { id: Number(params.id) },
-    include: {
-      contacts: true,
-      products: {
-        include: { product: { select: { id: true, name: true, sku: true, unit: true } } },
-        orderBy: { isPreferred: 'desc' },
+export default async function SupplierDetailPage({
+  params }: Props) {
+    const [supplier, recentOrders, allProducts] = await Promise.all([
+    prisma.sUP_Supplier.findUnique({
+      where: { id: Number(params.id) },
+      include: {
+        contacts: true,
+        products: {
+          include: { product: { select: { id: true, name: true, sku: true, unit: true } } },
+          orderBy: { isPreferred: 'desc' },
+        },
       },
-    },
-  })
+    }),
+    prisma.pO_Order.findMany({
+      where: { supplierId: Number(params.id) },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      include: {
+        _count: { select: { items: true } },
+        receipts: { select: { id: true } },
+      },
+    }),
+    prisma.pRD_Product.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, sku: true },
+      orderBy: { name: 'asc' },
+    }),
+  ])
 
   if (!supplier || !supplier.isActive) notFound()
 
-  // 取得所有商品供新增對應用
-  const allProducts = await prisma.pRD_Product.findMany({
-    where: { isActive: true },
-    select: { id: true, name: true, sku: true },
-    orderBy: { name: 'asc' },
-  })
+  const STATUS_LABELS: Record<number, { label: string; color: string }> = {
+    0: { label: '草稿',   color: 'bg-gray-100 text-gray-500' },
+    1: { label: '已送出', color: 'bg-blue-100 text-blue-700' },
+    2: { label: '部分入庫', color: 'bg-amber-100 text-amber-700' },
+    3: { label: '完成',   color: 'bg-green-100 text-green-700' },
+    4: { label: '取消',   color: 'bg-red-100 text-red-500' },
+  }
 
   return (
     <div className="max-w-3xl">
@@ -73,6 +91,50 @@ export default async function SupplierDetailPage({ params }: Props) {
             <p className="text-sm text-gray-700 whitespace-pre-wrap">{supplier.note}</p>
           </Card>
         )}
+
+        {/* 採購單歷史 */}
+        <Card title={`採購單記錄（${recentOrders.length} 筆）`}>
+          {recentOrders.length === 0 ? (
+            <p className="text-sm text-gray-400">尚無採購單</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-xs text-gray-500">
+                  <th className="text-left py-2 font-medium">單號</th>
+                  <th className="text-left py-2 font-medium">品項數</th>
+                  <th className="text-left py-2 font-medium">幣別</th>
+                  <th className="text-left py-2 font-medium">狀態</th>
+                  <th className="text-left py-2 font-medium">建立日期</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {recentOrders.map(o => {
+                  const badge = STATUS_LABELS[o.status] ?? STATUS_LABELS[0]
+                  return (
+                    <tr key={o.id}>
+                      <td className="py-2">
+                        <Link href={`/purchases/${o.id}`} className="font-mono text-blue-600 hover:underline">
+                          {o.poNo}
+                        </Link>
+                      </td>
+                      <td className="py-2 text-gray-600">{o._count.items}</td>
+                      <td className="py-2 text-gray-600">{o.currencyCode}</td>
+                      <td className="py-2">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${badge.color}`}>{badge.label}</span>
+                      </td>
+                      <td className="py-2 text-gray-500">{formatDate(o.createdAt)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
+          {recentOrders.length >= 20 && (
+            <Link href={`/purchases?supplierId=${params.id}`} className="text-xs text-blue-600 hover:underline mt-2 block">
+              查看全部 →
+            </Link>
+          )}
+        </Card>
 
         {/* 供應商商品對應 */}
         <div className="flex items-center justify-end mb-1">

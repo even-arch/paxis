@@ -3,7 +3,7 @@ import { formatDate } from '@/lib/utils'
 import PatiscoConfigForm from './PatiscoConfigForm'
 
 export default async function PatiscoSyncPage() {
-  const config = await prisma.sYS_PatiscoConfig.findFirst({
+    const config = await prisma.sYS_PatiscoConfig.findFirst({
     where: { isActive: true },
     orderBy: { id: 'desc' },
   })

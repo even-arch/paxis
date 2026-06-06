@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db'
 import { encrypt, decrypt } from '@/lib/crypto'
 
 export async function GET() {
-  const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const config = await prisma.sYS_EmailConfig.findFirst({ where: { isActive: true } })
@@ -27,7 +27,7 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
-  const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { apiKey, fromEmail, fromName } = await req.json() as {
@@ -57,7 +57,7 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE() {
-  const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   await prisma.sYS_EmailConfig.updateMany({

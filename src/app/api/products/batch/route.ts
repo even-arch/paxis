@@ -7,7 +7,7 @@ import bcrypt from 'bcryptjs'
 // action: 'archive' | 'unarchive' | 'delete'
 // delete 需要 password 驗證
 export async function POST(req: NextRequest) {
-  try {
+    try {
     const session = await getServerSession(authOptions)
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -33,26 +33,16 @@ export async function POST(req: NextRequest) {
       const valid = await bcrypt.compare(password, user.password)
       if (!valid) return NextResponse.json({ error: '密碼錯誤' }, { status: 403 })
 
-      // 確認沒有未完成的採購單品項
-      const activePoItems = await prisma.pO_Item.findMany({
-        where: { productId: { in: ids }, order: { status: { in: [0, 1, 2] } } },
-        select: { order: { select: { poNo: true } } },
-      })
-      if (activePoItems.length > 0) {
-        const nos = Array.from(new Set(activePoItems.map(i => i.order.poNo))).join(', ')
-        return NextResponse.json({
-          error: `以下採購單尚未完成，無法刪除：${nos}`,
-        }, { status: 400 })
-      }
-
-      // 依序刪除子資料再刪主資料（Prisma 不自動 cascade）
+      // 依序刪除子資料再刪主資料（含採購/銷售明細）
       await prisma.$transaction([
         prisma.pRD_ProductHistory.deleteMany({ where: { productId: { in: ids } } }),
         prisma.pRD_CategoryMapping.deleteMany({ where: { productId: { in: ids } } }),
         prisma.sUP_SupplierProduct.deleteMany({ where: { productId: { in: ids } } }),
-        prisma.iNV_Stock.deleteMany({ where: { productId: { in: ids } } }),
         prisma.iNV_Movement.deleteMany({ where: { productId: { in: ids } } }),
+        prisma.iNV_Stock.deleteMany({ where: { productId: { in: ids } } }),
         prisma.cOST_Sheet.deleteMany({ where: { productId: { in: ids } } }),
+        prisma.pO_Item.deleteMany({ where: { productId: { in: ids } } }),
+        prisma.sLS_Item.deleteMany({ where: { productId: { in: ids } } }),
         prisma.pRD_Product.deleteMany({ where: { id: { in: ids } } }),
       ])
       return NextResponse.json({ ok: true, affected: ids.length })

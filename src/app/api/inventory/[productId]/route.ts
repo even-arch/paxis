@@ -5,8 +5,9 @@ import { prisma } from '@/lib/db'
 
 type Params = { params: { productId: string } }
 
-export async function GET(_req: NextRequest, { params }: Params) {
-  const session = await getServerSession(authOptions)
+export async function GET(_req: NextRequest, {
+  params }: Params) {
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const productId = Number(params.productId)
@@ -27,8 +28,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
 }
 
 /** 更新安全庫存 */
-export async function PATCH(req: NextRequest, { params }: Params) {
-  const session = await getServerSession(authOptions)
+export async function PATCH(req: NextRequest, {
+  params }: Params) {
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()

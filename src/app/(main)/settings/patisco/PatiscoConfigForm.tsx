@@ -45,9 +45,19 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [catalogSyncing, setCatalogSyncing] = useState(false)
   const [msg, setMsg] = useState<{ type: 'ok' | 'error'; text: string } | null>(null)
   const [testResult, setTestResult] = useState<{
     ok: boolean; tools?: string[]; msg?: string; error?: string
+  } | null>(null)
+  const [syncResult, setSyncResult] = useState<{
+    buyers?: { created: number; updated: number; errors: number; total: number }
+    pi?: { processed: number; skipped: number; errors: number; details?: Array<{patiscoDocNo:string; status:string; msg?:string}> }
+    shipments?: { processed: number; skipped: number; errors: number }
+    durationMs?: number
+  } | null>(null)
+  const [catalogResult, setCatalogResult] = useState<{
+    products: number; created: number; updated: number; skipped: number; errors: number; durationMs?: number
   } | null>(null)
 
   const isConfigured = !!initialConfig
@@ -109,18 +119,55 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
     router.refresh()
   }
 
+  async function handleCatalogSync() {
+    setCatalogSyncing(true); setCatalogResult(null); setMsg(null)
+    try {
+      const res = await fetch('/api/patisco/catalog-sync', { method: 'POST' })
+      const data = await res.json()
+      setCatalogSyncing(false)
+      if (data.ok) {
+        setCatalogResult({
+          products: data.products,
+          created: data.created,
+          updated: data.updated,
+          skipped: data.skipped,
+          errors: data.errors,
+          durationMs: data.durationMs,
+        })
+      } else {
+        setMsg({ type: 'error', text: `型錄同步失敗：${data.error ?? '未知錯誤'}` })
+      }
+    } catch {
+      setCatalogSyncing(false)
+      setMsg({ type: 'error', text: '型錄同步請求失敗，請檢查網路' })
+    }
+  }
+
   async function handleManualSync() {
-    setSyncing(true)
-    const res = await fetch('/api/webhooks/patisco', { method: 'POST' })
-    const data = await res.json()
-    setSyncing(false)
-    setMsg({
-      type: data.ok ? 'ok' : 'error',
-      text: data.ok
-        ? `同步完成：處理 ${data.processed ?? 0} 張，跳過 ${data.skipped ?? 0} 張`
-        : `同步失敗：${data.error ?? '未知錯誤'}`,
-    })
-    router.refresh()
+    setSyncing(true); setSyncResult(null); setMsg(null)
+    try {
+      const res = await fetch('/api/patisco/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'all' }),
+      })
+      const data = await res.json()
+      setSyncing(false)
+      if (data.ok) {
+        setSyncResult({
+          buyers: data.buyers,
+          pi: data.pi,      // includes details[]
+          shipments: data.shipments,
+          durationMs: data.durationMs,
+        })
+      } else {
+        setMsg({ type: 'error', text: `同步失敗：${data.error ?? '未知錯誤'}` })
+      }
+      router.refresh()
+    } catch {
+      setSyncing(false)
+      setMsg({ type: 'error', text: '同步請求失敗，請檢查網路' })
+    }
   }
 
   // 連線狀態顏色
@@ -161,6 +208,10 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
               className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
               {syncing ? '同步中...' : '手動同步'}
             </button>
+            <button onClick={handleCatalogSync} disabled={catalogSyncing}
+              className="text-sm px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50">
+              {catalogSyncing ? '型錄同步中...' : '📦 型錄同步'}
+            </button>
           </div>
         )}
       </div>
@@ -188,12 +239,67 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
         </div>
       )}
 
+      {/* 同步結果 */}
+      {syncResult && (
+        <div className="px-6 py-3 border-b bg-blue-50 text-sm text-blue-800">
+          <p className="font-medium mb-1">✓ 同步完成{syncResult.durationMs ? `（${(syncResult.durationMs / 1000).toFixed(1)}s）` : ''}</p>
+          <div className="grid grid-cols-3 gap-3 text-xs mt-2">
+            {syncResult.buyers && (
+              <div className="bg-white rounded px-3 py-2 border border-blue-100">
+                <p className="font-medium text-blue-700 mb-1">👥 客戶</p>
+                <p>新增 <span className="font-bold">{syncResult.buyers.created}</span></p>
+                <p>更新 <span className="font-bold">{syncResult.buyers.updated}</span></p>
+                <p className="text-gray-400">共 {syncResult.buyers.total} 筆</p>
+                {syncResult.buyers.errors > 0 && <p className="text-red-500">錯誤 {syncResult.buyers.errors}</p>}
+              </div>
+            )}
+            {syncResult.pi && (
+              <div className="bg-white rounded px-3 py-2 border border-blue-100">
+                <p className="font-medium text-blue-700 mb-1">📄 PI 同步</p>
+                <p>處理 <span className="font-bold">{syncResult.pi.processed}</span></p>
+                <p>跳過 <span className="font-bold">{syncResult.pi.skipped}</span></p>
+                {syncResult.pi.errors > 0 && (
+                  <div>
+                    <p className="text-red-500">錯誤 {syncResult.pi.errors}</p>
+                    {syncResult.pi.details?.filter(d=>d.status==='error').slice(0,3).map((d,i)=>(
+                      <p key={i} className="text-red-400 text-xs mt-0.5 truncate">{d.patiscoDocNo}: {d.msg}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {syncResult.shipments && (
+              <div className="bg-white rounded px-3 py-2 border border-blue-100">
+                <p className="font-medium text-blue-700 mb-1">🚢 出貨同步</p>
+                <p>處理 <span className="font-bold">{syncResult.shipments.processed}</span></p>
+                <p>跳過 <span className="font-bold">{syncResult.shipments.skipped}</span></p>
+                {syncResult.shipments.errors > 0 && <p className="text-red-500">錯誤 {syncResult.shipments.errors}</p>}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 型錄同步結果 */}
+      {catalogResult && (
+        <div className="px-6 py-3 border-b bg-indigo-50 text-sm text-indigo-800">
+          <p className="font-medium mb-1">✓ 型錄同步完成{catalogResult.durationMs ? `（${(catalogResult.durationMs / 1000).toFixed(1)}s）` : ''}</p>
+          <div className="flex gap-4 text-xs mt-2">
+            <span>掃描 <b>{catalogResult.products}</b> 筆</span>
+            <span className="text-green-700">新增 <b>{catalogResult.created}</b></span>
+            <span className="text-blue-700">更新 <b>{catalogResult.updated}</b></span>
+            {catalogResult.skipped > 0 && <span className="text-gray-500">跳過 <b>{catalogResult.skipped}</b></span>}
+            {catalogResult.errors > 0 && <span className="text-red-600">錯誤 <b>{catalogResult.errors}</b></span>}
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSave} className="p-6 space-y-5">
         {/* MCP URL */}
         <div>
           <label className={lbl}>MCP Gateway URL</label>
           <input type="url" value={mcpUrl} onChange={e => setMcpUrl(e.target.value)} className={inp}
-            placeholder="https://mcp.patisco.com:9443" />
+            placeholder="https://mcp.patisco.com" />
         </div>
 
         {/* 模式切換 */}

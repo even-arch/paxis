@@ -9,9 +9,13 @@ const navItems = [
   { label: '總覽', href: '/dashboard', icon: '📊' },
   { label: '商品管理', href: '/products', icon: '📦' },
   { label: '供應商', href: '/suppliers', icon: '🏭' },
+  { label: '客戶', href: '/customers', icon: '🤝' },
+  { label: '銷售訂單', href: '/sales', icon: '📤' },
   { label: '採購單', href: '/purchases', icon: '🛒' },
   { label: '庫存管理', href: '/inventory', icon: '🗃️' },
-  { label: '成本計算', href: '/cost', icon: '💰' },
+  { label: '對帳 / 付款', href: '/finance', icon: '💳' },
+  { label: '到岸成本試算', href: '/cost', icon: '🧮' },
+  { label: 'UPS 出貨查詢', href: '/shipping', icon: '🚚' },
 ]
 
 const settingsItems = [
@@ -22,7 +26,7 @@ const settingsItems = [
   { label: '個人設定', href: '/settings/profile', icon: '👤' },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ companyName = 'PAXIS' }: { companyName?: string }) {
   const pathname = usePathname()
   const { data: session } = useSession()
 
@@ -30,7 +34,7 @@ export default function Sidebar() {
     <aside className="w-56 bg-gray-900 text-white flex flex-col">
       <div className="px-5 py-4 border-b border-gray-700">
         <h1 className="text-lg font-bold">PAXIS</h1>
-        <p className="text-xs text-gray-400">錫諾系統進銷存</p>
+        <p className="text-xs text-gray-400">{companyName}</p>
       </div>
 
       <nav className="flex-1 py-4 px-2 flex flex-col gap-0.5 overflow-y-auto">

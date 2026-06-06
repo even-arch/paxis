@@ -5,19 +5,27 @@ import { prisma } from '@/lib/db'
 import bcrypt from 'bcryptjs'
 
 export async function GET() {
-  const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const user = await prisma.sYS_User.findUnique({
+  // 先用 id 查，找不到就用 email（loginId）fallback，相容舊 JWT
+  let user = await prisma.sYS_User.findUnique({
     where: { id: Number(session.user.id) },
     select: { id: true, name: true, loginId: true },
   })
+  if (!user && session.user.email) {
+    user = await prisma.sYS_User.findFirst({
+      where: { loginId: session.user.email },
+      select: { id: true, name: true, loginId: true },
+    })
+  }
+  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
   return NextResponse.json(user)
 }
 
 // 改 email（loginId）
 export async function PUT(req: NextRequest) {
-  const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { name, email, currentPassword, newPassword } = await req.json() as {
@@ -27,7 +35,10 @@ export async function PUT(req: NextRequest) {
     newPassword?: string
   }
 
-  const user = await prisma.sYS_User.findUnique({ where: { id: Number(session.user.id) } })
+  let user = await prisma.sYS_User.findUnique({ where: { id: Number(session.user.id) } })
+  if (!user && session.user.email) {
+    user = await prisma.sYS_User.findFirst({ where: { loginId: session.user.email } })
+  }
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   const updates: Record<string, string> = {}

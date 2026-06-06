@@ -4,8 +4,9 @@ import PurchaseEditForm from './PurchaseEditForm'
 
 type Props = { params: { id: string } }
 
-export default async function EditPurchasePage({ params }: Props) {
-  const [order, suppliers] = await Promise.all([
+export default async function EditPurchasePage({
+  params }: Props) {
+    const [order, suppliers] = await Promise.all([
     prisma.pO_Order.findUnique({
       where: { id: Number(params.id) },
       include: { items: { include: { product: true } } },

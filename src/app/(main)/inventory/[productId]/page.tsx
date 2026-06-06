@@ -14,8 +14,9 @@ const MOVEMENT_TYPE: Record<number, { label: string; color: string }> = {
   6: { label: '盤點調整', color: 'text-purple-500' },
 }
 
-export default async function InventoryDetailPage({ params }: Props) {
-  const productId = Number(params.productId)
+export default async function InventoryDetailPage({
+  params }: Props) {
+    const productId = Number(params.productId)
 
   const [stock, movements, product] = await Promise.all([
     prisma.iNV_Stock.findUnique({

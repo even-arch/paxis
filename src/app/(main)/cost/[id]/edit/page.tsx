@@ -4,8 +4,9 @@ import CostForm from '@/modules/cost/CostForm'
 
 type Props = { params: { id: string } }
 
-export default async function EditCostPage({ params }: Props) {
-  const [sheet, products] = await Promise.all([
+export default async function EditCostPage({
+  params }: Props) {
+    const [sheet, products] = await Promise.all([
     prisma.cOST_Sheet.findUnique({ where: { id: Number(params.id) } }),
     prisma.pRD_Product.findMany({
       where: { isActive: true },

@@ -12,8 +12,8 @@ export type PatiscoOrderConfirmedPayload = {
 }
 
 export async function handleOrderConfirmed(payload: PatiscoOrderConfirmedPayload) {
-  const results: Array<{
-    patiscoProductId: number
+    const results: Array<{
+    patiscoProductId: string
     sku: string
     deducted: number
     stockAfter: number
@@ -23,7 +23,7 @@ export async function handleOrderConfirmed(payload: PatiscoOrderConfirmedPayload
 
   for (const item of payload.items) {
     const product = await prisma.pRD_Product.findFirst({
-      where: { patiscoProductId: item.productId, isActive: true },
+      where: { patiscoProductId: String(item.productId), isActive: true },
       include: {
         inventoryItems: true,
         supplierProducts: {
@@ -35,7 +35,7 @@ export async function handleOrderConfirmed(payload: PatiscoOrderConfirmedPayload
     })
 
     if (!product || !product.inventoryItems[0]) {
-      results.push({ patiscoProductId: item.productId, sku: item.sku, deducted: 0, stockAfter: 0, belowSafety: false })
+      results.push({ patiscoProductId: String(item.productId), sku: item.sku, deducted: 0, stockAfter: 0, belowSafety: false })
       continue
     }
 
@@ -57,7 +57,7 @@ export async function handleOrderConfirmed(payload: PatiscoOrderConfirmedPayload
         quantityAfter: newQty,
         reservedAfter: stock.reservedQty,
         patiscoDocType: 'DELIVERY_ORDER',
-        patiscoDocId: payload.orderId,
+        patiscoDocId: String(payload.orderId),
         patiscoDocNo: payload.orderNo,
         note: `Patisco 訂單 ${payload.orderNo}`,
       },
@@ -67,7 +67,7 @@ export async function handleOrderConfirmed(payload: PatiscoOrderConfirmedPayload
     const preferred = product.supplierProducts[0]
 
     results.push({
-      patiscoProductId: item.productId,
+      patiscoProductId: String(item.productId),
       sku: item.sku,
       deducted: item.quantity,
       stockAfter: newQty,

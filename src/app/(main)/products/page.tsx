@@ -6,8 +6,9 @@ export const dynamic = 'force-dynamic'
 
 type Props = { searchParams: { search?: string; page?: string; supplierId?: string; archived?: string } }
 
-export default async function ProductsPage({ searchParams }: Props) {
-  const search = searchParams.search ?? ''
+export default async function ProductsPage({
+  searchParams }: Props) {
+    const search = searchParams.search ?? ''
   const page = Math.max(1, Number(searchParams.page ?? 1))
   const supplierId = searchParams.supplierId ? Number(searchParams.supplierId) : null
   const archived = searchParams.archived === 'true'

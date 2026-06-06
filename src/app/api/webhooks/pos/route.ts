@@ -14,7 +14,7 @@ interface PosEvent {
 }
 
 export async function POST(req: NextRequest) {
-  const rawBody = await req.text()
+    const rawBody = await req.text()
 
   if (!verifyPosSignature(req, rawBody)) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })

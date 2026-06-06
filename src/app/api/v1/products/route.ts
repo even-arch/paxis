@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db'
 import { verifyPosApiKey } from '@/lib/posAuth'
 
 export async function GET(req: NextRequest) {
-  if (!verifyPosApiKey(req)) {
+    if (!verifyPosApiKey(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

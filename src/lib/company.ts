@@ -4,7 +4,7 @@ export type CompanyProfile = Awaited<ReturnType<typeof getCompanyProfile>>
 
 // Server-side: 取得公司資料，用於文件生成
 export async function getCompanyProfile() {
-  const company = await prisma.sYS_Company.findFirst({ where: { id: 1 } })
+    const company = await prisma.sYS_Company.findFirst({ where: { id: 1 } })
   return company ?? {
     id: 1,
     nameZh: '', nameEn: '', shortName: '',

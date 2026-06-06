@@ -24,7 +24,7 @@ export interface AppliedInvoice {
 }
 
 export async function POST(req: NextRequest) {
-  try {
+    try {
     const session = await getServerSession(authOptions)
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
 
     // ── 2. 處理每個品項 ─────────────────────────────────────────
     const items: AppliedInvoice['items'] = []
+    const usedSkusThisBatch = new Set<string>()
 
     for (const pi of parsed.items ?? []) {
       if (!pi || (!pi.name && !pi.specification && !pi.sku)) continue
@@ -76,23 +77,26 @@ export async function POST(req: NextRequest) {
       let product = null
       let productCreated = false
 
-      // 優先用 SKU 比對（唯一）
-      if (sku) {
+      // 同批次中已用過的 SKU 不做比對（避免多品項誤判為同一商品）
+      const effectiveSku = sku && !usedSkusThisBatch.has(sku.toLowerCase()) ? sku : null
+
+      // 1. SKU 比對（優先）
+      if (effectiveSku) {
         product = await prisma.pRD_Product.findFirst({
-          where: { sku: { equals: sku, mode: 'insensitive' } },
+          where: { sku: { equals: effectiveSku, mode: 'insensitive' } },
         })
       }
 
-      // SKU 找不到再用品名模糊比對
-      if (!product) {
+      // 2. 規格說明精確比對（SKU 缺失時的備用方案）
+      if (!product && !effectiveSku && specification) {
         product = await prisma.pRD_Product.findFirst({
-          where: { name: { contains: name, mode: 'insensitive' } },
+          where: { specification: { equals: specification, mode: 'insensitive' } },
         })
       }
 
       // 都找不到 → 自動建立
       if (!product) {
-        let finalSku = sku
+        let finalSku = effectiveSku
         if (finalSku) {
           const existing = await prisma.pRD_Product.findUnique({ where: { sku: finalSku } })
           if (existing) finalSku = null
@@ -109,6 +113,8 @@ export async function POST(req: NextRequest) {
         })
         productCreated = true
       }
+
+      if (product.sku) usedSkusThisBatch.add(product.sku.toLowerCase())
 
       // 確保供應商-商品關聯存在（不論是新建或已存在的產品）
       if (supplierId) {

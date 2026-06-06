@@ -2,7 +2,7 @@ import { prisma } from '@/lib/db'
 import PurchaseForm from './PurchaseForm'
 
 export default async function NewPurchasePage() {
-  const [suppliers, products] = await Promise.all([
+    const [suppliers, products] = await Promise.all([
     prisma.sUP_Supplier.findMany({
       where: { isActive: true },
       select: { id: true, name: true, shortName: true, currencyCode: true },

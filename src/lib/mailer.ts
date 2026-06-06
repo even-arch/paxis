@@ -10,7 +10,7 @@ interface MailOptions {
 }
 
 async function getResendConfig() {
-  const config = await prisma.sYS_EmailConfig.findFirst({ where: { isActive: true } })
+    const config = await prisma.sYS_EmailConfig.findFirst({ where: { isActive: true } })
   if (!config?.encryptedApiKey) return null
   return {
     apiKey: decrypt(config.encryptedApiKey),

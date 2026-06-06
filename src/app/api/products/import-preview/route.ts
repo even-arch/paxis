@@ -16,7 +16,7 @@ export interface PreviewItem {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { items } = await req.json() as { items: ParsedInvoice['items'] }

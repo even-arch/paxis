@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db'
 import { encrypt } from '@/lib/crypto'
 
 export async function GET(_req: NextRequest) {
-  const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const config = await prisma.sYS_PatiscoConfig.findFirst({
@@ -39,7 +39,7 @@ export async function GET(_req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()

@@ -6,8 +6,9 @@ import PurchaseActions from './PurchaseActions'
 
 type Props = { params: { id: string } }
 
-export default async function PurchaseDetailPage({ params }: Props) {
-  const order = await prisma.pO_Order.findUnique({
+export default async function PurchaseDetailPage({
+  params }: Props) {
+    const order = await prisma.pO_Order.findUnique({
     where: { id: Number(params.id) },
     include: {
       supplier: true,
@@ -25,12 +26,25 @@ export default async function PurchaseDetailPage({ params }: Props) {
             },
           },
         },
-        orderBy: { receivedAt: 'desc' },
+        orderBy: { performedAt: 'desc' },
+      },
+      supplierPIs: {
+        include: {
+          items: { include: { poItem: { include: { product: { select: { name: true, sku: true } } } } } },
+          performer: { select: { name: true } },
+        },
+        orderBy: { performedAt: 'desc' },
       },
     },
   })
 
   if (!order) notFound()
+
+  // 以單號比對關聯銷售訂單
+  const linkedSalesOrders = await prisma.sLS_Order.findMany({
+    where: { orderNo: order.poNo },
+    select: { id: true, orderNo: true, status: true, customer: { select: { name: true } }, createdAt: true },
+  })
 
   const badge = statusBadge(order.status)
   const isDraft = order.status === 0
@@ -70,6 +84,18 @@ export default async function PurchaseDetailPage({ params }: Props) {
             unitPrice: i.unitPrice.toString(),
             currencyCode: order.currencyCode,
           }))}
+          supplierPIs={order.supplierPIs.map(pi => ({
+            id: pi.id,
+            piNo: pi.piNo,
+            estimatedShipDate: pi.estimatedShipDate?.toISOString() ?? null,
+            performedAt: pi.performedAt.toISOString(),
+            performerName: pi.performer?.name ?? null,
+            items: pi.items.map(i => ({
+              poItemId: i.poItemId,
+              confirmedQty: i.confirmedQty,
+              productName: i.poItem.product.name,
+            })),
+          }))}
         />
       </div>
 
@@ -88,6 +114,22 @@ export default async function PurchaseDetailPage({ params }: Props) {
           <Row label="建立日期" value={formatDate(order.createdAt)} />
           {order.note && <div className="col-span-3"><Row label="備註" value={order.note} /></div>}
         </div>
+
+        {/* 關聯銷售訂單 */}
+        {linkedSalesOrders.length > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg px-5 py-4">
+            <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2">關聯銷售訂單（單號相同）</p>
+            <div className="flex flex-wrap gap-3">
+              {linkedSalesOrders.map(s => (
+                <Link key={s.id} href={`/sales/${s.id}`}
+                  className="flex items-center gap-2 bg-white border border-blue-200 rounded px-3 py-2 text-sm hover:border-blue-400 transition-colors">
+                  <span className="font-mono font-medium text-blue-700">{s.orderNo}</span>
+                  {s.customer && <span className="text-gray-500">{s.customer.name}</span>}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* 採購明細 */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -173,7 +215,7 @@ export default async function PurchaseDetailPage({ params }: Props) {
                         <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded">已入庫</span>
                       </div>
                       <span className="text-sm text-gray-500">
-                        入庫日期：<span className="text-gray-700 font-medium">{formatDate(receipt.receivedAt)}</span>
+                        入庫日期：<span className="text-gray-700 font-medium">{formatDate(receipt.performedAt)}</span>
                       </span>
                     </div>
                     <table className="w-full text-sm">

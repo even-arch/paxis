@@ -5,8 +5,9 @@ import { prisma } from '@/lib/db'
 
 type Params = { params: { id: string } }
 
-export async function GET(_req: NextRequest, { params }: Params) {
-  const session = await getServerSession(authOptions)
+export async function GET(_req: NextRequest, {
+  params }: Params) {
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const product = await prisma.pRD_Product.findUnique({
@@ -26,8 +27,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
   })
 }
 
-export async function PUT(req: NextRequest, { params }: Params) {
-  const session = await getServerSession(authOptions)
+export async function PUT(req: NextRequest, {
+  params }: Params) {
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
@@ -59,8 +61,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
   return NextResponse.json(product)
 }
 
-export async function DELETE(_req: NextRequest, { params }: Params) {
-  const session = await getServerSession(authOptions)
+export async function DELETE(_req: NextRequest, {
+  params }: Params) {
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   // 軟刪除

@@ -10,8 +10,9 @@ type Params = { params: { productId: string } }
  * type 3 = 手動調整, type 4 = 盤點調整
  * quantity: 正數=入庫, 負數=出庫
  */
-export async function POST(req: NextRequest, { params }: Params) {
-  const session = await getServerSession(authOptions)
+export async function POST(req: NextRequest, {
+  params }: Params) {
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()

@@ -4,8 +4,9 @@ import { prisma } from '@/lib/db'
 
 type Props = { searchParams: { search?: string; page?: string } }
 
-export default async function SuppliersPage({ searchParams }: Props) {
-  const search = searchParams.search ?? ''
+export default async function SuppliersPage({
+  searchParams }: Props) {
+    const search = searchParams.search ?? ''
   const page = Math.max(1, Number(searchParams.page ?? 1))
   const limit = 20
 

@@ -28,13 +28,14 @@ export interface AppliedProduct {
 }
 
 export async function POST(req: NextRequest) {
-  try {
+    try {
     const session = await getServerSession(authOptions)
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { items, supplierId } = await req.json() as ApplyProductsInput
 
     const result: AppliedProduct[] = []
+    const usedSkusThisBatch = new Set<string>()
 
     for (const pi of items ?? []) {
       if (!pi || (!pi.name && !pi.sku)) continue
@@ -48,20 +49,25 @@ export async function POST(req: NextRequest) {
       let product = null
       let productCreated = false
 
-      if (sku) {
+      // 同批次中已用過的 SKU 不做比對（避免多品項誤判為同一商品）
+      const effectiveSku = sku && !usedSkusThisBatch.has(sku.toLowerCase()) ? sku : null
+
+      // 1. SKU 比對（優先）
+      if (effectiveSku) {
         product = await prisma.pRD_Product.findFirst({
-          where: { sku: { equals: sku, mode: 'insensitive' } },
+          where: { sku: { equals: effectiveSku, mode: 'insensitive' } },
+        })
+      }
+
+      // 2. 規格說明精確比對（SKU 缺失時的備用方案）
+      if (!product && !effectiveSku && specification) {
+        product = await prisma.pRD_Product.findFirst({
+          where: { specification: { equals: specification, mode: 'insensitive' } },
         })
       }
 
       if (!product) {
-        product = await prisma.pRD_Product.findFirst({
-          where: { name: { contains: name, mode: 'insensitive' } },
-        })
-      }
-
-      if (!product) {
-        let finalSku = sku
+        let finalSku = effectiveSku
         if (finalSku) {
           const existing = await prisma.pRD_Product.findUnique({ where: { sku: finalSku } })
           if (existing) finalSku = null
@@ -72,6 +78,8 @@ export async function POST(req: NextRequest) {
         })
         productCreated = true
       }
+
+      if (product.sku) usedSkusThisBatch.add(product.sku.toLowerCase())
 
       if (supplierId) {
         await prisma.sUP_SupplierProduct.upsert({

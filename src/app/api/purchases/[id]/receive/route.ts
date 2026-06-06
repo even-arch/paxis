@@ -14,8 +14,9 @@ interface ReceiveItem {
   currency?: string   // 幣別
 }
 
-export async function POST(req: NextRequest, { params }: Params) {
-  const session = await getServerSession(authOptions)
+export async function POST(req: NextRequest, {
+  params }: Params) {
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const userId = parseInt((session.user as { id?: string })?.id ?? '', 10)
@@ -44,6 +45,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       orderId,
       receiptNo,
       note: body.note || null,
+      source: 'MANUAL',
+      performedBy: userId,
+      performedAt: new Date(),
       items: {
         create: receiveItems.map(i => ({
           poItemId: i.poItemId,
@@ -109,6 +113,9 @@ export async function POST(req: NextRequest, { params }: Params) {
         reservedAfter: stock.reservedQty,
         avgUnitCostAfter: newAvgCost,
         receiptId: receipt.id,
+        source: 'MANUAL',
+        performedBy: userId,
+        performedAt: new Date(),
         note: `入庫 ${receiptNo}`,
       },
     })
@@ -140,7 +147,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       patiscoNotifications.push(
         notifyInventoryUpdate({
           productId: poItem.productId,
-          patiscoProductId: poItem.product.patiscoProductId,
+          patiscoProductId: String(poItem.product.patiscoProductId),
           quantity: stock.quantity,
         }).catch(() => {})
       )
@@ -157,6 +164,32 @@ export async function POST(req: NextRequest, { params }: Params) {
     data: {
       status: allReceived ? 3 : anyReceived ? 2 : order.status,
       arrivedDate: allReceived ? new Date() : undefined,
+    },
+  })
+
+  // 自動建立應付帳款
+  const receiptAmountTWD = receiveItems.reduce((sum, item) => {
+    const poItem = order.items.find(i => i.id === item.poItemId)
+    if (!poItem) return sum
+    const cost = item.unitCost != null ? new Decimal(item.unitCost) : poItem.unitPrice
+    return sum.add(new Decimal(item.quantity).mul(cost))
+  }, new Decimal(0))
+
+  const supplier = await prisma.sUP_Supplier.findUnique({
+    where: { id: order.supplierId },
+    select: { paymentCycleDays: true },
+  })
+  const dueDate = supplier?.paymentCycleDays
+    ? new Date(Date.now() + supplier.paymentCycleDays * 86400000)
+    : null
+
+  await prisma.fIN_Payable.create({
+    data: {
+      supplierId: order.supplierId,
+      receiptId: receipt.id,
+      amountTWD: receiptAmountTWD,
+      dueDate,
+      status: 0,
     },
   })
 

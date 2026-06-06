@@ -5,8 +5,9 @@ import { ProductFormData } from '@/modules/product/productSchema'
 
 type Props = { params: { id: string } }
 
-export default async function EditProductPage({ params }: Props) {
-  const product = await prisma.pRD_Product.findUnique({
+export default async function EditProductPage({
+  params }: Props) {
+    const product = await prisma.pRD_Product.findUnique({
     where: { id: Number(params.id) },
   })
 

@@ -4,8 +4,9 @@ import SupplierForm, { type SupplierFormData } from '@/modules/supplier/Supplier
 
 type Props = { params: { id: string } }
 
-export default async function EditSupplierPage({ params }: Props) {
-  const supplier = await prisma.sUP_Supplier.findUnique({
+export default async function EditSupplierPage({
+  params }: Props) {
+    const supplier = await prisma.sUP_Supplier.findUnique({
     where: { id: Number(params.id) },
   })
 

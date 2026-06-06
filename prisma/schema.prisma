@@ -16,11 +16,6 @@ datasource db {
 // 系統設定 (SYS_)
 // =============================================================================
 
-// Patisco 連線設定（密碼 AES-256-GCM 加密儲存）
-// Patisco 連線設定
-// 支援兩種模式：
-//   1. 帳密模式：存 username + encryptedPass，cron 定時重新登入
-//   2. Token 模式：直接貼上 JWT + apiKey（JWT 到期後需手動重貼）
 model SYS_PatiscoConfig {
   id             Int      @id @default(autoincrement())
   mcpUrl         String   @default("https://mcp.patisco.com")
@@ -33,10 +28,10 @@ model SYS_PatiscoConfig {
   encryptedJwt   String?  // AES-256-GCM 加密，JWT 有時效
   apiKey         String?  // Patisco API Key（長效，UUID 格式）
   userId         String?  // Patisco userId（供顯示用）
-  jwtExpiresAt   DateTime? // JWT 到期時間（若能解析）
+  jwtExpiresAt   DateTime?
 
-  webhookSecret  String?  // Webhook 簽名驗證密鑰（選用）
-  cronSecret     String?  // Cron 安全驗證密鑰（選用）
+  webhookSecret  String?  // Webhook HMAC 簽名驗證密鑰
+  cronSecret     String?  // Cron 安全驗證密鑰
   isActive       Boolean  @default(true)
   lastTestedAt   DateTime?
   lastTestStatus String?  // 'ok' | 'error'
@@ -46,19 +41,21 @@ model SYS_PatiscoConfig {
   @@map("SYS_PatiscoConfig")
 }
 
-// Patisco PI 同步紀錄（去重 + 稽核）
+// Patisco 同步紀錄（去重 + 稽核）
 // source: 'webhook' | 'cron'
 // status: 'ok' | 'partial' | 'skipped' | 'error'
 model SYS_PatiscoSync {
   id           Int      @id @default(autoincrement())
-  patiscoDocId Int      @unique  // Patisco PI ID，確保每張 PI 只處理一次
-  patiscoDocNo String            // Patisco PI 單號（人讀用）
+  docType      String   @default("PI")  // PI | SHIPMENT
+  patiscoDocId String
+  patiscoDocNo String
   syncedAt     DateTime @default(now())
-  source       String            // 觸發來源：webhook | cron
-  status       String            // 結果：ok | partial | skipped | error
-  result       Json?             // 處理細節（哪些商品扣了多少）
-  errorMsg     String?           // 錯誤訊息
+  source       String   // webhook | cron | manual
+  status       String   // ok | partial | skipped | error
+  result       Json?
+  errorMsg     String?
 
+  @@unique([docType, patiscoDocId])
   @@index([syncedAt])
   @@map("SYS_PatiscoSync")
 }
@@ -72,27 +69,33 @@ model SYS_User {
   language    String    @default("zh-TW")
   createdAt   DateTime  @default(now())
 
-  // AI 功能：使用者自備 API Key，消耗自己的 token
-  aiProvider      String?   // 'anthropic' | 'openai'
-  encryptedAiKey  String?   // AES-256-GCM 加密後的 API Key
-  aiParseModel    String?   // 文件解析模型（留空用預設）
+  aiProvider      String?
+  encryptedAiKey  String?
+  aiParseModel    String?
 
+  // Relations
   purchaseOrders   PO_Order[]
+  receipts         PO_Receipt[]
+  supplierPIs      PO_SupplierPI[]
   costSheets       COST_Sheet[]
   passwordResets   SYS_PasswordReset[]
   settingAuditLogs SYS_SettingAuditLog[]
   productHistories PRD_ProductHistory[]
+  salesOrders          SLS_Order[]  @relation("SLS_Order_creator")
+  salesOrdersPerformed SLS_Order[]  @relation("SLS_Order_performer")
+  salesPIs             SLS_PI[]
+  shipments        SLS_Shipment[]
+  stockMovements   INV_Movement[]
 
   @@map("SYS_User")
 }
 
-// 存貨計價方法變更稽核日誌
 model SYS_SettingAuditLog {
   id          Int      @id @default(autoincrement())
-  field       String   // 被修改的設定欄位名稱，例如 'inventoryMethod'
+  field       String
   oldValue    String?
   newValue    String?
-  reason      String?  @db.Text // 變更原因（供稽核說明）
+  reason      String?  @db.Text
   changedBy   Int
   changer     SYS_User @relation(fields: [changedBy], references: [id])
   changedAt   DateTime @default(now())
@@ -101,58 +104,44 @@ model SYS_SettingAuditLog {
   @@map("SYS_SettingAuditLog")
 }
 
-// 公司基本資料（單筆，id=1）
 model SYS_Company {
   id            Int      @id @default(autoincrement())
 
-  // 存貨計價方法（一旦設定不可輕易更改，變更需寫入 SYS_SettingAuditLog）
   // WAC = 加權平均成本, FIFO = 先進先出, LIFO = 後進先出, SPECIFIC = 個別辨識
+  // 變更時必須寫入 SYS_SettingAuditLog
   inventoryMethod String @default("WAC")
 
-  // 名稱（多語言）
-  nameZh        String   @default("")   // 繁體中文公司名稱
-  nameEn        String   @default("")   // 英文公司名稱
-  shortName     String   @default("")   // 簡稱（文件用）
-
-  // 地址（多語言）
+  nameZh        String   @default("")
+  nameEn        String   @default("")
+  shortName     String   @default("")
   addressZh     String   @default("")
   addressEn     String   @default("")
   city          String   @default("")
   countryCode   String   @default("TW")
-
-  // 聯絡
   phone         String   @default("")
   fax           String   @default("")
   email         String   @default("")
   website       String   @default("")
-
-  // 貿易身分
-  taxId         String   @default("")   // 統一編號 / VAT
+  taxId         String   @default("")
   bankName      String   @default("")
   bankAccount   String   @default("")
   bankSwift     String   @default("")
-
-  // 自訂欄位（JSON 陣列：[{ label: string, value: string }]）
   customFields  Json     @default("[]")
-
-  // Logo（base64 data URL，列印時嵌入）
   logoBase64    String?  @db.Text
-
   updatedAt     DateTime @updatedAt
 
   @@map("SYS_Company")
 }
 
-// Email 寄信設定（用戶自備 Resend API Key，消耗自己的額度）
 model SYS_EmailConfig {
   id              Int      @id @default(autoincrement())
-  provider        String   @default("resend")  // 目前只支援 resend
-  encryptedApiKey String?  // AES-256-GCM 加密
-  fromEmail       String   @default("")         // 例：no-reply@yourdomain.com
-  fromName        String   @default("")         // 例：Point Asia
+  provider        String   @default("resend")
+  encryptedApiKey String?
+  fromEmail       String   @default("")
+  fromName        String   @default("")
   isActive        Boolean  @default(true)
   lastTestedAt    DateTime?
-  lastTestStatus  String?  // 'ok' | 'error'
+  lastTestStatus  String?
   lastTestMsg     String?
   updatedAt       DateTime @updatedAt
 
@@ -173,13 +162,30 @@ model SYS_PasswordReset {
 }
 
 model SYS_Currency {
-  code        String    @id // USD, TWD, EUR, JPY...
-  name        String   
-  symbol      String   
-  exchangeRate Decimal // 對 TWD 的匯率
-  updatedAt   DateTime  @updatedAt
+  code         String   @id
+  name         String
+  symbol       String
+  exchangeRate Decimal
+  updatedAt    DateTime @updatedAt
 
   @@map("SYS_Currency")
+}
+
+// 交易條件價格換算規則（公司級設定）
+// 例：供應商報 FOR（14）→ 我方對外 FOB（13）→ 需減 2.5%
+// adjustmentPct 正值 = 加 %；負值 = 減 %
+model SYS_PriceAdjustRule {
+  id            Int     @id @default(autoincrement())
+  fromTerms     Int     // 進貨條件 Patisco code（14=FOR, 13=FOB…）
+  toTerms       Int     // 對外條件 Patisco code（通常 13=FOB）
+  adjustmentPct Decimal // e.g. -2.50 = 减 2.5%；+5.00 = 加 5%
+  note          String?
+  isActive      Boolean @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([fromTerms, toTerms])
+  @@map("SYS_PriceAdjustRule")
 }
 
 // =============================================================================
@@ -188,48 +194,43 @@ model SYS_Currency {
 
 model PRD_Product {
   id            Int    @id @default(autoincrement())
-  name          String   
+  name          String
   sku           String?   @unique
-  modelNo       String?  
-  description   String?  
-  specification String?  
+  modelNo       String?
+  description   String?
+  specification String?
 
-  // 包裝規格
-  unitPerInner  Int?     // 每內箱數量
-  unitPerCarton Int?     // 每外箱數量
-  cbm           Decimal? // 材積 (cubic meter)
-  grossWeight   Decimal? // 毛重 KGS
-  netWeight     Decimal? // 淨重 KGS
-  length        Decimal? // CM
-  width         Decimal? 
-  height        Decimal? 
+  unitPerInner  Int?
+  unitPerCarton Int?
+  cbm           Decimal?
+  grossWeight   Decimal?
+  netWeight     Decimal?
+  length        Decimal?
+  width         Decimal?
+  height        Decimal?
 
-  // 貿易資訊
-  htsCode       String?  // HTS / HS 海關編碼
-  countryOfOrigin String?// ISO 國碼
-  unit          String?  // PCS, SET, KGS...
+  htsCode         String?
+  countryOfOrigin String?
+  unit            String?
 
-  // 庫存行為
-  isMadeToOrder Boolean  @default(false) // true = 可接單無現貨（接單後才採購）
-  safetyStock   Int      @default(0)     // 安全庫存量（低於此值發出警告）
+  isMadeToOrder Boolean  @default(false)
+  safetyStock   Int      @default(0)
 
-  // Patisco 介接
-  patiscoProductId Int?  // 對應 Patisco PRD_Product.ID
+  patiscoProductId String?
 
-  // POS 對接預留
-  sellingPrice      Decimal? // 建議售價（供 POS 定價參考）
-  isAvailableForPos Boolean  @default(false) // 是否開放 POS 系統販售
-  posProductId      String?  // 對應 POS 系統的產品 ID（對接後填入）
+  sellingPrice      Decimal?
+  isAvailableForPos Boolean  @default(false)
+  posProductId      String?
 
   isActive      Boolean   @default(true)
-  isArchived    Boolean   @default(false) // 封存（不刪資料，只從主列表隱藏）
+  isArchived    Boolean   @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  // Relations
   supplierProducts  SUP_SupplierProduct[]
   inventoryItems    INV_Stock[]
   purchaseItems     PO_Item[]
+  salesItems        SLS_Item[]
   costSheets        COST_Sheet[]
   categories        PRD_CategoryMapping[]
   history           PRD_ProductHistory[]
@@ -239,14 +240,11 @@ model PRD_Product {
   @@map("PRD_Product")
 }
 
-// 產品歷史快照（全欄位，每次異動自動寫入）
-// sourceType: 'PO_RECEIPT' = 採購入庫, 'AI_IMPORT' = AI 匯入, 'MANUAL_EDIT' = 手動編輯
 model PRD_ProductHistory {
   id          Int      @id @default(autoincrement())
   productId   Int
   product     PRD_Product @relation(fields: [productId], references: [id])
 
-  // 快照（異動當時的全欄位值）
   name          String
   sku           String?
   modelNo       String?
@@ -257,13 +255,13 @@ model PRD_ProductHistory {
   grossWeight   Decimal?
   netWeight     Decimal?
   unit          String?
-  unitCost      Decimal? // 進貨成本快照
-  currency      String?  // 幣別
+  unitCost      Decimal?
+  currency      String?
 
-  // 來源
-  sourceType  String   // 'PO_RECEIPT' | 'AI_IMPORT' | 'MANUAL_EDIT'
-  poOrderId   Int?     // 連結採購單（可點進去看原始單據）
-  poOrderNo   String?  // 採購單號（反正規化，直接顯示用）
+  // PO_RECEIPT | AI_IMPORT | MANUAL_EDIT
+  sourceType  String
+  poOrderId   Int?
+  poOrderNo   String?
 
   changedBy   Int
   changer     SYS_User @relation(fields: [changedBy], references: [id])
@@ -275,8 +273,8 @@ model PRD_ProductHistory {
 
 model PRD_Category {
   id        Int   @id @default(autoincrement())
-  name      String  
-  parentId  Int? 
+  name      String
+  parentId  Int?
   parent    PRD_Category?  @relation("CategoryTree", fields: [parentId], references: [id])
   children  PRD_Category[] @relation("CategoryTree")
   products  PRD_CategoryMapping[]
@@ -285,8 +283,8 @@ model PRD_Category {
 }
 
 model PRD_CategoryMapping {
-  productId   Int 
-  categoryId  Int 
+  productId   Int
+  categoryId  Int
   product     PRD_Product  @relation(fields: [productId], references: [id])
   category    PRD_Category @relation(fields: [categoryId], references: [id])
 
@@ -300,27 +298,37 @@ model PRD_CategoryMapping {
 
 model SUP_Supplier {
   id            Int    @id @default(autoincrement())
-  name          String   
-  shortName     String?  
-  address       String?  
-  city          String?  
-  countryCode   String?  
-  postalCode    String?  
-  phoneNo       String?  
-  fax           String?  
-  email         String?  
-  contactPerson String?  
-  taxId         String?  
-  paymentTerms  String?  // e.g. "T/T 30 days"
-  currencyCode  String?  // 慣用幣別
-  note          String?  
+  name          String
+  shortName     String?
+  address       String?
+  city          String?
+  countryCode   String?
+  postalCode    String?
+  phoneNo       String?
+  fax           String?
+  email         String?
+  contactPerson String?
+  taxId         String?
+  paymentTerms  String?
+  currencyCode  String?
+  note          String?
+
+  patiscoSupplierId String?  // 對應 Patisco 供應商 ID（未來開放時使用）
+
+  // 交易條件（Patisco Fix_Var TradingTerm code：13=FOB, 14=FOR, 2=CIF…）
+  defaultTradeTerms Int?
+
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  products      SUP_SupplierProduct[]
+  // 付款週期（天數，null 表示未設定）
+  paymentCycleDays Int?
+
+  products       SUP_SupplierProduct[]
   purchaseOrders PO_Order[]
-  contacts      SUP_Contact[]
+  contacts       SUP_Contact[]
+  payables       FIN_Payable[]
 
   @@index([name])
   @@map("SUP_Supplier")
@@ -328,13 +336,13 @@ model SUP_Supplier {
 
 model SUP_Contact {
   id          Int   @id @default(autoincrement())
-  supplierId  Int  
+  supplierId  Int
   supplier    SUP_Supplier @relation(fields: [supplierId], references: [id])
-  name        String  
-  title       String? 
-  phoneNo     String? 
-  mobile      String? 
-  email       String? 
+  name        String
+  title       String?
+  phoneNo     String?
+  mobile      String?
+  email       String?
   isDefault   Boolean  @default(false)
 
   @@index([supplierId])
@@ -343,18 +351,18 @@ model SUP_Contact {
 
 model SUP_SupplierProduct {
   id          Int    @id @default(autoincrement())
-  supplierId  Int   
-  productId   Int   
+  supplierId  Int
+  productId   Int
   supplier    SUP_Supplier @relation(fields: [supplierId], references: [id])
   product     PRD_Product  @relation(fields: [productId], references: [id])
 
-  supplierSku   String?  // 供應商自己的料號
-  unitPrice     Decimal? 
-  currencyCode  String?  
-  moq           Int?     // 最小起訂量
-  leadTimeDays  Int?     
-  isPreferred   Boolean   @default(false)  // 主要供應商
-  note          String?  
+  supplierSku   String?
+  unitPrice     Decimal?
+  currencyCode  String?
+  moq           Int?
+  leadTimeDays  Int?
+  isPreferred   Boolean   @default(false)
+  note          String?
   updatedAt     DateTime  @updatedAt
 
   @@unique([supplierId, productId])
@@ -363,39 +371,102 @@ model SUP_SupplierProduct {
 }
 
 // =============================================================================
-// 採購單 (PO_)
+// 客戶管理 (CUS_)
+// PAXIS 的客戶主檔，不直接對應 Patisco BU_Buyer。
+// Patisco webhook 帶來的 buyerCompanyId 存在 SLS_Order.patiscoBuyerId，
+// 由人工或自動流程關聯到此主檔。
 // =============================================================================
 
-// 採購狀態
+model CUS_Customer {
+  id            Int    @id @default(autoincrement())
+  name          String
+  shortName     String?
+  address       String?
+  city          String?
+  countryCode   String?
+  postalCode    String?
+  phoneNo       String?
+  fax           String?
+  email         String?
+  contactPerson String?
+  taxId         String?
+  paymentTerms  String?
+  currencyCode  String?
+  note          String?
+
+  patiscoBuyerId String?   // 對應 Patisco BS_Company.ID（選填，人工關聯）
+
+  // 交易條件（Patisco Fix_Var TradingTerm code：13=FOB, 14=FOR, 2=CIF…）
+  defaultTradeTerms Int?
+
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // 收款週期（天數，null 表示未設定）
+  collectionCycleDays Int?
+
+  salesOrders   SLS_Order[]
+  contacts      CUS_Contact[]
+  receivables   FIN_Receivable[]
+
+  @@index([name])
+  @@map("CUS_Customer")
+}
+
+model CUS_Contact {
+  id          Int   @id @default(autoincrement())
+  customerId  Int
+  customer    CUS_Customer @relation(fields: [customerId], references: [id])
+  name        String
+  title       String?
+  phoneNo     String?
+  mobile      String?
+  email       String?
+  isDefault   Boolean  @default(false)
+
+  @@index([customerId])
+  @@map("CUS_Contact")
+}
+
+// =============================================================================
+// 採購單 (PO_)
+//
+// 採購流程三節點：
+//   節點 1：PO_Order      — 我發出訂單正本給供應商（庫存不動）
+//   節點 2：PO_SupplierPI — 收到供應商 PI 副本，確認預計出貨（庫存不動）
+//   節點 3：PO_Receipt    — 收到裝箱單/實際到貨，按「入庫」→ quantity++
+//
+// 注意：quantity++ 發生在節點 3（裝箱單），不是節點 2（PI 副本）。
+// =============================================================================
+
+// 採購單狀態
 // 0=草稿, 1=已送出, 2=部分到貨, 3=完成, 4=取消
 model PO_Order {
   id            Int    @id @default(autoincrement())
-  poNo          String    @unique // 採購單號，自動產生
-  supplierId    Int   
+  poNo          String    @unique
+  supplierId    Int
   supplier      SUP_Supplier @relation(fields: [supplierId], references: [id])
 
   status        Int       @default(0)
-  currencyCode  String   
-  exchangeRate  Decimal  // 當時匯率快照
-  totalAmount   Decimal? 
+  currencyCode  String
+  exchangeRate  Decimal
+  totalAmount   Decimal?
 
-  expectedDate  DateTime?// 預計到貨日
-  shippedDate   DateTime?// 實際出貨日
-  arrivedDate   DateTime?// 實際到貨日
+  expectedDate  DateTime? // 預計到貨日
+  shippedDate   DateTime? // 供應商實際出貨日（從裝箱單取得）
+  arrivedDate   DateTime? // 實際到貨日
 
-  port          String?  // 裝運港
-  shipVia       String?  // 運送方式
+  port          String?
+  shipVia       String?
   note          String?
 
   // 採購觸發來源
-  // 0 = 主動補貨（預測/季節/促銷）
-  // 1 = 接單後採購（isMadeToOrder=true，無現貨接單）
-  // 2 = 安全庫存觸發（INV_Stock.quantity < safetyStock）
+  // 0 = 主動補貨, 1 = 接單後採購（isMadeToOrder）, 2 = 安全庫存觸發
   sourceType      Int      @default(0)
 
-  // Patisco 溯源（sourceType=1 時填入）
-  patiscoOrderNo  String?  // Patisco ORD_Order.No
-  patiscoOrderId  Int?     // Patisco ORD_Order.ID
+  patiscoOrderNo  String?
+  patiscoOrderId  String?
 
   createdBy     Int
   creator       SYS_User  @relation(fields: [createdBy], references: [id])
@@ -403,6 +474,7 @@ model PO_Order {
   updatedAt     DateTime  @updatedAt
 
   items         PO_Item[]
+  supplierPIs   PO_SupplierPI[]
   receipts      PO_Receipt[]
 
   @@index([supplierId, status])
@@ -412,34 +484,93 @@ model PO_Order {
 
 model PO_Item {
   id          Int    @id @default(autoincrement())
-  orderId     Int   
+  orderId     Int
   order       PO_Order  @relation(fields: [orderId], references: [id])
-  productId   Int   
+  productId   Int
   product     PRD_Product @relation(fields: [productId], references: [id])
 
-  unitPrice   Decimal  
-  quantity    Int      
-  receivedQty Int       @default(0)// 已入庫數量
-  unit        String?  
-  note        String?  
+  unitPrice   Decimal
+  quantity    Int
+  receivedQty Int       @default(0)
+  unit        String?
+  note        String?
 
-  receiptItems PO_ReceiptItem[]
+  receiptItems    PO_ReceiptItem[]
+  supplierPIItems PO_SupplierPIItem[]
 
   @@index([orderId])
   @@index([productId])
   @@map("PO_Item")
 }
 
+// 節點 2：收到供應商 PI 副本
+// 記錄供應商確認的數量與預計出貨日，庫存不動。
+model PO_SupplierPI {
+  id          Int    @id @default(autoincrement())
+  orderId     Int
+  order       PO_Order  @relation(fields: [orderId], references: [id])
+  piNo        String    // 供應商的 PI 單號
+
+  estimatedShipDate DateTime? // 供應商 PI 上標註的預計出貨日
+  note        String?
+
+  // 交易條件 & PI 層級加收
+  tradeTermsCode Int?    // Patisco payment 欄位值（13=FOB, 14=FOR…）
+  extraCharges   Json?   // [{name, type, amount}]
+
+  // 操作稽核
+  // source: PATISCO | MANUAL | AI_IMPORT
+  source      String   @default("MANUAL")
+  performedBy Int?     // null = Patisco 自動觸發
+  performer   SYS_User? @relation(fields: [performedBy], references: [id])
+  performedAt DateTime @default(now())
+
+  patiscoDocId     String?
+  patiscoDocNo     String?
+  patiscoCreatedAt DateTime? // Patisco 原始建立時間（createdDate YYYYMMDDHHmmss）
+
+  items       PO_SupplierPIItem[]
+
+  @@index([orderId])
+  @@map("PO_SupplierPI")
+}
+
+model PO_SupplierPIItem {
+  id            Int    @id @default(autoincrement())
+  supplierPIId  Int
+  supplierPI    PO_SupplierPI @relation(fields: [supplierPIId], references: [id])
+  poItemId      Int
+  poItem        PO_Item       @relation(fields: [poItemId], references: [id])
+
+  confirmedQty  Int  // 供應商確認的出貨數量
+
+  @@index([supplierPIId])
+  @@map("PO_SupplierPIItem")
+}
+
+// 節點 3：入庫確認（收到裝箱單 or 直接按入庫）
+// 觸發 quantity++，寫 INV_Movement type=1
 model PO_Receipt {
   id          Int    @id @default(autoincrement())
-  orderId     Int   
+  orderId     Int
   order       PO_Order  @relation(fields: [orderId], references: [id])
-  receiptNo   String   
-  receivedAt  DateTime  @default(now())
-  note        String?  
+  receiptNo   String
 
-  items       PO_ReceiptItem[]
+  // 操作稽核（必填，記錄是誰在什麼時間按下入庫）
+  // source: PATISCO | MANUAL | AI_IMPORT
+  source      String   @default("MANUAL")
+  performedBy Int?     // null = Patisco 自動觸發
+  performer   SYS_User? @relation(fields: [performedBy], references: [id])
+  performedAt DateTime @default(now())
+
+  patiscoDocId  String?
+  patiscoDocNo  String?
+
+  note        String?
+
+  items          PO_ReceiptItem[]
   stockMovements INV_Movement[]
+  payable        FIN_Payable?
 
   @@index([orderId])
   @@map("PO_Receipt")
@@ -447,52 +578,238 @@ model PO_Receipt {
 
 model PO_ReceiptItem {
   id          Int     @id @default(autoincrement())
-  receiptId   Int    
+  receiptId   Int
   receipt     PO_Receipt @relation(fields: [receiptId], references: [id])
-  poItemId    Int    
+  poItemId    Int
   poItem      PO_Item    @relation(fields: [poItemId], references: [id])
-  quantity    Int       
+  quantity    Int
 
   @@index([receiptId])
   @@map("PO_ReceiptItem")
 }
 
 // =============================================================================
-// 庫存管理 (INV_)
+// 銷售單 (SLS_)
+//
+// 銷售流程三節點：
+//   節點 1：SLS_Order    — 收到客戶訂單（庫存不動）
+//   節點 2：SLS_PI       — 我發出 PI 正本給客戶 → reservedQty++
+//   節點 3：SLS_Shipment — 發出裝箱單/確認出貨 → quantity--, reservedQty--
+//
+// 三種來源：
+//   PATISCO   = Patisco webhook 自動建立
+//   MANUAL    = 人工手填
+//   AI_IMPORT = 上傳 PDF/Excel，AI 解析後人工確認
 // =============================================================================
+
+// 銷售訂單狀態
+// 0=草稿, 1=已確認, 2=PI已發出, 3=部分出貨, 4=完成, 5=取消
+model SLS_Order {
+  id          Int    @id @default(autoincrement())
+  orderNo     String    @unique
+  customerId  Int?   // 可能尚未比對到客戶主檔
+  customer    CUS_Customer? @relation(fields: [customerId], references: [id])
+
+  status      Int    @default(0)
+  currencyCode  String
+  exchangeRate  Decimal
+  totalAmount   Decimal?
+
+  // 客戶期望出貨日（可能為 null，訂單上不一定有）
+  customerRequestedShipDate DateTime?
+  note        String?
+
+  // 操作稽核
+  source      String   @default("MANUAL")
+  performedBy Int?
+  performer   SYS_User? @relation("SLS_Order_performer", fields: [performedBy], references: [id])
+  performedAt DateTime @default(now())
+
+  // Patisco 溯源
+  patiscoBuyerId  String?    // Patisco buyerCompanyId（webhook 帶來）
+  patiscoBuyerName String? // 買家公司名稱快照
+  patiscoDocId    String?
+  patiscoDocNo    String?
+  patiscoCreatedAt DateTime? // Patisco 原始建立時間（createdDate YYYYMMDDHHmmss）
+
+  createdBy   Int
+  creator     SYS_User  @relation("SLS_Order_creator", fields: [createdBy], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  items       SLS_Item[]
+  pis         SLS_PI[]
+  shipments   SLS_Shipment[]
+
+  @@index([customerId, status])
+  @@index([orderNo])
+  @@map("SLS_Order")
+}
+
+model SLS_Item {
+  id          Int    @id @default(autoincrement())
+  orderId     Int
+  order       SLS_Order   @relation(fields: [orderId], references: [id])
+  productId   Int
+  product     PRD_Product @relation(fields: [productId], references: [id])
+
+  unitPrice   Decimal
+  quantity    Int
+  shippedQty  Int    @default(0) // 已出貨數量
+  unit        String?
+  note        String?
+
+  piItems       SLS_PIItem[]
+  shipmentItems SLS_ShipmentItem[]
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("SLS_Item")
+}
+
+// 節點 2：我發出 PI 正本給客戶
+// 觸發 reservedQty++，寫 INV_Movement type=2
+model SLS_PI {
+  id          Int    @id @default(autoincrement())
+  orderId     Int
+  order       SLS_Order @relation(fields: [orderId], references: [id])
+  piNo        String    @unique
+
+  // PI 上標註的預計出貨日（較貼近實際，用於追蹤提醒）
+  estimatedShipDate DateTime?
+
+  // 交易條件（Patisco TradingTerm code：13=FOB, 14=FOR…）& PI 層級加收
+  tradeTermsCode Int?    // Patisco payment 欄位值
+  extraCharges   Json?   // [{name, type, amount}]，對應 Patisco extraCharges
+
+  // 0=有效, 1=已取消
+  status      Int    @default(0)
+  cancelledAt DateTime?
+  cancelReason String?
+
+  // 操作稽核
+  source      String   @default("MANUAL")
+  performedBy Int?
+  performer   SYS_User? @relation(fields: [performedBy], references: [id])
+  performedAt DateTime @default(now())
+
+  patiscoDocId  String?
+  patiscoDocNo  String?
+  patiscoCreatedAt DateTime? // Patisco 原始建立時間（createdDate YYYYMMDDHHmmss）
+
+  items       SLS_PIItem[]
+  shipments   SLS_Shipment[]
+  stockMovements INV_Movement[]
+
+  @@index([orderId])
+  @@map("SLS_PI")
+}
+
+model SLS_PIItem {
+  id          Int    @id @default(autoincrement())
+  piId        Int
+  pi          SLS_PI    @relation(fields: [piId], references: [id])
+  slsItemId   Int
+  slsItem     SLS_Item  @relation(fields: [slsItemId], references: [id])
+
+  quantity    Int
+
+  // 品項層級快照（從 Patisco sync 填入，不覆蓋 PRD_Product）
+  unitPrice     Decimal?
+  unit          String?
+  unitPerCarton Int?
+  cbm           Decimal?
+  grossWeight   Decimal?
+  netWeight     Decimal?
+
+  @@index([piId])
+  @@map("SLS_PIItem")
+}
+
+// 節點 3：出貨確認（發出裝箱單 or 直接按出貨）
+// 觸發 quantity--, reservedQty--，寫 INV_Movement type=4
+model SLS_Shipment {
+  id          Int    @id @default(autoincrement())
+  piId        Int?
+  pi          SLS_PI?   @relation(fields: [piId], references: [id])
+  orderId     Int
+  order       SLS_Order @relation(fields: [orderId], references: [id])
+  shipmentNo  String    @unique
+
+  // 實際出貨資訊（作為最終 shippedAt 記錄）
+  actualShipDate  DateTime
+  shippingMethod  String?  // SEA | AIR | COURIER
+  portOfLoading   String?  // UN/LOCODE，如 TWKHH
+  portOfDischarge String?
+  trackingNo      String?
+
+  // 操作稽核（必填）
+  source      String   @default("MANUAL")
+  performedBy Int?
+  performer   SYS_User? @relation(fields: [performedBy], references: [id])
+  performedAt DateTime @default(now())
+
+  patiscoDocId  String?
+  patiscoDocNo  String?
+
+  note        String?
+
+  items          SLS_ShipmentItem[]
+  stockMovements INV_Movement[]
+  receivable     FIN_Receivable?
+
+  @@index([orderId])
+  @@map("SLS_Shipment")
+}
+
+model SLS_ShipmentItem {
+  id            Int    @id @default(autoincrement())
+  shipmentId    Int
+  shipment      SLS_Shipment @relation(fields: [shipmentId], references: [id])
+  slsItemId     Int
+  slsItem       SLS_Item     @relation(fields: [slsItemId], references: [id])
+
+  quantity      Int
+
+  @@index([shipmentId])
+  @@map("SLS_ShipmentItem")
+}
+
+// =============================================================================
+// 庫存管理 (INV_)
 //
 // 兩階段庫存模型：
 //   quantity     = 實際庫存（倉庫裡真正有的數量）
 //   reservedQty  = 預留量（已發 PI 正本給客戶、尚未出倉）
-//   availableQty = quantity - reservedQty（前端防超賣用這個數字）
+//   availableQty = quantity - reservedQty（前端防超賣用這個，不存 DB）
 //
-// 四個觸發點：
-//   入庫：收到供應商 PI 副本確認       → quantity++
-//   預留：發出 PI 正本給客戶確認       → reservedQty++
-//   取消：PI 正本取消                 → reservedQty--
-//   出倉：發出裝箱單+商業發票確認      → quantity--, reservedQty--
+// 五個觸發點（對應文件節點）：
+//   入庫：收到裝箱單/按入庫（PO_Receipt）           → quantity++
+//   預留：發出 PI 正本給客戶（SLS_PI）              → reservedQty++
+//   取消預留：PI 正本取消（SLS_PI.status=1）        → reservedQty--
+//   出倉：發出裝箱單/按出貨（SLS_Shipment）         → quantity--, reservedQty--
+//   手動調整/盤點/POS                              → 依情況
+// =============================================================================
 
 model INV_Stock {
   id           Int    @id @default(autoincrement())
   productId    Int    @unique
   product      PRD_Product @relation(fields: [productId], references: [id])
 
-  quantity     Int    @default(0) // 實際庫存（含已預留）
-  reservedQty  Int    @default(0) // 已發 PI 正本預留量
-  safetyStock  Int    @default(0) // 安全庫存預警值
-  avgUnitCost  Decimal? @default(0) // 移動加權平均成本（TWD）
+  quantity     Int    @default(0)
+  reservedQty  Int    @default(0)
+  safetyStock  Int    @default(0)
+  avgUnitCost  Decimal? @default(0)
   updatedAt    DateTime @updatedAt
-
-  // availableQty = quantity - reservedQty（在 application layer 計算，不存 DB）
 
   @@map("INV_Stock")
 }
 
 // 異動類型：
-//   1 = 入庫      供應商 PI 副本確認（quantity++）
-//   2 = 預留      客戶 PI 正本發出（reservedQty++）
-//   3 = 取消預留  客戶 PI 正本取消（reservedQty--）
-//   4 = 出倉      裝箱單+商業發票發出（quantity--, reservedQty--）
+//   1 = 採購入庫   PO_Receipt 確認（quantity++）
+//   2 = 預留       SLS_PI 發出（reservedQty++）
+//   3 = 取消預留   SLS_PI 取消（reservedQty--）
+//   4 = 出倉       SLS_Shipment 確認（quantity--, reservedQty--）
 //   5 = 手動調整入
 //   6 = 手動調整出
 //   7 = 盤點調整
@@ -501,59 +818,70 @@ model INV_Stock {
 model INV_Movement {
   id           Int      @id @default(autoincrement())
   productId    Int
-  type         Int      // 見上方說明
+  type         Int
 
-  // 數量變動（正數=增加, 負數=減少）
-  qtyDelta        Int   // quantity 的變動量
-  reservedDelta   Int   @default(0) // reservedQty 的變動量
+  qtyDelta        Int
+  reservedDelta   Int   @default(0)
 
   // 異動後快照（方便查帳，不需要重算）
-  quantityAfter   Int
-  reservedAfter   Int
-  avgUnitCostAfter Decimal? // 異動後的移動加權平均成本
+  quantityAfter    Int
+  reservedAfter    Int
+  avgUnitCostAfter Decimal?
 
-  // 來源溯源（對應 Patisco 文件）
-  // patiscoDocType: PI_CONFIRMED, PI_CANCELLED, DELIVERY_ORDER, MANUAL
-  patiscoDocType  String?
-  patiscoDocId    Int?    // Patisco 單據 ID
-  patiscoDocNo    String? // Patisco 單據號碼（人讀用）
+  // 操作稽核（是誰在什麼時間觸發這筆異動）
+  // performedBy = null 時表示 Patisco 自動觸發（稽核資訊在 patiscoDocId）
+  performedBy  Int?
+  performer    SYS_User? @relation(fields: [performedBy], references: [id])
+  performedAt  DateTime  @default(now())
 
-  // 來源溯源（對應 PAXIS 內部）
-  receiptId       Int?
-  receipt         PO_Receipt? @relation(fields: [receiptId], references: [id])
+  // 來源溯源（PATISCO | MANUAL | AI_IMPORT）
+  source       String    @default("MANUAL")
+
+  // 採購側溯源
+  receiptId    Int?
+  receipt      PO_Receipt? @relation(fields: [receiptId], references: [id])
+
+  // 銷售側溯源
+  slsPiId      Int?
+  slsPi        SLS_PI?      @relation(fields: [slsPiId], references: [id])
+  slsShipmentId Int?
+  slsShipment   SLS_Shipment? @relation(fields: [slsShipmentId], references: [id])
+
+  // Patisco 文件溯源
+  patiscoDocType  String?  // ORDER | PI | SHIPMENT
+  patiscoDocId    String?
+  patiscoDocNo    String?
 
   note         String?
   createdAt    DateTime @default(now())
 
   @@index([productId, createdAt])
   @@index([receiptId])
+  @@index([slsPiId])
+  @@index([slsShipmentId])
   @@index([patiscoDocType, patiscoDocId])
   @@map("INV_Movement")
 }
 
 // =============================================================================
 // 成本計算 (COST_)
-// 對應 ET61 的 K-MART / WAL-MART 到岸成本計算表
 // =============================================================================
 
 model COST_Sheet {
   id            Int    @id @default(autoincrement())
-  name          String   // 試算表名稱
-  productId     Int   
+  name          String
+  productId     Int
   product       PRD_Product @relation(fields: [productId], references: [id])
 
-  // FOB 成本
-  fobPrice      Decimal  
-  fobCurrency   String   
-  fobExRate     Decimal  // FOB 幣別對 USD 匯率快照
+  fobPrice      Decimal
+  fobCurrency   String
+  fobExRate     Decimal
 
-  // 出口端
   countryOfOrigin String?
   portOfLoading   String?
 
-  // 進口端成本（USD）
   htsCode         String?
-  dutyRate        Decimal?// 關稅率 %
+  dutyRate        Decimal?
   dutyAmount      Decimal?
   oceanFreight    Decimal?
   insurance       Decimal?
@@ -563,22 +891,151 @@ model COST_Sheet {
   userFee         Decimal?
   harborFee       Decimal?
   otherCharge     Decimal?
-  otherChargeNote String? 
+  otherChargeNote String?
 
-  // 計算結果
-  landedCost    Decimal? // 到岸總成本
-  sellingPrice  Decimal? // 建議售價
-  grossMarginPct Decimal?// 毛利率 %
+  landedCost      Decimal?
+  sellingPrice    Decimal?
+  grossMarginPct  Decimal?
 
-  // 容器資訊
-  container40ftQty  Int? // 40呎貨櫃裝載量（箱）
-  container40ftPcs  Int? // 40呎貨櫃裝載量（件）
+  container40ftQty  Int?
+  container40ftPcs  Int?
 
-  createdBy     Int   
+  createdBy     Int
   creator       SYS_User  @relation(fields: [createdBy], references: [id])
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   @@index([productId])
   @@map("COST_Sheet")
+}
+
+// =============================================================================
+// 財務對帳 (FIN_)
+//
+// FIN_Payable   — 應付帳款，由 PO_Receipt 入庫確認時自動產生
+// FIN_Receivable — 應收帳款，由 SLS_Shipment 出貨確認時自動產生
+// =============================================================================
+
+// 付款狀態：0=未付, 1=部分付清, 2=已付清
+model FIN_Payable {
+  id          Int    @id @default(autoincrement())
+
+  supplierId  Int
+  supplier    SUP_Supplier @relation(fields: [supplierId], references: [id])
+
+  // 來源單據
+  receiptId   Int    @unique
+  receipt     PO_Receipt @relation(fields: [receiptId], references: [id])
+
+  // 金額（TWD）
+  amountTWD   Decimal
+
+  // 到期日（入庫日 + 供應商付款週期）
+  dueDate     DateTime?
+
+  // 付款狀態
+  status      Int    @default(0)  // 0=未付, 1=部分, 2=已付
+  paidAt      DateTime?
+  paidAmountTWD Decimal?
+  note        String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([supplierId])
+  @@index([dueDate])
+  @@map("FIN_Payable")
+}
+
+// 收款狀態：0=未收, 1=部分收款, 2=已收清
+model FIN_Receivable {
+  id          Int    @id @default(autoincrement())
+
+  customerId  Int?
+  customer    CUS_Customer? @relation(fields: [customerId], references: [id])
+  customerName String?  // 備用，customerId 為 null 時使用
+
+  // 來源單據
+  shipmentId  Int    @unique
+  shipment    SLS_Shipment @relation(fields: [shipmentId], references: [id])
+
+  // 金額（原始幣別，通常是 EUR）
+  currencyCode    String
+  amountForeign   Decimal  // EUR 金額
+
+  // 報帳匯率（PI 開出時的匯率，用於帳面計算）
+  rateAtInvoice   Decimal
+  amountTWD       Decimal  // = amountForeign × rateAtInvoice
+
+  // 到期日（出貨日 + 客戶收款週期）
+  dueDate         DateTime?
+
+  // 收款狀態
+  status          Int    @default(0)  // 0=未收, 1=部分, 2=已收
+  collectedAt     DateTime?
+  collectedForeign Decimal?  // 實際收到的 EUR 金額
+  rateAtCollection Decimal?  // 押匯匯率
+  collectedTWD    Decimal?   // = collectedForeign × rateAtCollection
+  fxGainLoss      Decimal?   // = collectedTWD - (collectedForeign × rateAtInvoice)
+
+  note            String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([customerId])
+  @@index([dueDate])
+  @@map("FIN_Receivable")
+}
+
+// =============================================================================
+// UPS 出貨提單紀錄 (UPS_)
+// 記錄每一張 UPS 提單的完整資訊，包含關聯 PI、提貨預約等。
+// =============================================================================
+
+model UPS_ShipmentLog {
+  id                   Int      @id @default(autoincrement())
+
+  // UPS 回傳識別碼
+  trackingNumber       String
+  upsShipmentId        String?  // UPS ShipmentIdentificationNumber
+
+  // 服務
+  serviceCode          String
+  serviceName          String?
+
+  // 關聯 PI（選填，可能是手動建立未關聯 PI）
+  piId                 Int?
+  piNo                 String?
+
+  // 地址快照（JSON，避免主檔變更後失去歷史紀錄）
+  originSnapshot       Json
+  destinationSnapshot  Json
+
+  // 貨物快照
+  packagesSnapshot     Json     // Array of { weightKg, dims, items[] }
+  declaredValue        Decimal?
+  declaredCurrency     String?
+
+  // 費用（UPS 回傳）
+  chargedAmount        Decimal?
+  chargedCurrency      String?
+
+  // 標籤（Base64）
+  labelBase64          String?  @db.Text
+  labelFormat          String?  @default("GIF")  // GIF | PNG | PDF
+
+  // 預約提貨
+  pickupConfirmationNo String?
+  pickupReadyTime      DateTime?   // 可供提貨的最早時間
+  pickupCloseTime      DateTime?   // 最晚關門時間
+  pickupScheduledDate  DateTime?   // UPS 預約提貨日
+
+  createdAt            DateTime @default(now())
+  createdByUserId      Int?
+
+  @@index([trackingNumber])
+  @@index([piNo])
+  @@index([createdAt])
+  @@map("UPS_ShipmentLog")
 }

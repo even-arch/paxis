@@ -5,8 +5,9 @@ import { verifyPosApiKey } from '@/lib/posAuth'
 
 type Params = { params: { sku: string } }
 
-export async function GET(req: NextRequest, { params }: Params) {
-  if (!verifyPosApiKey(req)) {
+export async function GET(req: NextRequest, {
+  params }: Params) {
+    if (!verifyPosApiKey(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { syncPatiscoPIs } from '@/api/patisco/sync'
+import { syncPatiscoPIs, syncPatiscoBuyers, syncPatiscoSellers, syncPatiscoSupplierPOs } from '@/api/patisco/sync'
+import { patiscoLogin } from '@/api/patisco/client'
+import { prisma } from '@/lib/db'
 
-/**
- * Vercel Cron Job — 每 5 分鐘輪詢 Patisco 已確認 PI
- * 設定在 vercel.json 的 crons 區塊
- *
- * 安全機制：只允許 Vercel 的 cron 呼叫（驗證 CRON_SECRET）
- */
+const DEFAULT_MCP_URL = process.env.PATISCO_MCP_URL ?? 'https://mcp.patisco.com'
+async function rawMcpCall(creds: { jwt: string; apiKey: string; _mcpUrl?: string }, tool: string, args: Record<string, unknown>) {
+  const base = creds._mcpUrl ?? DEFAULT_MCP_URL
+  const res = await fetch(`${base}/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${creds.jwt}`, 'X-API-Key': creds.apiKey },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 9001, method: 'tools/call', params: { name: tool, arguments: args } }),
+    signal: AbortSignal.timeout(30_000),
+  })
+  return res.json()
+}
+
 export async function GET(req: NextRequest) {
-  // 驗證 Vercel Cron Secret
   const authHeader = req.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
 
@@ -19,19 +26,43 @@ export async function GET(req: NextRequest) {
   const start = Date.now()
 
   try {
-    const result = await syncPatiscoPIs('cron')
+    const creds = await patiscoLogin(prisma)
+    const dbUrl = process.env.DATABASE_URL!
+
+    // DEBUG MODE: ?raw=1 直接回傳 raw MCP 結果，不跑完整 sync
+    const { searchParams } = req.nextUrl
+    if (searchParams.get('raw') === '1' && creds) {
+      const tool = searchParams.get('tool') ?? 'listOrderCopies'
+      const args: Record<string, unknown> = {}
+      // 數字欄位自動轉型（Patisco 要求 number，querystring 傳進來是 string）
+      const NUM_FIELDS = new Set(['first', 'offset', 'limit', 'page'])
+      searchParams.forEach((v, k) => {
+        if (k === 'raw' || k === 'tool') return
+        args[k] = NUM_FIELDS.has(k) ? Number(v) : v
+      })
+      const raw = await rawMcpCall(creds, tool, args)
+      return NextResponse.json({ tool, args, raw })
+    }
+
+    const sellerResult = await syncPatiscoSellers('cron', prisma, creds ?? undefined)
+    const buyerResult  = await syncPatiscoBuyers('cron', prisma, creds ?? undefined)
+    const piResult     = await syncPatiscoPIs('cron', prisma, dbUrl, creds ?? undefined)
+    const poResult     = await syncPatiscoSupplierPOs('cron', prisma, dbUrl, creds ?? undefined)
 
     return NextResponse.json({
       ok: true,
       durationMs: Date.now() - start,
-      ...result,
+      sellers: sellerResult,
+      buyers: buyerResult,
+      pi: piResult,
+      po: {
+        ...poResult,
+        _note: 'getOrderCopyDetail/getOrderCopyProducts 對買方角色 Forbidden/GraphQL bug，商品明細待 Patisco 修復後補入',
+      },
     })
   } catch (err) {
-    console.error('[cron/patisco-sync]', err)
-    return NextResponse.json({
-      ok: false,
-      error: err instanceof Error ? err.message : String(err),
-      durationMs: Date.now() - start,
-    }, { status: 500 })
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('[cron/patisco-sync] 失敗:', msg)
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 })
   }
 }

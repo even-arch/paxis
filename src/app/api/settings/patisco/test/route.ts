@@ -6,14 +6,14 @@ import { patiscoLogin, listTools } from '@/api/patisco/client'
 
 /** 測試 Patisco 連線 */
 export async function POST(_req: NextRequest) {
-  const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const config = await prisma.sYS_PatiscoConfig.findFirst({ where: { isActive: true } })
   if (!config) return NextResponse.json({ ok: false, error: '尚未設定 Patisco 帳號' }, { status: 400 })
 
-  // 實際嘗試登入
-  const creds = await patiscoLogin()
+  // 實際嘗試登入（傳入租戶 DB，確保讀到本帳號的設定）
+  const creds = await patiscoLogin(prisma)
   const now = new Date()
 
   if (!creds) {

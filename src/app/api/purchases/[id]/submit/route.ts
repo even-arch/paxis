@@ -7,8 +7,9 @@ import { notifyPurchaseCreated } from '@/api/patisco/client'
 type Params = { params: { id: string } }
 
 /** 送出採購單（草稿 → 已送出） */
-export async function POST(_req: NextRequest, { params }: Params) {
-  const session = await getServerSession(authOptions)
+export async function POST(_req: NextRequest, {
+  params }: Params) {
+    const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const id = Number(params.id)

@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic'
 const ImportWizard = dynamic(() => import('./ImportWizard'), { ssr: false })
 
 export default async function ImportPage() {
-  const [suppliers, products] = await Promise.all([
+    const [suppliers, products] = await Promise.all([
     prisma.sUP_Supplier.findMany({
       where: { isActive: true },
       select: { id: true, name: true, shortName: true, currencyCode: true, email: true, phoneNo: true, address: true, city: true, countryCode: true, paymentTerms: true },

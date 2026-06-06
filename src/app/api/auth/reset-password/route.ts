@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '密碼至少 8 個字元' }, { status: 400 })
   }
 
-  const reset = await prisma.sYS_PasswordReset.findUnique({ where: { token } })
+  const reset = await prisma.sYS_PasswordReset.findUnique({ where: { token } }).catch(() => null)
 
   if (!reset || reset.usedAt || reset.expiresAt < new Date()) {
     return NextResponse.json({ error: '連結已失效或已使用，請重新申請' }, { status: 400 })
