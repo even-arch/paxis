@@ -144,7 +144,8 @@ async function pdfToImages(pdfBuffer: Buffer, maxPages = 8): Promise<string[]> {
 
     return images
   } catch (err) {
-    console.warn('[pdfToImages] mupdf failed, will fall back to text extraction:', err)
+    const msg = err instanceof Error ? `${err.message}\n${err.stack}` : String(err)
+    console.error('[pdfToImages] mupdf failed, falling back to text extraction:', msg)
     return []
   }
 }
