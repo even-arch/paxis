@@ -14,6 +14,8 @@ export interface ApplySupplierInput {
   address?: string | null
   city?: string | null
   country?: string | null
+  postalCode?: string | null
+  taxId?: string | null
 }
 
 export interface AppliedSupplier {
@@ -27,7 +29,7 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions)
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { supplierName, supplierEmail, supplierShortName, contactPerson, paymentTerms, currencyCode, phone, address, city, country } = await req.json() as ApplySupplierInput
+    const { supplierName, supplierEmail, supplierShortName, contactPerson, paymentTerms, currencyCode, phone, address, city, country, postalCode, taxId } = await req.json() as ApplySupplierInput
     const name = supplierName?.trim() ?? ''
     if (!name) return NextResponse.json({ error: '供應商名稱不能為空' }, { status: 400 })
 
@@ -55,6 +57,8 @@ export async function POST(req: NextRequest) {
           address:       address ?? null,
           city:          city ?? null,
           countryCode:   country ?? null,
+          postalCode:    postalCode ?? null,
+          taxId:         taxId ?? null,
         },
       })
       supplierCreated = true

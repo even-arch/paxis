@@ -18,12 +18,16 @@ type DbProduct = { id: number; name: string; sku: string | null; unit: string | 
 type ProductDraft = {
   name: string; specification: string; sku: string
   qty: string; unitPrice: string; unit: string
-  conflictId: number | null; conflictName: string; conflictSpec: string
+  htsCode: string
+  conflictId: number | null; conflictName: string; conflictSpec: string; conflictSku: string
   hasDiff: boolean; action: 'create' | 'use-existing'
+  /** 如果 parsedSku 是用「前綴比對」到 DB 的，這裡存原始解析到的 sku */
+  parsedSkuRaw: string
+  isPartialSkuMatch: boolean
 }
 type SupplierDraft = {
   name: string; shortName: string; email: string; phone: string
-  address: string; city: string; country: string
+  address: string; city: string; country: string; postalCode: string; taxId: string
   contactPerson: string; paymentTerms: string; currencyCode: string
   matchedId: number | null; matchedSupplier: DbSupplier | null
 }
@@ -49,6 +53,7 @@ export default function ImportWizard({
   const [productDrafts,  setProductDrafts]  = useState<ProductDraft[]>([])
   const [supplierDraft,  setSupplierDraft]  = useState<SupplierDraft>({
     name: '', shortName: '', email: '', phone: '', address: '', city: '', country: '',
+    postalCode: '', taxId: '',
     contactPerson: '', paymentTerms: '', currencyCode: 'USD',
     matchedId: null, matchedSupplier: null,
   })
@@ -91,19 +96,37 @@ export default function ImportWizard({
       if (!res.ok) throw new Error(json.error ?? `解析失敗 (HTTP ${res.status})`)
       const inv = json.data!
 
-      // 本地 SKU 衝突偵測
+      // 本地 SKU 衝突偵測（含前綴比對：PDF 有時把備注塞在 SKU 欄）
       const drafts: ProductDraft[] = (inv.items ?? []).map(it => {
-        const sku = it.sku?.trim() ?? ''
-        const ex  = sku ? initProducts.find(p => p.sku && p.sku.toLowerCase() === sku.toLowerCase()) : undefined
+        const parsedSkuRaw = it.sku?.trim() ?? ''
+        const skuLower = parsedSkuRaw.toLowerCase()
+
+        // 1. 完全相符
+        let ex = parsedSkuRaw ? initProducts.find(p => p.sku && p.sku.toLowerCase() === skuLower) : undefined
+        let isPartialSkuMatch = false
+
+        // 2. 前綴相符（PDF SKU 欄帶了額外後綴，例如「12345 EXTRA INFO」→ DB 裡只有「12345」）
+        if (!ex && parsedSkuRaw) {
+          ex = initProducts.find(p =>
+            p.sku && skuLower.startsWith(p.sku.toLowerCase() + ' ')
+          )
+          if (ex) isPartialSkuMatch = true
+        }
+
+        const sku = isPartialSkuMatch && ex ? ex.sku! : parsedSkuRaw
         const hasDiff = ex
-          ? ex.name.toLowerCase() !== (it.name?.trim().toLowerCase() ?? '') ||
+          ? isPartialSkuMatch ||
+            ex.name.toLowerCase() !== (it.name?.trim().toLowerCase() ?? '') ||
             (ex.specification ?? '') !== (it.specification?.trim() ?? '')
           : false
         return {
           name: it.name?.trim() ?? '', specification: it.specification?.trim() ?? '', sku,
           qty: String(it.qty ?? 1), unitPrice: String(it.unitPrice ?? 0), unit: it.unit?.trim() ?? 'PCS',
-          conflictId: ex?.id ?? null, conflictName: ex?.name ?? '', conflictSpec: ex?.specification ?? '',
+          htsCode: (it as unknown as { htsCode?: string }).htsCode?.trim() ?? '',
+          conflictId: ex?.id ?? null, conflictName: ex?.name ?? '',
+          conflictSpec: ex?.specification ?? '', conflictSku: ex?.sku ?? '',
           hasDiff, action: ex ? 'use-existing' : 'create',
+          parsedSkuRaw, isPartialSkuMatch,
         }
       })
       setProductDrafts(drafts)
@@ -122,6 +145,7 @@ export default function ImportWizard({
         address: (inv as unknown as Record<string, string>).supplierAddress?.trim() ?? '',
         city: (inv as unknown as Record<string, string>).supplierCity?.trim() ?? '',
         country: (inv as unknown as Record<string, string>).supplierCountry?.trim() ?? '',
+        postalCode: '', taxId: '',
         contactPerson: '', paymentTerms: '', currencyCode: inv.currency ?? 'USD',
         matchedId: matched?.id ?? null, matchedSupplier: matched ?? null,
       })
@@ -157,6 +181,9 @@ export default function ImportWizard({
             qty:           Number(d.qty),
             unitPrice:     Number(d.unitPrice),
             unit:          d.unit,
+            htsCode:       d.htsCode || null,
+            action:        d.action,
+            conflictId:    d.conflictId,
           })),
         }),
       })
@@ -176,10 +203,10 @@ export default function ImportWizard({
       }))
       setSavedProducts(saved)
 
-      // 初始化 PO 品項（使用已解析的 productId）
-      setPoItems(saved.map(s => ({
+      // 初始化 PO 品項（使用已解析的 productId，名稱優先用使用者在步驟 1 手動調整的版本）
+      setPoItems(saved.map((s, idx) => ({
         productId:   s.productId,
-        productName: s.productName,
+        productName: productDrafts[idx]?.name.trim() || s.productName,
         sku:         s.sku,
         qty:         String(s.qty),
         unitPrice:   String(s.unitPrice),
@@ -215,6 +242,8 @@ export default function ImportWizard({
           address:           supplierDraft.address || null,
           city:              supplierDraft.city || null,
           country:           supplierDraft.country || null,
+          postalCode:        supplierDraft.postalCode || null,
+          taxId:             supplierDraft.taxId || null,
           contactPerson:     supplierDraft.contactPerson || null,
           paymentTerms:      supplierDraft.paymentTerms || null,
           currencyCode:      supplierDraft.currencyCode || null,
@@ -357,24 +386,42 @@ export default function ImportWizard({
                   {isConflict && (
                     <div className="mb-3 flex items-start gap-3">
                       <div className="flex-1 bg-white border border-amber-200 rounded p-3 text-xs">
-                        <p className="font-medium text-amber-700 mb-2">⚠ 料號「{item.sku}」已存在，資料有差異</p>
-                        <div className="grid grid-cols-2 gap-3 text-gray-600">
-                          <div><p className="text-gray-400 mb-0.5">現有名稱</p><p className="font-medium">{item.conflictName}</p></div>
-                          <div><p className="text-gray-400 mb-0.5">匯入名稱</p><p className="font-medium">{item.name}</p></div>
-                          <div><p className="text-gray-400 mb-0.5">現有規格</p><p className="line-clamp-2">{item.conflictSpec || '-'}</p></div>
-                          <div><p className="text-gray-400 mb-0.5">匯入規格</p><p className="line-clamp-2">{item.specification || '-'}</p></div>
+                        <p className="font-medium text-amber-700 mb-2">
+                          ⚠ 找到相似的既有產品（料號：{item.conflictSku || item.sku}），請確認是否為同一個商品
+                        </p>
+                        {/* 差異點列表 */}
+                        <ul className="mb-2 space-y-1 text-amber-800">
+                          {item.isPartialSkuMatch && (
+                            <li>• 文件 SKU 欄位帶有額外後綴：「{item.parsedSkuRaw}」→ 系統判斷前綴「{item.conflictSku}」符合</li>
+                          )}
+                          {item.conflictName.toLowerCase() !== item.name.toLowerCase() && (
+                            <li>• 名稱不同：現有「{item.conflictName}」／文件「{item.name}」</li>
+                          )}
+                          {(item.conflictSpec || '') !== (item.specification || '') && (
+                            <li>• 規格不同：現有「{item.conflictSpec || '（空）'}」／文件「{item.specification || '（空）'}」</li>
+                          )}
+                        </ul>
+                        <div className="grid grid-cols-2 gap-3 text-gray-600 border-t border-amber-100 pt-2">
+                          <div><p className="text-gray-400 mb-0.5">現有產品</p>
+                            <p className="font-medium">{item.conflictName}</p>
+                            <p className="text-gray-400 mt-0.5">{item.conflictSpec || '-'}</p>
+                          </div>
+                          <div><p className="text-gray-400 mb-0.5">文件內容</p>
+                            <p className="font-medium">{item.name}</p>
+                            <p className="text-gray-400 mt-0.5">{item.specification || '-'}</p>
+                          </div>
                         </div>
                       </div>
                       <div className="flex flex-col gap-2 shrink-0 pt-1">
                         <button type="button"
-                          onClick={() => setProductDrafts(p => p.map((d, i) => i === idx ? { ...d, action: 'use-existing' } : d))}
-                          className={`px-3 py-1.5 rounded text-xs font-medium ${item.action === 'use-existing' ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300 text-gray-700'}`}>
-                          使用現有
+                          onClick={() => setProductDrafts(p => p.map((d, i) => i === idx ? { ...d, action: 'use-existing', sku: d.conflictSku || d.sku } : d))}
+                          className={`px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap ${item.action === 'use-existing' ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300 text-gray-700'}`}>
+                          ✓ 是同一個，沿用現有
                         </button>
                         <button type="button"
-                          onClick={() => setProductDrafts(p => p.map((d, i) => i === idx ? { ...d, action: 'create', sku: '' } : d))}
-                          className={`px-3 py-1.5 rounded text-xs font-medium ${item.action === 'create' ? 'bg-orange-500 text-white' : 'bg-white border border-gray-300 text-gray-700'}`}>
-                          建新產品
+                          onClick={() => setProductDrafts(p => p.map((d, i) => i === idx ? { ...d, action: 'create', sku: d.parsedSkuRaw, conflictId: null } : d))}
+                          className={`px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap ${item.action === 'create' ? 'bg-orange-500 text-white' : 'bg-white border border-gray-300 text-gray-700'}`}>
+                          ✕ 不同，另建新產品
                         </button>
                       </div>
                     </div>
@@ -512,9 +559,17 @@ export default function ImportWizard({
               <input type="text" value={supplierDraft.city}
                 onChange={e => setSupplierDraft(d => ({ ...d, city: e.target.value }))} className={inp} />
             </Field>
+            <Field label="郵遞區號">
+              <input type="text" value={supplierDraft.postalCode}
+                onChange={e => setSupplierDraft(d => ({ ...d, postalCode: e.target.value }))} className={inp} placeholder="例：700" />
+            </Field>
             <Field label="國家">
               <input type="text" value={supplierDraft.country}
                 onChange={e => setSupplierDraft(d => ({ ...d, country: e.target.value }))} className={inp} placeholder="TAIWAN" />
+            </Field>
+            <Field label="統編 / Tax ID">
+              <input type="text" value={supplierDraft.taxId}
+                onChange={e => setSupplierDraft(d => ({ ...d, taxId: e.target.value }))} className={inp} placeholder="例：12345678" />
             </Field>
             <div className="col-span-2">
               <Field label="地址">

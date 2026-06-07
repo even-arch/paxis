@@ -15,6 +15,8 @@ interface MatchedOrder {
   exchangeRate: string | null  // 訂單建立時登記的匯率
   totalAmountForeign: number | null  // 訂單外幣總額
   items: Array<{ id: number; sku: string | null; quantity: number; unit: string; unitPrice: string }>
+  /** 目前有效（status=0）的 PI id，出貨時需要傳入才能正確扣 reservedQty */
+  activePiId: number | null
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -95,6 +97,9 @@ export default function ShipmentImportPage() {
       const detail = await detailRes.json()
       const detailItems = (detail.items ?? []) as Array<{ id: number; product: { sku: string | null }; quantity: number; unit: string; unitPrice: string }>
       const totalAmountForeign = detailItems.reduce((sum, it) => sum + it.quantity * parseFloat(it.unitPrice || '0'), 0)
+      // 找出最近一張有效（status=0）的 PI，出貨時需要帶入才能正確扣 reservedQty
+      const activePis = (detail.pis ?? []) as Array<{ id: number; status: number }>
+      const activePiId = activePis.find(p => p.status === 0)?.id ?? null
       setMatchedOrder({
         id: detail.id,
         orderNo: detail.orderNo,
@@ -102,6 +107,7 @@ export default function ShipmentImportPage() {
         currencyCode: detail.currencyCode ?? 'EUR',
         exchangeRate: detail.exchangeRate ?? null,
         totalAmountForeign: totalAmountForeign || null,
+        activePiId,
         items: detailItems.map(it => ({
           id: it.id,
           sku: it.product?.sku ?? null,
@@ -139,6 +145,12 @@ export default function ShipmentImportPage() {
   const twdTotalNum = twdTotal.trim() !== '' ? parseFloat(twdTotal) : null
   const impliedRate = (twdTotalNum != null && eurTotal != null && eurTotal > 0)
     ? twdTotalNum / eurTotal
+    : null
+
+  // 若未輸入 TWD，則以「訂單 TWD 估算 ÷ CI 外幣總額」推算預估出貨匯率
+  // 公式：(訂單外幣 × 訂單匯率) / CI 外幣 = 預估出貨匯率
+  const estimatedRate = (impliedRate == null && orderTwdEstimate != null && eurTotal != null && eurTotal > 0)
+    ? orderTwdEstimate / eurTotal
     : null
 
   // ── 儲存到 PAXIS ──────────────────────────────────────────────────────────────
@@ -181,6 +193,7 @@ export default function ShipmentImportPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          piId: matchedOrder.activePiId ?? null,   // ★ 傳入才能正確扣 reservedQty
           actualShipDate,
           shippingMethod: shippingMethod || null,
           portOfLoading: portOfLoading || null,
@@ -488,12 +501,14 @@ export default function ShipmentImportPage() {
                 <div>
                   <p className="text-xs text-gray-500 mb-1">出貨匯率（TWD/{parsed.currency ?? 'EUR'}）</p>
                   <div className={`border rounded px-3 py-2 text-sm font-mono font-bold ${
-                    impliedRate != null ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-gray-50 text-gray-400'
+                    impliedRate != null ? 'bg-blue-50 border-blue-200 text-blue-800'
+                    : estimatedRate != null ? 'bg-amber-50 border-amber-200 text-amber-800'
+                    : 'bg-gray-50 text-gray-400'
                   }`}>
                     {impliedRate != null
                       ? impliedRate.toFixed(4)
-                      : orderExRate != null
-                        ? `${orderExRate} (訂單登記)`
+                      : estimatedRate != null
+                        ? `≈ ${estimatedRate.toFixed(4)} （訂單估算）`
                         : '— 請輸入 TWD 金額'}
                   </div>
                 </div>

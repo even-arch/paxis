@@ -103,24 +103,31 @@ export async function POST(req: NextRequest, {
     },
   })
 
-  // 更新庫存：quantity--, reservedQty--（若有 PI 才扣 reserved）
-  const hasPi = !!body.piId
-
+  // 更新庫存：quantity-- 一定執行；reservedQty-- 只在有預留量時才扣（防止出現負值）
   for (const shipItem of body.items) {
     const orderItem = order.items.find(i => i.id === shipItem.slsItemId)
     if (!orderItem) continue
+
+    // 先查現有庫存，確認 reservedQty 是否有值可扣
+    const existingStock = await prisma.iNV_Stock.findUnique({
+      where: { productId: orderItem.productId },
+      select: { reservedQty: true },
+    })
+    // 若現有 reservedQty > 0，出貨時扣回（但最多扣到 0，不讓它變負）
+    const currentReserved = existingStock?.reservedQty ?? 0
+    const reservedDecrement = Math.min(shipItem.quantity, Math.max(0, currentReserved))
 
     const stock = await prisma.iNV_Stock.upsert({
       where: { productId: orderItem.productId },
       create: {
         productId: orderItem.productId,
         quantity: -shipItem.quantity,
-        reservedQty: hasPi ? -shipItem.quantity : 0,
+        reservedQty: 0,
         safetyStock: 0,
       },
       update: {
         quantity: { decrement: shipItem.quantity },
-        ...(hasPi ? { reservedQty: { decrement: shipItem.quantity } } : {}),
+        ...(reservedDecrement > 0 ? { reservedQty: { decrement: reservedDecrement } } : {}),
       },
     })
 
@@ -129,11 +136,11 @@ export async function POST(req: NextRequest, {
         productId: orderItem.productId,
         type: 4,
         qtyDelta: -shipItem.quantity,
-        reservedDelta: hasPi ? -shipItem.quantity : 0,
+        reservedDelta: -reservedDecrement,
         quantityAfter: stock.quantity,
         reservedAfter: stock.reservedQty,
         slsShipmentId: shipment.id,
-        source: 'MANUAL',
+        source: sourceLabel,
         performedBy: userId,
         performedAt: now,
         note: `出倉 ${shipmentNo}`,

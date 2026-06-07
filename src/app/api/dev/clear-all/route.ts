@@ -51,11 +51,13 @@ export async function POST(req: NextRequest) {
     // Patisco 同步紀錄
     await prisma.sYS_PatiscoSync.deleteMany()
 
-    // 商品相關
+    // 商品相關（及相依的關聯表）
     await prisma.cOST_Sheet.deleteMany()
     await prisma.pRD_ProductHistory.deleteMany()
     await prisma.pRD_CategoryMapping.deleteMany()
     await prisma.sUP_SupplierProduct.deleteMany()
+    // CUS_CustomerProduct 有 FK 指向 PRD_Product 和 CUS_Customer，先刪
+    await prisma.cUS_CustomerProduct.deleteMany()
     await prisma.pRD_Product.deleteMany()
 
     // 供應商、客戶

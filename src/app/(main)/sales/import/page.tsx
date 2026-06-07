@@ -7,7 +7,7 @@ export default async function SalesImportPage() {
     const [customers, products] = await Promise.all([
     prisma.cUS_Customer.findMany({
       where: { isActive: true },
-      select: { id: true, name: true, shortName: true, currencyCode: true, email: true, phoneNo: true, paymentTerms: true, city: true, countryCode: true },
+      select: { id: true, name: true, shortName: true, currencyCode: true, email: true, phoneNo: true, paymentTerms: true, city: true, countryCode: true, postalCode: true, taxId: true },
       orderBy: { name: 'asc' },
     }),
     prisma.pRD_Product.findMany({

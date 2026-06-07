@@ -12,6 +12,11 @@ export interface ApplyProductsInput {
     unitPrice: number
     unit: string
     countryOfOrigin?: string | null
+    htsCode?: string | null
+    /** 使用者在精靈選擇的動作：use-existing = 沿用衝突的現有產品；create = 新建 */
+    action?: 'create' | 'use-existing'
+    /** 當 action=use-existing 時，指向要沿用的 DB product id */
+    conflictId?: number | null
   }[]
   supplierId?: number | null
 }
@@ -45,9 +50,31 @@ export async function POST(req: NextRequest) {
       const specification = pi.specification?.trim() || null
       const unit = pi.unit?.trim() || 'PCS'
       const countryOfOrigin = pi.countryOfOrigin?.trim() || null
+      const htsCode = pi.htsCode?.trim() || null
 
       let product = null
       let productCreated = false
+
+      // ── 若使用者明確選擇「沿用現有產品」，直接查 DB 該 id ─────────────────
+      if (pi.action === 'use-existing' && pi.conflictId) {
+        product = await prisma.pRD_Product.findUnique({ where: { id: pi.conflictId } })
+        if (product) {
+          if (product.sku) usedSkusThisBatch.add(product.sku.toLowerCase())
+          if (supplierId) {
+            await prisma.sUP_SupplierProduct.upsert({
+              where: { supplierId_productId: { supplierId, productId: product.id } },
+              create: { supplierId, productId: product.id, isPreferred: true },
+              update: {},
+            }).catch(() => {})
+          }
+          result.push({
+            productId: product.id, productName: product.name, sku: product.sku,
+            specification: product.specification ?? null, productCreated: false,
+            qty: pi.qty ?? 1, unitPrice: pi.unitPrice ?? 0, unit,
+          })
+          continue
+        }
+      }
 
       // 同批次中已用過的 SKU 不做比對（避免多品項誤判為同一商品）
       const effectiveSku = sku && !usedSkusThisBatch.has(sku.toLowerCase()) ? sku : null
@@ -74,12 +101,17 @@ export async function POST(req: NextRequest) {
         }
 
         product = await prisma.pRD_Product.create({
-          data: { name, sku: finalSku, specification, unit, countryOfOrigin },
+          data: { name, sku: finalSku, specification, unit, countryOfOrigin, htsCode },
         })
         productCreated = true
       }
 
       if (product.sku) usedSkusThisBatch.add(product.sku.toLowerCase())
+
+      // 若文件提供了 htsCode 且產品目前還沒有，順便填入
+      if (htsCode && !product.htsCode) {
+        await prisma.pRD_Product.update({ where: { id: product.id }, data: { htsCode } }).catch(() => {})
+      }
 
       if (supplierId) {
         await prisma.sUP_SupplierProduct.upsert({

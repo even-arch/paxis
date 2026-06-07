@@ -649,6 +649,8 @@ model SLS_Order {
 
   // 客戶期望出貨日（可能為 null，訂單上不一定有）
   customerRequestedShipDate DateTime?
+  /** 客戶的採購單號（當從 PI 匯入時補填，用於與客戶文件核對） */
+  customerPoNo  String?
   note        String?
 
   // 操作稽核
@@ -691,6 +693,8 @@ model SLS_Item {
   shippedQty  Int    @default(0) // 已出貨數量
   unit        String?
   note        String?
+  /** 客戶 PO 上使用的 SKU 代碼（可能與我方 SKU 不同，用於 PO↔PI 核對） */
+  customerSkuRef String?
 
   piItems       SLS_PIItem[]
   shipmentItems SLS_ShipmentItem[]
@@ -1081,4 +1085,13 @@ model UPS_ShipmentLog {
   @@index([piNo])
   @@index([createdAt])
   @@map("UPS_ShipmentLog")
+}
+
+// 系統 Key-Value 設定表（持久化，取代 in-memory system-settings）
+model SYS_KeyValue {
+  key       String   @id
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+
+  @@map("SYS_KeyValue")
 }

@@ -26,6 +26,16 @@ type ActivePI = {
   estimatedShipDate: string | null
 }
 
+type ShipmentItem = {
+  id: number
+  productName: string
+  sku: string | null
+  quantity: number
+  cartons: number | null
+  grossWeightKg: number | null
+  cbm: number | null
+}
+
 type ExistingShipment = {
   id: number
   shipmentNo: string
@@ -34,8 +44,13 @@ type ExistingShipment = {
   portOfLoading: string | null
   portOfDischarge: string | null
   trackingNo: string | null
+  packingListNo: string | null
+  commercialInvNo: string | null
+  note: string | null
+  source: string
   performedAt: string
   performerName: string | null
+  items: ShipmentItem[]
 }
 
 type Props = {
@@ -67,6 +82,8 @@ export default function SalesShipmentPanel({ orderId, orderStatus, items, active
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  // 出貨詳細展開狀態
+  const [expandedDetail, setExpandedDetail] = useState<number | null>(null)
   // 供應商佔比展開狀態
   const [expandedBreakdown, setExpandedBreakdown] = useState<number | null>(null)
   const [breakdownData, setBreakdownData] = useState<Record<number, SupplierBreakdown>>({})
@@ -337,31 +354,107 @@ export default function SalesShipmentPanel({ orderId, orderStatus, items, active
           {shipments.map(s => (
             <div key={s.id} className="px-6 py-4">
               <div className="flex items-start justify-between">
-                <div>
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-1">
                     <span className="font-mono font-medium text-gray-800">{s.shipmentNo}</span>
                     <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">已出貨</span>
-                    {s.shippingMethod && <span className="text-xs text-gray-500">{s.shippingMethod}</span>}
+                    {s.shippingMethod && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{s.shippingMethod}</span>}
+                    {s.source === 'AI_IMPORT' && <span className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded">AI 匯入</span>}
+                    {s.source === 'UPS' && <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded">UPS</span>}
                   </div>
-                  <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-500">
+                  <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-500 mb-1">
                     <span>離港日：<span className="text-gray-700 font-medium">{s.actualShipDate.slice(0, 10)}</span></span>
-                    {s.portOfLoading && <span>裝運港：{s.portOfLoading}</span>}
-                    {s.portOfDischarge && <span>目的港：{s.portOfDischarge}</span>}
-                    {s.trackingNo && <span>追蹤號：<span className="font-mono">{s.trackingNo}</span></span>}
+                    {s.portOfLoading && <span>裝運港：<span className="text-gray-700">{s.portOfLoading}</span></span>}
+                    {s.portOfDischarge && <span>目的港：<span className="text-gray-700">{s.portOfDischarge}</span></span>}
+                    {s.trackingNo && <span>B/L：<span className="font-mono text-gray-700">{s.trackingNo}</span></span>}
+                    {s.packingListNo && <span>P/L 號：<span className="font-mono text-gray-700">{s.packingListNo}</span></span>}
+                    {s.commercialInvNo && <span>C/I 號：<span className="font-mono text-gray-700">{s.commercialInvNo}</span></span>}
+                  </div>
+                  {/* 品項摘要 */}
+                  <div className="text-xs text-gray-400">
+                    {s.items.map(it => (
+                      <span key={it.id} className="mr-3">
+                        {it.productName}{it.sku ? ` (${it.sku})` : ''} × {it.quantity.toLocaleString()}
+                      </span>
+                    ))}
                   </div>
                 </div>
-                <div className="flex items-start gap-3 ml-4">
+                <div className="flex items-start gap-2 ml-4 shrink-0">
+                  <button
+                    onClick={() => setExpandedDetail(prev => prev === s.id ? null : s.id)}
+                    className="text-xs text-indigo-600 hover:underline whitespace-nowrap">
+                    {expandedDetail === s.id ? '▲ 收起' : '▼ 詳細'}
+                  </button>
                   <button
                     onClick={() => loadBreakdown(s.id)}
                     className="text-xs text-blue-600 hover:underline whitespace-nowrap">
                     {breakdownLoading === s.id ? '計算中…' : expandedBreakdown === s.id ? '▲ 收起佔比' : '▼ 供應商佔比'}
                   </button>
-                  <div className="text-right text-xs text-gray-400 shrink-0">
+                  {/* UPS 出貨按鈕：沒有 trackingNo 時顯示，有了就改顯示追蹤號 */}
+                  {s.trackingNo && s.source === 'UPS' ? (
+                    <span className="text-xs bg-orange-50 border border-orange-200 text-orange-700 px-2 py-0.5 rounded font-mono">
+                      UPS: {s.trackingNo}
+                    </span>
+                  ) : (
+                    <a
+                      href={`/shipping?slsShipmentId=${s.id}`}
+                      className="text-xs bg-amber-500 text-white px-2 py-0.5 rounded hover:bg-amber-600 whitespace-nowrap">
+                      📦 UPS 出貨
+                    </a>
+                  )}
+                  <div className="text-right text-xs text-gray-400">
                     <div>操作：{s.performerName ?? '-'}</div>
                     <div>{new Date(s.performedAt).toLocaleDateString('zh-TW')}</div>
                   </div>
                 </div>
               </div>
+
+              {/* 詳細資料展開區 */}
+              {expandedDetail === s.id && (
+                <div className="mt-3 border border-indigo-100 rounded-lg overflow-hidden">
+                  <div className="bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-700">出貨完整紀錄</div>
+                  <div className="p-4 grid grid-cols-2 gap-x-8 gap-y-2 text-xs">
+                    <div><span className="text-gray-400">出貨單號：</span><span className="font-mono font-medium">{s.shipmentNo}</span></div>
+                    <div><span className="text-gray-400">離港日：</span><span className="font-medium">{s.actualShipDate.slice(0, 10)}</span></div>
+                    {s.shippingMethod && <div><span className="text-gray-400">運送方式：</span>{s.shippingMethod}</div>}
+                    {s.portOfLoading && <div><span className="text-gray-400">裝運港（POL）：</span>{s.portOfLoading}</div>}
+                    {s.portOfDischarge && <div><span className="text-gray-400">目的港（POD）：</span>{s.portOfDischarge}</div>}
+                    {s.trackingNo && <div><span className="text-gray-400">B/L / AWB：</span><span className="font-mono">{s.trackingNo}</span></div>}
+                    {s.packingListNo && <div><span className="text-gray-400">Packing List No.：</span><span className="font-mono">{s.packingListNo}</span></div>}
+                    {s.commercialInvNo && <div><span className="text-gray-400">Commercial Invoice No.：</span><span className="font-mono">{s.commercialInvNo}</span></div>}
+                  </div>
+                  {/* 品項明細 */}
+                  <table className="w-full text-xs border-t border-indigo-100">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="text-left px-4 py-2 font-medium text-gray-500">商品</th>
+                        <th className="text-left px-4 py-2 font-medium text-gray-500">料號</th>
+                        <th className="text-right px-4 py-2 font-medium text-gray-500">數量</th>
+                        <th className="text-right px-4 py-2 font-medium text-gray-500">箱數</th>
+                        <th className="text-right px-4 py-2 font-medium text-gray-500">毛重(kg)</th>
+                        <th className="text-right px-4 py-2 font-medium text-gray-500">材積</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {s.items.map(it => (
+                        <tr key={it.id}>
+                          <td className="px-4 py-2 font-medium text-gray-800">{it.productName}</td>
+                          <td className="px-4 py-2 font-mono text-gray-500">{it.sku ?? '-'}</td>
+                          <td className="px-4 py-2 text-right">{it.quantity.toLocaleString()}</td>
+                          <td className="px-4 py-2 text-right">{it.cartons ?? '-'}</td>
+                          <td className="px-4 py-2 text-right">{it.grossWeightKg != null ? it.grossWeightKg.toFixed(2) : '-'}</td>
+                          <td className="px-4 py-2 text-right">{it.cbm != null ? it.cbm.toFixed(3) : '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {s.note && (
+                    <div className="px-4 py-3 border-t border-indigo-100 text-xs text-gray-600 bg-gray-50">
+                      <span className="text-gray-400">備註：</span>{s.note}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* 供應商佔比展開區塊 */}
               {expandedBreakdown === s.id && breakdownData[s.id] && (() => {

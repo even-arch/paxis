@@ -198,6 +198,14 @@ export default function SalesPIPanel({ orderId, orderStatus, items, pis }: Props
                   )}
                 </div>
                 <div className="flex items-center gap-3">
+                  {/* UPS 出貨：從 PI 直接帶入資料 */}
+                  {pi.status === 0 && (
+                    <a
+                      href={`/shipping?piId=${pi.id}`}
+                      className="text-xs bg-amber-500 text-white px-2 py-0.5 rounded hover:bg-amber-600 whitespace-nowrap">
+                      📦 UPS 出貨
+                    </a>
+                  )}
                   <span className="text-xs text-gray-400">{new Date(pi.performedAt).toLocaleDateString('zh-TW')}</span>
                   {pi.status === 0 && (
                     cancellingId === pi.id ? (

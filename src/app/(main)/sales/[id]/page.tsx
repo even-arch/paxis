@@ -5,6 +5,7 @@ import { formatDate, formatCurrency } from '@/lib/utils'
 import SalesPIPanel from './SalesPIPanel'
 import SalesShipmentPanel from './SalesShipmentPanel'
 import SalesChainPanel from './SalesChainPanel'
+import CustomerPoPanel from './CustomerPoPanel'
 
 type Props = { params: { id: string } }
 
@@ -31,6 +32,7 @@ export default async function SalesDetailPage({
       performer: { select: { name: true } },
       items: {
         include: { product: { select: { id: true, name: true, sku: true, unit: true } } },
+        orderBy: { id: 'asc' },
       },
       pis: {
         orderBy: { performedAt: 'desc' },
@@ -38,7 +40,14 @@ export default async function SalesDetailPage({
       },
       shipments: {
         orderBy: { performedAt: 'desc' },
-        include: { performer: { select: { name: true } } },
+        include: {
+          performer: { select: { name: true } },
+          items: {
+            include: {
+              slsItem: { include: { product: { select: { name: true, sku: true } } } },
+            },
+          },
+        },
       },
     },
   })
@@ -192,6 +201,18 @@ export default async function SalesDetailPage({
           </table>
         </div>
 
+        {/* 客戶 PO 關聯面板 */}
+        <CustomerPoPanel
+          orderId={order.id}
+          customerPoNo={order.customerPoNo ?? null}
+          items={order.items.map(i => ({
+            id: i.id,
+            productName: i.product.name,
+            sku: i.product.sku ?? null,
+            customerSkuRef: i.customerSkuRef ?? null,
+          }))}
+        />
+
         {/* PI 管理面板 */}
         <SalesPIPanel
           orderId={order.id}
@@ -239,8 +260,21 @@ export default async function SalesDetailPage({
             portOfLoading: s.portOfLoading,
             portOfDischarge: s.portOfDischarge,
             trackingNo: s.trackingNo,
+            packingListNo: s.packingListNo ?? null,
+            commercialInvNo: s.commercialInvNo ?? null,
+            note: s.note ?? null,
+            source: s.source,
             performedAt: s.performedAt.toISOString(),
             performerName: s.performer?.name ?? null,
+            items: s.items.map(si => ({
+              id: si.id,
+              productName: si.slsItem.product.name,
+              sku: si.slsItem.product.sku ?? null,
+              quantity: si.quantity,
+              cartons: si.cartons ?? null,
+              grossWeightKg: si.grossWeightKg != null ? parseFloat(si.grossWeightKg.toString()) : null,
+              cbm: si.cbm != null ? parseFloat(si.cbm.toString()) : null,
+            })),
           }))}
         />
 

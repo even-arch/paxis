@@ -1,27 +1,20 @@
 import { withAuth } from 'next-auth/middleware'
-import { NextResponse } from 'next/server'
 
-const ADMIN_EMAIL = 'even@xinosys.com'
-
-export default withAuth(
-  function middleware(req) {
-    const { pathname } = req.nextUrl
-    const email = req.nextauth.token?.email as string | undefined
-
-    // /admin 路徑只有管理員可進
-    if (pathname.startsWith('/admin') && email !== ADMIN_EMAIL) {
-      return NextResponse.redirect(new URL('/login', req.url))
-    }
-    return NextResponse.next()
+// 只保護 (main) 群組的登入狀態
+// admin 路徑的 email 權限檢查在 admin/layout.tsx（Server Component）處理，
+// 以避免 Vercel Edge Runtime 解密 JWT 的問題
+export default withAuth({
+  pages: {
+    signIn: '/login',
   },
-  {
-    callbacks: {
-      // token 存在才繼續（否則 withAuth 會自動導向 /login）
-      authorized: ({ token }) => !!token,
-    },
-  }
-)
+  callbacks: {
+    authorized: ({ token }) => !!token,
+  },
+})
 
 export const config = {
-  matcher: ['/admin/:path*'],
+  matcher: [
+    // 保護主系統路徑（排除登入頁、API、靜態資源）
+    '/((?!login|api|_next/static|_next/image|favicon\\.ico|admin).*)',
+  ],
 }

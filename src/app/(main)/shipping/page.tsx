@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -273,11 +274,17 @@ function ContactPicker({
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function ShippingPage() {
+  const searchParams = useSearchParams()
+
   // Import from PI
   const [piList, setPiList] = useState<PiSummary[]>([])
   const [piLoading, setPiLoading] = useState(false)
   const [piLoaded, setPiLoaded] = useState(false)
   const [selectedPiId, setSelectedPiId] = useState<number | null>(null)
+
+  // 從 SLS_Shipment 帶入（?slsShipmentId=）
+  const [linkedSlsShipmentId, setLinkedSlsShipmentId] = useState<number | null>(null)
+  const [linkedShipmentNo, setLinkedShipmentNo] = useState<string | null>(null)
 
   // Packages
   const [packages, setPackages] = useState<Package[]>([emptyPackage()])
@@ -440,6 +447,98 @@ export default function ShippingPage() {
       }
     } catch { /* ignore bad sessionStorage data */ }
   }, [])
+
+  // ── 從 URL ?slsShipmentId= 預填 ───────────────────────────────────────────────
+  useEffect(() => {
+    const slsShipmentId = searchParams.get('slsShipmentId')
+    if (!slsShipmentId) return
+    const id = Number(slsShipmentId)
+    if (isNaN(id)) return
+
+    setLinkedSlsShipmentId(id)
+
+    fetch(`/api/shipments/${id}`)
+      .then(r => r.json())
+      .then((json: { ok?: boolean; data?: {
+        id: number; shipmentNo: string; piId: number | null; piNo: string | null
+        currencyCode: string
+        recipient: { name: string; address: string; city: string; countryCode: string; postalCode: string; taxId: string } | null
+        totalCartons: number | null; totalGrossWeightKg: number | null; totalCbm: number | null
+        items: Array<{ sku: string; name: string; specification: string; quantity: number; cbm: number | null; grossWeightKg: number | null }>
+      }; error?: string }) => {
+        if (!json.ok || !json.data) return
+        const d = json.data
+        setLinkedShipmentNo(d.shipmentNo)
+        if (d.piId) setSelectedPiId(d.piId)
+
+        // 預填收件方地址（從客戶資料）
+        if (d.recipient) {
+          setDestination({
+            name: d.recipient.name,
+            addressLine: d.recipient.address || '',
+            city: d.recipient.city || '',
+            stateProvinceCode: '',
+            postalCode: d.recipient.postalCode || '',
+            countryCode: d.recipient.countryCode || '',
+            taxId: d.recipient.taxId || '',
+          })
+        }
+
+        // 預填貨物（每個品項一箱，或用 totalCartons）
+        const cartons = d.totalCartons || 1
+        const weightEach = d.totalGrossWeightKg ? (d.totalGrossWeightKg / cartons).toFixed(2) : ''
+        const cbmEach = d.totalCbm ? (d.totalCbm / cartons).toFixed(4) : ''
+        const cftEach = cbmEach ? (parseFloat(cbmEach) * CBM_TO_CFT).toFixed(3) : ''
+
+        setPackages(Array.from({ length: cartons }, (_, i): Package => ({
+          grossWeightKg: weightEach,
+          netWeightKg: '',
+          lengthCm: '',
+          widthCm: '',
+          heightCm: '',
+          cbmStr: cbmEach,
+          cftStr: cftEach,
+          dimsFromCbm: !!cbmEach,
+          quantity: '1',
+          packageType: 'package',
+          items: i === 0 ? d.items.map(it => ({
+            sku: it.sku || '',
+            modelNo: '',
+            desc: it.name,
+            specification: it.specification || '',
+            qty: String(it.quantity),
+            unitPrice: '',
+            unit: 'PC',
+            currencyCode: d.currencyCode || 'USD',
+          })) : [emptyPackageItem()],
+        })))
+
+        if (d.currencyCode) setDeclaredCurrency(d.currencyCode)
+      })
+      .catch(e => console.warn('[shipping] load slsShipment failed', e))
+  }, [searchParams])
+
+  // ── 從 URL ?piId= 直接帶入指定 PI ────────────────────────────────────────────
+  useEffect(() => {
+    const piIdParam = searchParams.get('piId')
+    if (!piIdParam) return
+    const piId = Number(piIdParam)
+    if (isNaN(piId)) return
+
+    fetch(`/api/shipping/pi-list?id=${piId}`)
+      .then(r => r.json())
+      .then((data: { pis?: PiSummary[] }) => {
+        const pi = data.pis?.[0]
+        if (!pi) return
+        // 加入 list（讓 selectedPiId 能顯示），然後 importFromPi
+        setPiList([pi])
+        setPiLoaded(true)
+        importFromPi(pi)
+      })
+      .catch(e => console.warn('[shipping] load piId failed', e))
+    // importFromPi 是在 render 期間定義的函數，用 ref 或直接在 effect 內呼叫都行
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   // ── 使用公司地址 ─────────────────────────────────────────────────────────────
 
@@ -621,6 +720,7 @@ export default function ShippingPage() {
           declaredCurrency: declaredCurrency || undefined,
           piId: selectedPiId ?? undefined,
           piNo: piData?.piNo ?? undefined,
+          slsShipmentId: linkedSlsShipmentId ?? undefined,
         }),
       })
       const shipData = await res.json()
@@ -915,6 +1015,22 @@ export default function ShippingPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-800">UPS 出貨</h1>
       </div>
+
+      {/* 從 SLS_Shipment 帶入時的提示 banner */}
+      {linkedSlsShipmentId && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm flex items-center justify-between">
+          <div>
+            <span className="font-medium text-amber-800">📦 從出貨單帶入：</span>
+            <span className="text-amber-700 font-mono ml-1">{linkedShipmentNo ?? `#${linkedSlsShipmentId}`}</span>
+            <span className="text-amber-600 text-xs ml-2">建提單後，追蹤號將自動寫回此出貨紀錄</span>
+          </div>
+          <button
+            onClick={() => { setLinkedSlsShipmentId(null); setLinkedShipmentNo(null) }}
+            className="text-xs text-amber-500 hover:text-amber-700 underline ml-4">
+            取消關聯
+          </button>
+        </div>
+      )}
 
       {/* ── Section A: 從 PI 匯入 / AI 解析 ── */}
       <div className="bg-white rounded-lg border p-5 space-y-3">

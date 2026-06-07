@@ -10,6 +10,7 @@ export default function LoginForm() {
   const [credError, setCredError] = useState<string | null>(null)
   const searchParams = useSearchParams()
   const error = searchParams.get('error')
+  const callbackUrl = searchParams.get('callbackUrl') ?? '/dashboard'
 
   const errorMessage = credError
     ?? (error ? '登入失敗，請再試一次。' : null)
@@ -21,7 +22,7 @@ export default function LoginForm() {
     const res = await signIn('credentials', {
       email,
       password,
-      callbackUrl: '/dashboard',
+      callbackUrl,
       redirect: false,
     })
     setLoading(false)

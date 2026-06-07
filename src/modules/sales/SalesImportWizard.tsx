@@ -12,18 +12,20 @@ type DbCustomer = {
   id: number; name: string; shortName: string | null; currencyCode: string | null
   email: string | null; phoneNo: string | null; paymentTerms: string | null
   city: string | null; countryCode: string | null
+  postalCode: string | null; taxId: string | null
 }
 type DbProduct = { id: number; name: string; sku: string | null; unit: string | null; specification: string | null }
 
 type ProductDraft = {
   name: string; specification: string; sku: string
   qty: string; unitPrice: string; unit: string
-  conflictId: number | null; conflictName: string; conflictSpec: string
+  conflictId: number | null; conflictName: string; conflictSpec: string; conflictSku: string
   hasDiff: boolean; action: 'create' | 'use-existing'
+  parsedSkuRaw: string; isPartialSkuMatch: boolean
 }
 type CustomerDraft = {
   name: string; shortName: string; email: string; phone: string
-  address: string; city: string; country: string
+  address: string; city: string; country: string; postalCode: string; taxId: string
   contactPerson: string; paymentTerms: string; currencyCode: string
   matchedId: number | null; matchedCustomer: DbCustomer | null
 }
@@ -46,6 +48,7 @@ export default function SalesImportWizard({
   const [productDrafts, setProductDrafts] = useState<ProductDraft[]>([])
   const [customerDraft, setCustomerDraft] = useState<CustomerDraft>({
     name: '', shortName: '', email: '', phone: '', address: '', city: '', country: '',
+    postalCode: '', taxId: '',
     contactPerson: '', paymentTerms: '', currencyCode: 'USD',
     matchedId: null, matchedCustomer: null,
   })
@@ -69,12 +72,19 @@ export default function SalesImportWizard({
   const [createdPiNo, setCreatedPiNo] = useState<string | null>(null)
   const [piError, setPiError] = useState('')
 
+  // PI 文件匯入相關狀態
+  const [isPI, setIsPI] = useState(false)           // 文件是否為我方發出的 PI
+  const [importedPiNo, setImportedPiNo] = useState('')      // AI 解析出的 PI 號碼
+  const [estimatedShipDate, setEstimatedShipDate] = useState('')  // PI 上的預計出貨日
+
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const stepLabels = ['上傳訂單', '確認產品', '確認客戶', '建立客戶訂單']
+  const stepLabels = isPI
+    ? ['上傳 PI', '確認產品', '確認客戶', '建立訂單＋PI']
+    : ['上傳訂單', '確認產品', '確認客戶', '建立客戶訂單']
   const stepIdx = ({ upload: 0, products: 1, customer: 2, order: 3, success: 3 } as Record<Mode, number>)[mode]
 
   // ─── 步驟 0：上傳 & AI 解析 ─────────────────────────────────────────────────
@@ -90,19 +100,38 @@ export default function SalesImportWizard({
       if (!res.ok) throw new Error(json.error ?? `解析失敗 (HTTP ${res.status})`)
       const ord = json.data!
 
-      // 本地 SKU 衝突偵測
+      // ── 判斷文件類型 ──────────────────────────────────────────────────────────
+      const docIsPI = ord.documentType === 'PI'
+      setIsPI(docIsPI)
+      if (docIsPI) {
+        setImportedPiNo(ord.piNo?.trim() ?? '')
+        if (ord.estimatedShipDate) setEstimatedShipDate(ord.estimatedShipDate)
+      }
+
+      // ── 本地 SKU 衝突偵測（PI 文件：我方 SKU，預設沿用現有，不需要使用者決策）──
       const drafts: ProductDraft[] = (ord.items ?? []).map(it => {
-        const sku = it.sku?.trim() ?? ''
-        const ex = sku ? initProducts.find(p => p.sku && p.sku.toLowerCase() === sku.toLowerCase()) : undefined
+        const parsedSkuRaw = it.sku?.trim() ?? ''
+        const skuLower = parsedSkuRaw.toLowerCase()
+        let ex = parsedSkuRaw ? initProducts.find(p => p.sku && p.sku.toLowerCase() === skuLower) : undefined
+        let isPartialSkuMatch = false
+        if (!ex && parsedSkuRaw) {
+          ex = initProducts.find(p => p.sku && skuLower.startsWith(p.sku.toLowerCase() + ' '))
+          if (ex) isPartialSkuMatch = true
+        }
+        const sku = isPartialSkuMatch && ex ? ex.sku! : parsedSkuRaw
         const hasDiff = ex
-          ? ex.name.toLowerCase() !== (it.name?.trim().toLowerCase() ?? '') ||
+          ? isPartialSkuMatch ||
+            ex.name.toLowerCase() !== (it.name?.trim().toLowerCase() ?? '') ||
             (ex.specification ?? '') !== (it.specification?.trim() ?? '')
           : false
         return {
           name: it.name?.trim() ?? '', specification: it.specification?.trim() ?? '', sku,
           qty: String(it.qty ?? 1), unitPrice: String(it.unitPrice ?? 0), unit: it.unit?.trim() ?? 'PCS',
-          conflictId: ex?.id ?? null, conflictName: ex?.name ?? '', conflictSpec: ex?.specification ?? '',
-          hasDiff, action: ex ? 'use-existing' : 'create',
+          conflictId: ex?.id ?? null, conflictName: ex?.name ?? '',
+          conflictSpec: ex?.specification ?? '', conflictSku: ex?.sku ?? '',
+          hasDiff,
+          action: ex ? 'use-existing' : 'create',
+          parsedSkuRaw, isPartialSkuMatch,
         }
       })
       setProductDrafts(drafts)
@@ -121,6 +150,7 @@ export default function SalesImportWizard({
         address: ord.customerAddress?.trim() ?? '',
         city: ord.customerCity?.trim() ?? '',
         country: ord.customerCountry?.trim() ?? '',
+        postalCode: '', taxId: '',
         contactPerson: '', paymentTerms: ord.paymentTerms?.trim() ?? '',
         currencyCode: ord.currency ?? 'USD',
         matchedId: matched?.id ?? null, matchedCustomer: matched ?? null,
@@ -129,6 +159,7 @@ export default function SalesImportWizard({
       if (ord.orderNo) setOrderRefNo(ord.orderNo)
       if (ord.currency) setCurrencyCode(ord.currency)
       if (ord.requestedShipDate) setRequestedShipDate(ord.requestedShipDate)
+      if (ord.estimatedShipDate && !ord.requestedShipDate) setRequestedShipDate(ord.estimatedShipDate)
       if (ord.paymentTerms) setPaymentTerms(ord.paymentTerms)
 
       setMode('products')
@@ -159,6 +190,8 @@ export default function SalesImportWizard({
             qty: Number(d.qty),
             unitPrice: Number(d.unitPrice),
             unit: d.unit,
+            action: d.action,
+            conflictId: d.conflictId,
           })),
         }),
       })
@@ -206,9 +239,12 @@ export default function SalesImportWizard({
           customerAddress: customerDraft.address || null,
           customerCity: customerDraft.city || null,
           customerCountry: customerDraft.country || null,
+          customerPostalCode: customerDraft.postalCode || null,
+          customerTaxId: customerDraft.taxId || null,
           contactPerson: customerDraft.contactPerson || null,
           paymentTerms: customerDraft.paymentTerms || null,
           currencyCode: customerDraft.currencyCode || null,
+          matchedId: customerDraft.matchedId || null,
         }),
       })
       const json = await res.json() as { data?: AppliedCustomer; error?: string }
@@ -255,7 +291,41 @@ export default function SalesImportWizard({
       })
       const json = await res.json() as { id?: number; error?: string }
       if (!res.ok) throw new Error(json.error ?? `建立失敗 (HTTP ${res.status})`)
-      setCreatedOrderId(json.id!)
+      const newOrderId = json.id!
+      setCreatedOrderId(newOrderId)
+
+      // ── PI 文件匯入：自動建立 PI ────────────────────────────────────────────
+      if (isPI) {
+        setCreatingPi(true)
+        try {
+          // 取訂單品項（含 slsItemId）
+          const orderRes = await fetch(`/api/sales/${newOrderId}`)
+          const orderData = await orderRes.json()
+          if (!orderRes.ok) throw new Error(orderData.error ?? '無法取得訂單資料')
+          const piItems = (orderData.items ?? []).map((it: { id: number; quantity: number }) => ({
+            slsItemId: it.id,
+            quantity: it.quantity,
+          }))
+          const piRes = await fetch(`/api/sales/${newOrderId}/pi`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              piNo: importedPiNo || undefined,
+              estimatedShipDate: estimatedShipDate || undefined,
+              items: piItems,
+              source: 'AI_IMPORT',
+            }),
+          })
+          const piData = await piRes.json()
+          if (!piRes.ok) throw new Error(piData.error ?? 'PI 建立失敗')
+          setCreatedPiNo(piData.piNo)
+        } catch (piErr) {
+          setPiError(piErr instanceof Error ? piErr.message : 'PI 自動建立失敗，請到訂單頁手動建立')
+        } finally {
+          setCreatingPi(false)
+        }
+      }
+
       setMode('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -337,9 +407,19 @@ export default function SalesImportWizard({
             className="w-full flex flex-col items-center gap-4 bg-white border-2 border-dashed border-teal-300 rounded-xl p-12 hover:border-teal-500 hover:bg-teal-50 transition-all text-center">
             <span className="text-5xl">📋</span>
             <div>
-              <p className="font-semibold text-gray-800 text-lg">點擊上傳客戶訂單文件</p>
+              <p className="font-semibold text-gray-800 text-lg">點擊上傳客戶訂單（PO）或我方形式發票（PI）</p>
               <p className="text-sm text-gray-500 mt-1">支援 PDF、Excel、圖片（JPG / PNG）</p>
-              <p className="text-xs text-teal-600 mt-3">AI 自動識別客戶資訊與訂購品項，逐步確認後建立客戶訂單</p>
+              <div className="flex justify-center gap-8 mt-3 text-xs text-left">
+                <div className="text-teal-700">
+                  <p className="font-medium mb-1">📥 匯入客戶 PO</p>
+                  <p className="text-gray-500">建立客戶訂單<br />需手動確認 PI</p>
+                </div>
+                <div className="w-px bg-gray-200" />
+                <div className="text-indigo-700">
+                  <p className="font-medium mb-1">✨ 匯入我方 PI</p>
+                  <p className="text-gray-500">一步建立訂單＋PI<br />SKU 自動對應，不需確認</p>
+                </div>
+              </div>
             </div>
           </button>
         )}
@@ -355,9 +435,19 @@ export default function SalesImportWizard({
         <ErrBar />
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100">
-            <h2 className="text-base font-semibold text-gray-800">步驟 1：確認產品資料</h2>
+            <div className="flex items-center gap-3 mb-0.5">
+              <h2 className="text-base font-semibold text-gray-800">步驟 1：確認產品資料</h2>
+              {isPI && (
+                <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-medium">
+                  ✨ PI 文件 — SKU 自動對應
+                </span>
+              )}
+            </div>
             <p className="text-xs text-gray-500 mt-0.5">
-              確認後按「存入產品資料庫」立即寫入。<span className="text-amber-600">⚠ 黃底 = 料號已存在但資料有差異。</span>
+              {isPI
+                ? '這是我方發出的 PI，SKU 應與現有產品直接對應。確認後按「存入產品資料庫」。'
+                : <>確認後按「存入產品資料庫」立即寫入。<span className="text-amber-600">⚠ 黃底 = 料號已存在但資料有差異。</span></>
+              }
             </p>
           </div>
           <div className="divide-y divide-gray-50">
@@ -369,24 +459,41 @@ export default function SalesImportWizard({
                   {isConflict && (
                     <div className="mb-3 flex items-start gap-3">
                       <div className="flex-1 bg-white border border-amber-200 rounded p-3 text-xs">
-                        <p className="font-medium text-amber-700 mb-2">⚠ 料號「{item.sku}」已存在，資料有差異</p>
-                        <div className="grid grid-cols-2 gap-3 text-gray-600">
-                          <div><p className="text-gray-400 mb-0.5">現有名稱</p><p className="font-medium">{item.conflictName}</p></div>
-                          <div><p className="text-gray-400 mb-0.5">匯入名稱</p><p className="font-medium">{item.name}</p></div>
-                          <div><p className="text-gray-400 mb-0.5">現有規格</p><p className="line-clamp-2">{item.conflictSpec || '-'}</p></div>
-                          <div><p className="text-gray-400 mb-0.5">匯入規格</p><p className="line-clamp-2">{item.specification || '-'}</p></div>
+                        <p className="font-medium text-amber-700 mb-2">
+                          ⚠ 找到相似的既有產品（料號：{item.conflictSku || item.sku}），請確認是否為同一個商品
+                        </p>
+                        <ul className="mb-2 space-y-1 text-amber-800">
+                          {item.isPartialSkuMatch && (
+                            <li>• 文件 SKU 欄位帶有額外後綴：「{item.parsedSkuRaw}」→ 系統判斷前綴「{item.conflictSku}」符合</li>
+                          )}
+                          {item.conflictName.toLowerCase() !== item.name.toLowerCase() && (
+                            <li>• 名稱不同：現有「{item.conflictName}」／文件「{item.name}」</li>
+                          )}
+                          {(item.conflictSpec || '') !== (item.specification || '') && (
+                            <li>• 規格不同：現有「{item.conflictSpec || '（空）'}」／文件「{item.specification || '（空）'}」</li>
+                          )}
+                        </ul>
+                        <div className="grid grid-cols-2 gap-3 text-gray-600 border-t border-amber-100 pt-2">
+                          <div><p className="text-gray-400 mb-0.5">現有產品</p>
+                            <p className="font-medium">{item.conflictName}</p>
+                            <p className="text-gray-400 mt-0.5">{item.conflictSpec || '-'}</p>
+                          </div>
+                          <div><p className="text-gray-400 mb-0.5">文件內容</p>
+                            <p className="font-medium">{item.name}</p>
+                            <p className="text-gray-400 mt-0.5">{item.specification || '-'}</p>
+                          </div>
                         </div>
                       </div>
                       <div className="flex flex-col gap-2 shrink-0 pt-1">
                         <button type="button"
-                          onClick={() => setProductDrafts(p => p.map((d, i) => i === idx ? { ...d, action: 'use-existing' } : d))}
-                          className={`px-3 py-1.5 rounded text-xs font-medium ${item.action === 'use-existing' ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300 text-gray-700'}`}>
-                          使用現有
+                          onClick={() => setProductDrafts(p => p.map((d, i) => i === idx ? { ...d, action: 'use-existing', sku: d.conflictSku || d.sku } : d))}
+                          className={`px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap ${item.action === 'use-existing' ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300 text-gray-700'}`}>
+                          ✓ 是同一個，沿用現有
                         </button>
                         <button type="button"
-                          onClick={() => setProductDrafts(p => p.map((d, i) => i === idx ? { ...d, action: 'create', sku: '' } : d))}
-                          className={`px-3 py-1.5 rounded text-xs font-medium ${item.action === 'create' ? 'bg-orange-500 text-white' : 'bg-white border border-gray-300 text-gray-700'}`}>
-                          建新產品
+                          onClick={() => setProductDrafts(p => p.map((d, i) => i === idx ? { ...d, action: 'create', sku: d.parsedSkuRaw, conflictId: null } : d))}
+                          className={`px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap ${item.action === 'create' ? 'bg-orange-500 text-white' : 'bg-white border border-gray-300 text-gray-700'}`}>
+                          ✕ 不同，另建新產品
                         </button>
                       </div>
                     </div>
@@ -472,15 +579,36 @@ export default function SalesImportWizard({
                 {mc.phoneNo      && <div><span className="text-gray-400">電話：</span>{mc.phoneNo}</div>}
                 {mc.paymentTerms && <div><span className="text-gray-400">付款：</span>{mc.paymentTerms}</div>}
                 {mc.currencyCode && <div><span className="text-gray-400">幣別：</span>{mc.currencyCode}</div>}
+                {mc.taxId        && <div><span className="text-gray-400">統編：</span>{mc.taxId}</div>}
                 {(mc.city || mc.countryCode) && (
-                  <div className="col-span-2"><span className="text-gray-400">地點：</span>{[mc.city, mc.countryCode].filter(Boolean).join(', ')}</div>
+                  <div className="col-span-2"><span className="text-gray-400">地點：</span>{[mc.city, mc.postalCode, mc.countryCode].filter(Boolean).join(', ')}</div>
                 )}
               </div>
               <div className="flex gap-2">
                 <button type="button"
-                  onClick={() => setCustomerDraft(d => ({ ...d, matchedId: mc.id, matchedCustomer: mc }))}
-                  className={`px-3 py-1.5 rounded text-xs font-medium ${customerDraft.matchedId === mc.id ? 'bg-blue-600 text-white' : 'bg-white border border-blue-300 text-blue-700'}`}>
-                  ✓ 是，使用此客戶
+                  onClick={() => {
+                    setCustomerDraft(d => ({ ...d, matchedId: mc.id, matchedCustomer: mc }))
+                    // 直接呼叫 saveCustomer，帶入 matchedId
+                    const draft = { ...customerDraft, matchedId: mc.id }
+                    setLoading(true); setError('')
+                    fetch('/api/ai/apply-customer', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ customerName: mc.name, matchedId: mc.id }),
+                    })
+                      .then(r => r.json())
+                      .then((json: { data?: AppliedCustomer; error?: string }) => {
+                        if (json.error) throw new Error(json.error)
+                        setSavedCustomer({ customerId: json.data!.customerId, customerName: json.data!.customerName, isNew: false })
+                        setMode('order')
+                      })
+                      .catch(err => setError(err instanceof Error ? err.message : String(err)))
+                      .finally(() => setLoading(false))
+                    void draft
+                  }}
+                  disabled={loading}
+                  className="px-3 py-1.5 rounded text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
+                  {loading ? '處理中…' : '✓ 是，使用此客戶'}
                 </button>
                 <button type="button"
                   onClick={() => setCustomerDraft(d => ({ ...d, matchedId: null, matchedCustomer: null }))}
@@ -512,9 +640,17 @@ export default function SalesImportWizard({
               <input type="text" value={customerDraft.city}
                 onChange={e => setCustomerDraft(d => ({ ...d, city: e.target.value }))} className={inp} />
             </Field>
+            <Field label="郵遞區號">
+              <input type="text" value={customerDraft.postalCode}
+                onChange={e => setCustomerDraft(d => ({ ...d, postalCode: e.target.value }))} className={inp} placeholder="例：51467" />
+            </Field>
             <Field label="國家">
               <input type="text" value={customerDraft.country}
-                onChange={e => setCustomerDraft(d => ({ ...d, country: e.target.value }))} className={inp} placeholder="US / TW" />
+                onChange={e => setCustomerDraft(d => ({ ...d, country: e.target.value }))} className={inp} placeholder="US / TW / DE" />
+            </Field>
+            <Field label="統編 / VAT No.">
+              <input type="text" value={customerDraft.taxId}
+                onChange={e => setCustomerDraft(d => ({ ...d, taxId: e.target.value }))} className={inp} placeholder="例：DE123456789" />
             </Field>
             <div className="col-span-2">
               <Field label="地址">
@@ -553,23 +689,39 @@ export default function SalesImportWizard({
     return (
       <div className="max-w-lg space-y-5">
         <div className="bg-green-50 border border-green-300 rounded-xl p-6 text-center space-y-2">
-          <div className="text-4xl">✅</div>
-          <h2 className="text-lg font-semibold text-green-800">客戶訂單已建立</h2>
+          <div className="text-4xl">{isPI ? '🎉' : '✅'}</div>
+          <h2 className="text-lg font-semibold text-green-800">
+            {isPI ? '訂單＋PI 已一步建立完成' : '客戶訂單已建立'}
+          </h2>
           <p className="text-sm text-gray-600">
             訂單號：<span className="font-mono font-bold">{orderRefNo || `#${createdOrderId}`}</span>
           </p>
+          {creatingPi && <p className="text-xs text-indigo-600 animate-pulse">正在自動建立 PI…</p>}
         </div>
 
-        {!createdPiNo ? (
+        {piError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <p className="text-sm text-red-700">❌ {piError}</p>
+            <p className="text-xs text-red-500 mt-1">請到訂單頁面手動建立 PI。</p>
+          </div>
+        )}
+
+        {createdPiNo ? (
+          <div className="bg-teal-50 border border-teal-200 rounded-xl p-5 space-y-2">
+            <p className="text-sm font-semibold text-teal-800">✓ PI 已建立</p>
+            <p className="text-xs text-gray-600">PI 號：<span className="font-mono font-bold">{createdPiNo}</span></p>
+            <p className="text-xs text-gray-500">庫存已預留（reservedQty++）</p>
+            <button type="button"
+              onClick={() => { router.push(`/sales/${createdOrderId}`); router.refresh() }}
+              className="mt-2 text-teal-700 text-sm underline">→ 前往訂單</button>
+          </div>
+        ) : !isPI ? (
           <div className="bg-white rounded-xl border p-5 space-y-3">
             <h3 className="text-sm font-semibold text-gray-800">同時建立 PI 給客戶？</h3>
             <p className="text-xs text-gray-500">
               PI 將包含全部訂單品項，並自動預留庫存（reservedQty++）。
               若稍後再建立，請到訂單頁面操作。
             </p>
-            {piError && (
-              <p className="text-sm text-red-600 bg-red-50 rounded px-3 py-1.5">❌ {piError}</p>
-            )}
             <div className="flex gap-3">
               <button type="button" onClick={handleCreatePi} disabled={creatingPi}
                 className="flex-1 bg-teal-600 text-white py-2 rounded-md text-sm font-medium hover:bg-teal-700 disabled:opacity-50">
@@ -583,14 +735,11 @@ export default function SalesImportWizard({
             </div>
           </div>
         ) : (
-          <div className="bg-teal-50 border border-teal-200 rounded-xl p-5 space-y-2">
-            <p className="text-sm font-semibold text-teal-800">✓ PI 已建立</p>
-            <p className="text-xs text-gray-600">PI 號：<span className="font-mono font-bold">{createdPiNo}</span></p>
-            <p className="text-xs text-gray-500">庫存已預留（reservedQty++）</p>
-            <button type="button"
-              onClick={() => { router.push(`/sales/${createdOrderId}`); router.refresh() }}
-              className="mt-2 text-teal-700 text-sm underline">→ 前往訂單</button>
-          </div>
+          <button type="button"
+            onClick={() => { router.push(`/sales/${createdOrderId}`); router.refresh() }}
+            className="w-full border border-gray-300 text-gray-700 py-2 rounded-md text-sm hover:bg-gray-50">
+            → 前往訂單查看
+          </button>
         )}
       </div>
     )

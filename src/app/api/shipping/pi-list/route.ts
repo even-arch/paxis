@@ -9,13 +9,15 @@ import { prisma } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  
+  const { searchParams } = new URL(req.url)
+  const singleId = searchParams.get('id') ? Number(searchParams.get('id')) : null
+
   const pis = await prisma.sLS_PI.findMany({
-    where: { status: 0 },
+    where: singleId ? { id: singleId } : { status: 0 },
     orderBy: { performedAt: 'desc' },
     take: 30,
     select: {

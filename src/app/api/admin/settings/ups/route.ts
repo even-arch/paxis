@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSystemSetting, setSystemSetting } from '@/lib/system-settings'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { getSystemSetting, setSystemSetting, ensureKeyValueTable } from '@/lib/system-settings'
 
 export async function GET(req: NextRequest) {
-  
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const [dbAccountNo, dbMultiplier] = await Promise.all([
     getSystemSetting('ups_xinosys_account_no'),
     getSystemSetting('ups_discount_multiplier'),
@@ -21,26 +25,34 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  
-  const { accountNo, discountMultiplier } = await req.json()
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // 帳號（可為空字串，代表清除）
-  if (accountNo !== undefined) {
-    await setSystemSetting('ups_xinosys_account_no', accountNo?.trim() ?? '')
-  }
+  try {
+    // 確保 SYS_KeyValue 表存在（第一次使用時自動建立）
+    await ensureKeyValueTable()
 
-  // 折扣係數
-  if (discountMultiplier !== undefined) {
-    if (discountMultiplier === null) {
-      await setSystemSetting('ups_discount_multiplier', '')
-    } else {
-      const n = parseFloat(discountMultiplier)
-      if (isNaN(n) || n <= 0 || n > 1) {
-        return NextResponse.json({ error: '折扣係數必須介於 0（不含）至 1' }, { status: 400 })
-      }
-      await setSystemSetting('ups_discount_multiplier', String(n))
+    const { accountNo, discountMultiplier } = await req.json()
+
+    if (accountNo !== undefined) {
+      await setSystemSetting('ups_xinosys_account_no', accountNo?.trim() ?? '')
     }
-  }
 
-  return NextResponse.json({ ok: true })
+    if (discountMultiplier !== undefined) {
+      if (discountMultiplier === null) {
+        await setSystemSetting('ups_discount_multiplier', '')
+      } else {
+        const n = parseFloat(discountMultiplier)
+        if (isNaN(n) || n <= 0 || n > 1) {
+          return NextResponse.json({ error: '折扣係數必須介於 0（不含）至 1' }, { status: 400 })
+        }
+        await setSystemSetting('ups_discount_multiplier', String(n))
+      }
+    }
+
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    console.error('[ups settings]', err)
+    return NextResponse.json({ error: `儲存失敗：${(err as Error).message}` }, { status: 500 })
+  }
 }

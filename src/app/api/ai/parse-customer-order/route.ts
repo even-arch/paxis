@@ -6,7 +6,16 @@ import { decrypt } from '@/lib/crypto'
 import { callLLM, buildMessagesForFile, parseJsonResponse } from '@/lib/ai-llm'
 
 export interface ParsedCustomerOrder {
-  documentType?: 'PO' | 'ORDER' | null
+  /**
+   * 文件類型：
+   * - "PI"    = 我方發出的形式發票（Proforma Invoice），賣方是我們
+   * - "PO"    = 客戶發來的採購訂單（Purchase Order），買方是客戶
+   * - "ORDER" = 其他類型訂單
+   */
+  documentType?: 'PI' | 'PO' | 'ORDER' | null
+  /** 若 documentType === 'PI'，這是 PI 號碼 */
+  piNo?: string | null
+  estimatedShipDate?: string | null  // PI 上的預計出貨日
   customerName?: string | null
   customerEmail?: string | null
   customerPhone?: string | null
@@ -30,14 +39,39 @@ export interface ParsedCustomerOrder {
 }
 
 const SYSTEM_PROMPT = `你是一個專業的貿易文件解析助理。
-用戶提供的是客戶（買方）寄來的訂單文件（PO / Purchase Order）。
+用戶提供的是「客戶端相關文件」，可能是以下兩種之一：
 
-## 文件方向
-- 這份文件是「買方」發給「我方賣家」的採購訂單。
-- 「客戶」= 買方 = 文件的發行方（From / Issued by / Buyer）。
-- 「我方」= 賣方 = 文件的收件方（To / Seller / Vendor）。
+## 文件類型判斷（最優先，必須先判斷）
 
-## 客戶資訊
+判斷依據是**文件的主從關係**（誰發出、誰收到），而不只是標題文字。
+
+**類型 A：客戶（買方）發給我方（賣方）的採購訂單 → documentType = "PO"**
+- 判斷邏輯：文件是「買方」發出的，我方是「收件人 / 賣方 / Vendor / Supplier / Seller」
+- 常見標題：Purchase Order、P.O.、Order Confirmation、Ordering Sheet
+- 文件上「From / Issued by / Buyer / Ordered by」= 客戶，「To / Seller / Vendor」= 我方
+
+**類型 B：我方（賣方）發給客戶（買方）的形式發票 → documentType = "PI"**
+- 判斷邏輯：文件是「我方賣方」發出的，客戶是「收件人 / 買方 / Buyer / To」
+- 常見標題：Proforma Invoice、Pro-forma Invoice、P.I.、Quotation（若含確認訂購意思）
+- 文件上「From / Issued by / Seller / Exporter」= 我方，「To / Bill To / Buyer / Consignee」= 客戶
+
+**⚠️ 判斷重點**：
+- 「我方」通常是台灣或亞洲的供應商/出口商
+- 「客方」通常是歐美或其他地區的進口商/採購商
+- 若仍無法確定，優先以**誰是 Issuer（發行者）**判斷：我方發行 = PI，客方發行 = PO
+
+根據判斷結果，documentType 填：
+- "PI" → 類型 B（我方形式發票）
+- "PO" → 類型 A（客戶採購訂單）
+- "ORDER" → 無法確定類型
+
+---
+
+## PI 專屬欄位（documentType==="PI" 時才需填）
+- piNo: 文件上的 PI 號碼（Proforma Invoice No. / PI No.）
+- estimatedShipDate: PI 上的預計出貨日（Est. Ship Date / Shipment Date）格式 YYYY-MM-DD
+
+## 客戶資訊（買方）
 從文件中找出買方的以下資訊（找不到填 null）：
 - customerName: 客戶公司全名
 - customerEmail: 客戶 Email
@@ -46,9 +80,10 @@ const SYSTEM_PROMPT = `你是一個專業的貿易文件解析助理。
 - customerCity: 客戶城市
 - customerCountry: 客戶國家（英文）
 
-## 出貨日期
-- requestedShipDate: 客戶希望的出貨日或交期（Required Shipment Date / Ship By / Delivery Date）
-- 格式 YYYY-MM-DD，找不到填 null
+## 訂單/PI 資訊
+- orderNo: 若是 PO，填客戶的 PO 號；若是 PI，填 PI 號（和 piNo 相同）
+- requestedShipDate: 客戶希望的出貨日（PO 場合）或 PI 上的預計出貨日（找不到填 null）
+- 格式 YYYY-MM-DD
 
 ## 商品名稱語言規則（極重要，必須嚴格遵守）
 "name" 欄位的語言必須與 "specification" 欄位的主要語言完全一致：
@@ -66,14 +101,16 @@ const SYSTEM_PROMPT = `你是一個專業的貿易文件解析助理。
 請回傳以下 JSON 格式，不要有任何其他文字：
 
 {
-  "documentType": "PO" 或 "ORDER" 或 null,
+  "documentType": "PI" 或 "PO" 或 "ORDER" 或 null,
+  "piNo": "PI號碼或 null（僅 documentType=PI 時填）",
+  "estimatedShipDate": "YYYY-MM-DD 或 null（僅 documentType=PI 時填）",
   "customerName": "客戶公司全名或 null",
   "customerEmail": "Email 或 null",
   "customerPhone": "電話或 null",
   "customerAddress": "街道地址或 null",
   "customerCity": "城市或 null",
   "customerCountry": "國家或 null",
-  "orderNo": "訂單編號或 null",
+  "orderNo": "訂單編號或 PI 號或 null",
   "orderDate": "YYYY-MM-DD 或 null",
   "requestedShipDate": "YYYY-MM-DD 或 null",
   "currency": "USD / EUR 等或 null",

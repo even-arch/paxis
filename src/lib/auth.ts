@@ -48,7 +48,8 @@ export const authOptions: NextAuthOptions = {
     },
     session({ session, token }) {
       if (session.user) {
-        session.user.id = token.id as string
+        session.user.id    = token.id as string
+        session.user.email = token.email as string  // 明確帶出 email，admin 授權需要
       }
       return session
     },

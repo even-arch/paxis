@@ -90,6 +90,37 @@ export async function GET(req: NextRequest) {
         CONSTRAINT "CUS_CustomerProduct_customerId_productId_key" UNIQUE ("customerId", "productId")
       )`,
       `CREATE INDEX IF NOT EXISTS "CUS_CustomerProduct_productId_idx" ON "CUS_CustomerProduct"("productId")`,
+      `CREATE TABLE IF NOT EXISTS "SYS_KeyValue" (
+        "key" TEXT PRIMARY KEY,
+        "value" TEXT NOT NULL DEFAULT '',
+        "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+      )`,
+      `CREATE TABLE IF NOT EXISTS "UPS_ShipmentLog" (
+        "id" SERIAL PRIMARY KEY,
+        "trackingNumber" TEXT NOT NULL,
+        "upsShipmentId" TEXT,
+        "serviceCode" TEXT NOT NULL,
+        "serviceName" TEXT,
+        "piId" INTEGER,
+        "piNo" TEXT,
+        "originSnapshot" JSONB,
+        "destinationSnapshot" JSONB,
+        "packagesSnapshot" JSONB,
+        "declaredValue" NUMERIC,
+        "declaredCurrency" TEXT,
+        "chargedAmount" NUMERIC,
+        "chargedCurrency" TEXT,
+        "labelBase64" TEXT,
+        "labelFormat" TEXT DEFAULT 'GIF',
+        "pickupConfirmationNo" TEXT,
+        "pickupReadyTime" TIMESTAMP WITH TIME ZONE,
+        "pickupCloseTime" TIMESTAMP WITH TIME ZONE,
+        "pickupScheduledDate" TIMESTAMP WITH TIME ZONE,
+        "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        "createdByUserId" INTEGER
+      )`,
+      `CREATE INDEX IF NOT EXISTS "UPS_ShipmentLog_trackingNumber_idx" ON "UPS_ShipmentLog"("trackingNumber")`,
+      `CREATE INDEX IF NOT EXISTS "UPS_ShipmentLog_piNo_idx" ON "UPS_ShipmentLog"("piNo")`,
     ]
     const migResult: string[] = []
     for (const stmt of stmts) {
