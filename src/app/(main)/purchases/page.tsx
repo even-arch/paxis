@@ -51,10 +51,16 @@ export default async function PurchasesPage({
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">供應商訂單</h1>
-        <Link href="/purchases/new"
-          className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
-          + 新增供應商訂單
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/purchases/import"
+            className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700">
+            ✨ AI 匯入
+          </Link>
+          <Link href="/purchases/new"
+            className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50">
+            + 手動建立
+          </Link>
+        </div>
       </div>
 
       <form method="GET" className="mb-4 flex gap-2 flex-wrap">

@@ -31,7 +31,7 @@ export default async function ProductDetailPage({
     <div className="max-w-3xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <Link href="/products" className="text-sm text-gray-400 hover:text-gray-600">← 商品列表</Link>
+          <Link href="/products" className="text-sm text-gray-400 hover:text-gray-600">← 商品管理</Link>
           <h1 className="text-2xl font-bold text-gray-800 mt-1">{product.name}</h1>
         </div>
         <div className="flex gap-2">

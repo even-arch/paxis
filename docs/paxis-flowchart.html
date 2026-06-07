@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PAXIS 系統流程圖</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; background: #f5f5f0; color: #1a1a1a; }
+
+  .page-header {
+    padding: 20px 32px 12px;
+    border-bottom: 1px solid #ddd;
+    background: white;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+  }
+  .page-header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+  .page-header p { font-size: 12px; color: #888; }
+
+  .legend {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    padding: 10px 32px;
+    background: white;
+    border-bottom: 1px solid #eee;
+    font-size: 11px;
+    color: #555;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+  .canvas-wrap {
+    overflow-x: auto;
+    overflow-y: auto;
+    padding: 32px;
+  }
+  svg { display: block; }
+
+  /* node styles */
+  .node-box { rx: 6; ry: 6; }
+
+  /* tooltips */
+  [data-tip] { cursor: default; }
+  [data-tip]:hover .tip { display: block; }
+  .tip {
+    display: none;
+    position: absolute;
+    background: #1a1a1a;
+    color: white;
+    font-size: 11px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    white-space: nowrap;
+    z-index: 100;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>PAXIS 系統流程圖</h1>
+  <p>供應商 → 我公司 → 客戶｜三節點採購 + 三節點銷售</p>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>採購流程（藍）</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>銷售流程（綠）</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div>庫存 INV（橘）</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#a855f7"></div>Patisco 自動（紫）</div>
+  <div class="legend-item"><span style="color:#888;border-bottom:2px dashed #888;width:24px;display:inline-block"></span>出貨路徑 A — 手動</div>
+  <div class="legend-item"><span style="color:#a855f7;border-bottom:2px dashed #a855f7;width:24px;display:inline-block"></span>出貨路徑 B — Excel</div>
+  <div class="legend-item"><span style="color:#f97316;border-bottom:2px dashed #f97316;width:24px;display:inline-block"></span>出貨路徑 C — UPS</div>
+  <div class="legend-item">
+    <svg width="28" height="12"><rect x="2" y="2" width="24" height="8" rx="2" fill="none" stroke="#888" stroke-width="1.5" stroke-dasharray="3,2"/></svg>資料庫表
+  </div>
+</div>
+
+<div class="canvas-wrap">
+<svg width="1640" height="1100" viewBox="0 0 1640 1100" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <!-- arrow markers -->
+  <marker id="arr-blue" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L8,3 z" fill="#3b82f6"/>
+  </marker>
+  <marker id="arr-green" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L8,3 z" fill="#22c55e"/>
+  </marker>
+  <marker id="arr-gray" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L8,3 z" fill="#9ca3af"/>
+  </marker>
+  <marker id="arr-orange" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L8,3 z" fill="#f97316"/>
+  </marker>
+  <marker id="arr-purple" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L8,3 z" fill="#a855f7"/>
+  </marker>
+  <marker id="arr-inv" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L8,3 z" fill="#ea580c"/>
+  </marker>
+</defs>
+
+<!-- ═══════════════════════════════════════════════════════════
+     BACKGROUND LANES
+═══════════════════════════════════════════════════════════ -->
+
+<!-- Purchase lane -->
+<rect x="20" y="20" width="720" height="860" rx="12" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+<text x="36" y="44" font-size="11" font-weight="600" fill="#3b82f6" letter-spacing="0.05em">採購側  PURCHASE</text>
+
+<!-- Sales lane -->
+<rect x="760" y="20" width="860" height="860" rx="12" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+<text x="776" y="44" font-size="11" font-weight="600" fill="#15803d" letter-spacing="0.05em">銷售側  SALES</text>
+
+<!-- Inventory lane -->
+<rect x="20" y="900" width="1600" height="180" rx="12" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.5"/>
+<text x="36" y="924" font-size="11" font-weight="600" fill="#c2410c" letter-spacing="0.05em">庫存  INVENTORY</text>
+
+<!-- ═══════════════════════════════════════════════════════════
+     PURCHASE SIDE — LEFT COLUMN
+═══════════════════════════════════════════════════════════ -->
+
+<!-- ── PO NODE 1 header ── -->
+<rect x="40" y="60" width="680" height="220" rx="8" fill="white" stroke="#93c5fd" stroke-width="1.5"/>
+<rect x="40" y="60" width="680" height="28" rx="8" fill="#dbeafe"/>
+<rect x="40" y="80" width="680" height="8" fill="#dbeafe"/>
+<text x="56" y="78" font-size="12" font-weight="700" fill="#1d4ed8">節點 1  PO_Order — 建立採購訂單</text>
+
+<!-- Path A manual -->
+<rect x="56" y="102" width="200" height="56" rx="6" fill="#f8faff" stroke="#93c5fd" stroke-width="1.5"/>
+<text x="156" y="122" text-anchor="middle" font-size="11" font-weight="600" fill="#1d4ed8">手動填寫</text>
+<text x="156" y="138" text-anchor="middle" font-size="10" fill="#6b7280">/purchases/new</text>
+<text x="156" y="151" text-anchor="middle" font-size="10" fill="#9ca3af">填寫表單 → 儲存</text>
+
+<!-- Path B AI -->
+<rect x="280" y="102" width="200" height="56" rx="6" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1.5"/>
+<text x="380" y="122" text-anchor="middle" font-size="11" font-weight="600" fill="#7c3aed">✨ AI 匯入</text>
+<text x="380" y="138" text-anchor="middle" font-size="10" fill="#6b7280">/purchases/import</text>
+<text x="380" y="151" text-anchor="middle" font-size="10" fill="#9ca3af">上傳 PDF/Excel → AI 解析 → 確認</text>
+
+<!-- Path C Patisco -->
+<rect x="504" y="102" width="200" height="56" rx="6" fill="#faf5ff" stroke="#d8b4fe" stroke-width="1.5"/>
+<text x="604" y="122" text-anchor="middle" font-size="11" font-weight="600" fill="#9333ea">Patisco Webhook</text>
+<text x="604" y="138" text-anchor="middle" font-size="10" fill="#6b7280">POST /api/webhooks/patisco</text>
+<text x="604" y="151" text-anchor="middle" font-size="10" fill="#9ca3af">source = PATISCO，自動建立</text>
+
+<!-- Merge arrow to DB -->
+<line x1="156" y1="158" x2="156" y2="178" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+<line x1="380" y1="158" x2="380" y2="178" stroke="#a855f7" stroke-width="1.5" marker-end="url(#arr-purple)"/>
+<line x1="604" y1="158" x2="604" y2="178" stroke="#a855f7" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-purple)"/>
+<line x1="156" y1="192" x2="380" y2="192" stroke="#3b82f6" stroke-width="1"/>
+<line x1="380" y1="192" x2="604" y2="192" stroke="#3b82f6" stroke-width="1"/>
+<line x1="380" y1="192" x2="380" y2="205" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+
+<!-- PO_Order DB cylinder -->
+<ellipse cx="380" cy="218" rx="80" ry="12" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+<rect x="300" y="218" width="160" height="36" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="0"/>
+<line x1="300" y1="218" x2="300" y2="254" stroke="#3b82f6" stroke-width="1.5"/>
+<line x1="460" y1="218" x2="460" y2="254" stroke="#3b82f6" stroke-width="1.5"/>
+<ellipse cx="380" cy="254" rx="80" ry="12" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+<text x="380" y="239" text-anchor="middle" font-size="11" font-weight="700" fill="#1e3a8a">PO_Order</text>
+<text x="380" y="256" text-anchor="middle" font-size="9" fill="#3b82f6">庫存不動</text>
+
+<!-- ── PO NODE 2 header ── -->
+<rect x="40" y="295" width="680" height="160" rx="8" fill="white" stroke="#93c5fd" stroke-width="1.5"/>
+<rect x="40" y="295" width="680" height="28" rx="8" fill="#dbeafe"/>
+<rect x="40" y="315" width="680" height="8" fill="#dbeafe"/>
+<text x="56" y="313" font-size="12" font-weight="700" fill="#1d4ed8">節點 2  PO_SupplierPI — 記錄供應商 PI</text>
+
+<text x="380" y="348" text-anchor="middle" font-size="11" fill="#374151">從 <tspan font-weight="600">/purchases/{id}</tspan> 頁面</text>
+<rect x="240" y="358" width="280" height="32" rx="6" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+<text x="380" y="374" text-anchor="middle" font-size="11" fill="#1d4ed8">點「記錄供應商 PI」</text>
+<text x="380" y="388" text-anchor="middle" font-size="10" fill="#6b7280">填 PI 號、金額（外幣）、預計出貨日</text>
+
+<!-- PO_SupplierPI DB -->
+<ellipse cx="380" cy="416" rx="90" ry="12" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+<rect x="290" y="416" width="180" height="30" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+<line x1="290" y1="416" x2="290" y2="446" stroke="#3b82f6" stroke-width="1.5"/>
+<line x1="470" y1="416" x2="470" y2="446" stroke="#3b82f6" stroke-width="1.5"/>
+<ellipse cx="380" cy="446" rx="90" ry="12" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+<text x="380" y="435" text-anchor="middle" font-size="11" font-weight="700" fill="#1e3a8a">PO_SupplierPI</text>
+<text x="380" y="449" text-anchor="middle" font-size="9" fill="#3b82f6">庫存不動</text>
+
+<!-- ── PO NODE 3 header ── -->
+<rect x="40" y="480" width="680" height="180" rx="8" fill="white" stroke="#93c5fd" stroke-width="1.5"/>
+<rect x="40" y="480" width="680" height="28" rx="8" fill="#dbeafe"/>
+<rect x="40" y="500" width="680" height="8" fill="#dbeafe"/>
+<text x="56" y="498" font-size="12" font-weight="700" fill="#1d4ed8">節點 3  PO_Receipt — 確認入庫  ★ quantity++</text>
+
+<text x="380" y="530" text-anchor="middle" font-size="11" fill="#374151">從 <tspan font-weight="600">/purchases/{id}</tspan> 頁面</text>
+<rect x="240" y="540" width="280" height="32" rx="6" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+<text x="380" y="556" text-anchor="middle" font-size="11" fill="#1d4ed8">點「確認入庫」</text>
+<text x="380" y="570" text-anchor="middle" font-size="10" fill="#6b7280">填箱數、毛重（kg）、實際到貨日</text>
+
+<!-- PO_Receipt DB -->
+<ellipse cx="380" cy="600" rx="80" ry="12" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+<rect x="300" y="600" width="160" height="30" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+<line x1="300" y1="600" x2="300" y2="630" stroke="#3b82f6" stroke-width="1.5"/>
+<line x1="460" y1="600" x2="460" y2="630" stroke="#3b82f6" stroke-width="1.5"/>
+<ellipse cx="380" cy="630" rx="80" ry="12" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+<text x="380" y="619" text-anchor="middle" font-size="11" font-weight="700" fill="#1e3a8a">PO_Receipt</text>
+
+<!-- Arrow to INV -->
+<line x1="380" y1="642" x2="380" y2="906" stroke="#ea580c" stroke-width="2" marker-end="url(#arr-inv)" stroke-dasharray="6,3"/>
+<rect x="276" y="730" width="208" height="22" rx="4" fill="#ffedd5" stroke="#fed7aa" stroke-width="1"/>
+<text x="380" y="745" text-anchor="middle" font-size="10" fill="#c2410c">INV_Movement type=1  quantity++</text>
+
+<!-- Vertical chain arrows purchase -->
+<line x1="380" y1="266" x2="380" y2="293" stroke="#3b82f6" stroke-width="2" marker-end="url(#arr-blue)"/>
+<line x1="380" y1="458" x2="380" y2="478" stroke="#3b82f6" stroke-width="2" marker-end="url(#arr-blue)"/>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     SALES SIDE — RIGHT COLUMN
+═══════════════════════════════════════════════════════════ -->
+
+<!-- ── SLS NODE 1 header ── -->
+<rect x="780" y="60" width="820" height="220" rx="8" fill="white" stroke="#86efac" stroke-width="1.5"/>
+<rect x="780" y="60" width="820" height="28" rx="8" fill="#dcfce7"/>
+<rect x="780" y="80" width="820" height="8" fill="#dcfce7"/>
+<text x="796" y="78" font-size="12" font-weight="700" fill="#15803d">節點 1  SLS_Order — 建立客戶訂單</text>
+
+<!-- Path A manual -->
+<rect x="796" y="102" width="220" height="56" rx="6" fill="#f8fff8" stroke="#86efac" stroke-width="1.5"/>
+<text x="906" y="122" text-anchor="middle" font-size="11" font-weight="600" fill="#15803d">手動填寫</text>
+<text x="906" y="138" text-anchor="middle" font-size="10" fill="#6b7280">/sales/new</text>
+<text x="906" y="151" text-anchor="middle" font-size="10" fill="#9ca3af">填寫表單 → 儲存</text>
+
+<!-- Path B AI -->
+<rect x="1040" y="102" width="240" height="56" rx="6" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1.5"/>
+<text x="1160" y="122" text-anchor="middle" font-size="11" font-weight="600" fill="#7c3aed">✨ AI 匯入</text>
+<text x="1160" y="138" text-anchor="middle" font-size="10" fill="#6b7280">/sales/import</text>
+<text x="1160" y="151" text-anchor="middle" font-size="10" fill="#9ca3af">上傳客戶 PO → AI 解析 → 確認</text>
+
+<!-- Path C Patisco -->
+<rect x="1304" y="102" width="276" height="56" rx="6" fill="#faf5ff" stroke="#d8b4fe" stroke-width="1.5"/>
+<text x="1442" y="122" text-anchor="middle" font-size="11" font-weight="600" fill="#9333ea">Patisco Webhook</text>
+<text x="1442" y="138" text-anchor="middle" font-size="10" fill="#6b7280">POST /api/webhooks/patisco</text>
+<text x="1442" y="151" text-anchor="middle" font-size="10" fill="#9ca3af">event: order.confirmed</text>
+
+<!-- Merge arrows -->
+<line x1="906" y1="158" x2="906" y2="178" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arr-green)"/>
+<line x1="1160" y1="158" x2="1160" y2="178" stroke="#a855f7" stroke-width="1.5" marker-end="url(#arr-purple)"/>
+<line x1="1442" y1="158" x2="1442" y2="178" stroke="#a855f7" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-purple)"/>
+<line x1="906" y1="192" x2="1160" y2="192" stroke="#22c55e" stroke-width="1"/>
+<line x1="1160" y1="192" x2="1442" y2="192" stroke="#22c55e" stroke-width="1"/>
+<line x1="1160" y1="192" x2="1160" y2="205" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arr-green)"/>
+
+<!-- SLS_Order DB -->
+<ellipse cx="1160" cy="218" rx="80" ry="12" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+<rect x="1080" y="218" width="160" height="36" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+<line x1="1080" y1="218" x2="1080" y2="254" stroke="#22c55e" stroke-width="1.5"/>
+<line x1="1240" y1="218" x2="1240" y2="254" stroke="#22c55e" stroke-width="1.5"/>
+<ellipse cx="1160" cy="254" rx="80" ry="12" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+<text x="1160" y="239" text-anchor="middle" font-size="11" font-weight="700" fill="#14532d">SLS_Order</text>
+<text x="1160" y="256" text-anchor="middle" font-size="9" fill="#15803d">庫存不動</text>
+
+<!-- ── SLS NODE 2 header ── -->
+<rect x="780" y="295" width="820" height="160" rx="8" fill="white" stroke="#86efac" stroke-width="1.5"/>
+<rect x="780" y="295" width="820" height="28" rx="8" fill="#dcfce7"/>
+<rect x="780" y="315" width="820" height="8" fill="#dcfce7"/>
+<text x="796" y="313" font-size="12" font-weight="700" fill="#15803d">節點 2  SLS_PI — 發行 PI  ★ reservedQty++</text>
+
+<text x="1160" y="348" text-anchor="middle" font-size="11" fill="#374151">從 <tspan font-weight="600">/sales/{id}</tspan> 頁面</text>
+<rect x="980" y="358" width="360" height="32" rx="6" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+<text x="1160" y="374" text-anchor="middle" font-size="11" fill="#15803d">點「發行 PI」</text>
+<text x="1160" y="388" text-anchor="middle" font-size="10" fill="#6b7280">填 PI 號、金額（EUR）、預計出貨日、收款條件</text>
+
+<!-- SLS_PI DB -->
+<ellipse cx="1160" cy="416" rx="80" ry="12" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+<rect x="1080" y="416" width="160" height="30" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+<line x1="1080" y1="416" x2="1080" y2="446" stroke="#22c55e" stroke-width="1.5"/>
+<line x1="1240" y1="416" x2="1240" y2="446" stroke="#22c55e" stroke-width="1.5"/>
+<ellipse cx="1160" cy="446" rx="80" ry="12" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+<text x="1160" y="435" text-anchor="middle" font-size="11" font-weight="700" fill="#14532d">SLS_PI</text>
+<text x="1160" y="449" text-anchor="middle" font-size="9" fill="#15803d">reservedQty++</text>
+
+<!-- Arrow SLS_PI → INV -->
+<line x1="1080" y1="430" x2="860" y2="906" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arr-inv)" stroke-dasharray="5,3"/>
+<rect x="880" y="650" width="220" height="22" rx="4" fill="#ffedd5" stroke="#fed7aa" stroke-width="1"/>
+<text x="990" y="665" text-anchor="middle" font-size="10" fill="#c2410c">INV_Movement type=2  reservedQty++</text>
+
+<!-- ── SLS NODE 3 header ── -->
+<rect x="780" y="480" width="820" height="380" rx="8" fill="white" stroke="#86efac" stroke-width="1.5"/>
+<rect x="780" y="480" width="820" height="28" rx="8" fill="#dcfce7"/>
+<rect x="780" y="500" width="820" height="8" fill="#dcfce7"/>
+<text x="796" y="498" font-size="12" font-weight="700" fill="#15803d">節點 3  SLS_Shipment — 確認出貨  ★ quantity--  reservedQty--</text>
+
+<!-- Sub-header: three paths -->
+<text x="1190" y="528" text-anchor="middle" font-size="10" fill="#6b7280">三條入口路徑，結果相同，source 標記不同</text>
+
+<!-- Path A — manual -->
+<rect x="796" y="540" width="240" height="100" rx="6" fill="#f9fafb" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="5,3"/>
+<text x="916" y="560" text-anchor="middle" font-size="10" font-weight="700" fill="#374151">路徑 A — 手動</text>
+<text x="916" y="576" text-anchor="middle" font-size="10" fill="#6b7280">/sales/{id} 頁面</text>
+<rect x="820" y="582" width="192" height="22" rx="4" fill="white" stroke="#d1d5db" stroke-width="1.5"/>
+<text x="916" y="597" text-anchor="middle" font-size="10" fill="#374151">點「+ 確認出貨」</text>
+<text x="916" y="618" text-anchor="middle" font-size="10" fill="#9ca3af">填日期/箱數/追蹤號 → 儲存</text>
+<text x="916" y="632" text-anchor="middle" font-size="9" fill="#9ca3af">source = MANUAL</text>
+
+<!-- Path B — Excel -->
+<rect x="1058" y="540" width="260" height="160" rx="6" fill="#faf5ff" stroke="#c4b5fd" stroke-width="1.5" stroke-dasharray="5,3"/>
+<text x="1188" y="560" text-anchor="middle" font-size="10" font-weight="700" fill="#7c3aed">路徑 B — Excel 匯入</text>
+<text x="1188" y="576" text-anchor="middle" font-size="10" fill="#6b7280">/shipping 頁面</text>
+<rect x="1074" y="582" width="228" height="22" rx="4" fill="white" stroke="#c4b5fd" stroke-width="1.5"/>
+<text x="1188" y="597" text-anchor="middle" font-size="10" fill="#7c3aed">點「📥 匯入出貨文件」</text>
+<line x1="1188" y1="604" x2="1188" y2="618" stroke="#a855f7" stroke-width="1" marker-end="url(#arr-purple)"/>
+<text x="1188" y="630" text-anchor="middle" font-size="10" fill="#6b7280">/sales/shipment-import</text>
+<text x="1188" y="644" text-anchor="middle" font-size="10" fill="#9ca3af">上傳 Invoice + PL Excel</text>
+<text x="1188" y="658" text-anchor="middle" font-size="10" fill="#9ca3af">AI 解析 → 預覽 → 儲存</text>
+<text x="1188" y="672" text-anchor="middle" font-size="9" fill="#7c3aed">source = AI_IMPORT</text>
+<text x="1188" y="687" text-anchor="middle" font-size="9" fill="#9ca3af">可選：→ 前往估 UPS 運費</text>
+
+<!-- Path C — UPS -->
+<rect x="1340" y="540" width="244" height="200" rx="6" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.5" stroke-dasharray="5,3"/>
+<text x="1462" y="560" text-anchor="middle" font-size="10" font-weight="700" fill="#c2410c">路徑 C — UPS 出貨</text>
+<text x="1462" y="576" text-anchor="middle" font-size="10" fill="#6b7280">/shipping 頁面</text>
+<rect x="1356" y="582" width="212" height="22" rx="4" fill="white" stroke="#fed7aa" stroke-width="1.5"/>
+<text x="1462" y="597" text-anchor="middle" font-size="10" fill="#c2410c">選 PI 或 AI 解析文件</text>
+<line x1="1462" y1="604" x2="1462" y2="618" stroke="#f97316" stroke-width="1" marker-end="url(#arr-orange)"/>
+<text x="1462" y="630" text-anchor="middle" font-size="10" fill="#6b7280">查詢 UPS 運費</text>
+<text x="1462" y="644" text-anchor="middle" font-size="10" fill="#9ca3af">（/api/shipping/rates）</text>
+<line x1="1462" y1="648" x2="1462" y2="658" stroke="#f97316" stroke-width="1" marker-end="url(#arr-orange)"/>
+<text x="1462" y="670" text-anchor="middle" font-size="10" fill="#6b7280">選擇服務 → 建 UPS 提單</text>
+<text x="1462" y="684" text-anchor="middle" font-size="10" fill="#9ca3af">（/api/shipping/create-shipment）</text>
+<line x1="1462" y1="688" x2="1462" y2="698" stroke="#f97316" stroke-width="1" marker-end="url(#arr-orange)"/>
+<text x="1462" y="710" text-anchor="middle" font-size="10" fill="#6b7280">下載標籤 + 記錄到 PAXIS</text>
+<text x="1462" y="724" text-anchor="middle" font-size="9" fill="#c2410c">source = UPS</text>
+<text x="1462" y="738" text-anchor="middle" font-size="9" fill="#9ca3af">預約提貨 / 自送 UPS</text>
+
+<!-- Merge arrows path A/B/C → SLS_Shipment -->
+<line x1="916" y1="640" x2="916" y2="820" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-gray)"/>
+<line x1="1188" y1="700" x2="1188" y2="820" stroke="#a855f7" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-purple)"/>
+<line x1="1462" y1="740" x2="1462" y2="820" stroke="#f97316" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-orange)"/>
+<line x1="916" y1="834" x2="1462" y2="834" stroke="#22c55e" stroke-width="1"/>
+<line x1="1190" y1="820" x2="1190" y2="834" stroke="#22c55e" stroke-width="1"/>
+<line x1="1190" y1="834" x2="1190" y2="844" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arr-green)"/>
+
+<!-- SLS_Shipment DB -->
+<ellipse cx="1190" cy="858" rx="90" ry="12" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+<rect x="1100" y="858" width="180" height="0" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+<ellipse cx="1190" cy="858" rx="90" ry="12" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+<text x="1190" y="862" text-anchor="middle" font-size="11" font-weight="700" fill="#14532d">SLS_Shipment</text>
+
+<!-- Arrow to INV -->
+<line x1="1190" y1="870" x2="1190" y2="906" stroke="#ea580c" stroke-width="2" marker-end="url(#arr-inv)"/>
+
+<!-- Vertical chain arrows sales -->
+<line x1="1160" y1="266" x2="1160" y2="293" stroke="#22c55e" stroke-width="2" marker-end="url(#arr-green)"/>
+<line x1="1160" y1="458" x2="1160" y2="478" stroke="#22c55e" stroke-width="2" marker-end="url(#arr-green)"/>
+
+<!-- ═══════════════════════════════════════════════════════════
+     INVENTORY LANE
+═══════════════════════════════════════════════════════════ -->
+
+<!-- INV_Stock DB -->
+<ellipse cx="780" cy="970" rx="110" ry="14" fill="#ffedd5" stroke="#f97316" stroke-width="2"/>
+<rect x="670" y="970" width="220" height="50" fill="#ffedd5" stroke="#f97316" stroke-width="2"/>
+<line x1="670" y1="970" x2="670" y2="1020" stroke="#f97316" stroke-width="2"/>
+<line x1="890" y1="970" x2="890" y2="1020" stroke="#f97316" stroke-width="2"/>
+<ellipse cx="780" cy="1020" rx="110" ry="14" fill="#ffedd5" stroke="#f97316" stroke-width="2"/>
+<text x="780" y="993" text-anchor="middle" font-size="12" font-weight="700" fill="#9a3412">INV_Stock</text>
+<text x="780" y="1008" text-anchor="middle" font-size="10" fill="#c2410c">quantity  reservedQty  availableQty*</text>
+<text x="780" y="1027" text-anchor="middle" font-size="9" fill="#9a3412">*availableQty = quantity − reservedQty（前端算，不存 DB）</text>
+
+<!-- INV_Movement DB -->
+<ellipse cx="1200" cy="950" rx="130" ry="14" fill="#fed7aa" stroke="#f97316" stroke-width="2"/>
+<rect x="1070" y="950" width="260" height="60" fill="#fed7aa" stroke="#f97316" stroke-width="2"/>
+<line x1="1070" y1="950" x2="1070" y2="1010" stroke="#f97316" stroke-width="2"/>
+<line x1="1330" y1="950" x2="1330" y2="1010" stroke="#f97316" stroke-width="2"/>
+<ellipse cx="1200" cy="1010" rx="130" ry="14" fill="#fed7aa" stroke="#f97316" stroke-width="2"/>
+<text x="1200" y="971" text-anchor="middle" font-size="12" font-weight="700" fill="#9a3412">INV_Movement</text>
+<text x="1200" y="986" text-anchor="middle" font-size="10" fill="#7c2d12">唯一真相來源 — 所有庫存變動均由此驅動</text>
+<text x="1200" y="1000" text-anchor="middle" font-size="9" fill="#9a3412">type=1 入庫(qty++) ｜ type=2 PI 預留(rsv++) ｜ type=4 出貨(qty-- rsv--)</text>
+<text x="1200" y="1013" text-anchor="middle" font-size="9" fill="#c2410c">performedBy, performedAt, source 每筆必記</text>
+
+<!-- INV_Movement → INV_Stock -->
+<line x1="1070" y1="975" x2="895" y2="985" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arr-inv)"/>
+<text x="982" y="970" text-anchor="middle" font-size="9" fill="#c2410c">寫入後更新</text>
+
+<!-- ── Inventory legend table ── -->
+<rect x="40" y="936" width="580" height="130" rx="6" fill="white" stroke="#fed7aa" stroke-width="1.5"/>
+<text x="56" y="956" font-size="11" font-weight="600" fill="#9a3412">庫存影響摘要</text>
+<line x1="40" y1="960" x2="620" y2="960" stroke="#fed7aa" stroke-width="1"/>
+<!-- table header -->
+<rect x="40" y="960" width="580" height="20" fill="#fff7ed"/>
+<text x="100" y="975" text-anchor="middle" font-size="10" font-weight="600" fill="#374151">觸發事件</text>
+<text x="310" y="975" text-anchor="middle" font-size="10" font-weight="600" fill="#374151">quantity</text>
+<text x="440" y="975" text-anchor="middle" font-size="10" font-weight="600" fill="#374151">reservedQty</text>
+<text x="572" y="975" text-anchor="middle" font-size="10" font-weight="600" fill="#374151">INV type</text>
+<!-- row 1 -->
+<text x="100" y="995" text-anchor="middle" font-size="10" fill="#374151">PO_Receipt 確認入庫</text>
+<text x="310" y="995" text-anchor="middle" font-size="11" fill="#15803d">＋＋</text>
+<text x="440" y="995" text-anchor="middle" font-size="10" fill="#9ca3af">—</text>
+<text x="572" y="995" text-anchor="middle" font-size="10" fill="#374151">type = 1</text>
+<!-- row 2 -->
+<text x="100" y="1015" text-anchor="middle" font-size="10" fill="#374151">SLS_PI 發行</text>
+<text x="310" y="1015" text-anchor="middle" font-size="10" fill="#9ca3af">—</text>
+<text x="440" y="1015" text-anchor="middle" font-size="11" fill="#d97706">＋＋</text>
+<text x="572" y="1015" text-anchor="middle" font-size="10" fill="#374151">type = 2</text>
+<!-- row 3 -->
+<text x="100" y="1035" text-anchor="middle" font-size="10" fill="#374151">SLS_Shipment 出貨</text>
+<text x="310" y="1035" text-anchor="middle" font-size="11" fill="#dc2626">－－</text>
+<text x="440" y="1035" text-anchor="middle" font-size="11" fill="#dc2626">－－</text>
+<text x="572" y="1035" text-anchor="middle" font-size="10" fill="#374151">type = 4</text>
+<!-- row 4 -->
+<text x="100" y="1055" text-anchor="middle" font-size="10" fill="#374151">SLS_PI 作廢</text>
+<text x="310" y="1055" text-anchor="middle" font-size="10" fill="#9ca3af">—</text>
+<text x="440" y="1055" text-anchor="middle" font-size="11" fill="#15803d">－－</text>
+<text x="572" y="1055" text-anchor="middle" font-size="10" fill="#374151">type = 3</text>
+
+<!-- ═══════════════════════════════════════════════════════════
+     AUXILIARY FLOWS — bottom right
+═══════════════════════════════════════════════════════════ -->
+
+<!-- aux panel -->
+<rect x="40" y="680" width="700" height="200" rx="8" fill="white" stroke="#e5e7eb" stroke-width="1.5"/>
+<rect x="40" y="680" width="700" height="24" rx="8" fill="#f3f4f6"/>
+<rect x="40" y="696" width="700" height="8" fill="#f3f4f6"/>
+<text x="56" y="696" font-size="11" font-weight="700" fill="#374151">輔助功能</text>
+
+<!-- UPS rate only -->
+<rect x="56" y="718" width="200" height="80" rx="6" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.5"/>
+<text x="156" y="736" text-anchor="middle" font-size="10" font-weight="600" fill="#c2410c">UPS 費率查詢（純工具）</text>
+<text x="156" y="752" text-anchor="middle" font-size="10" fill="#6b7280">/shipping</text>
+<text x="156" y="766" text-anchor="middle" font-size="10" fill="#9ca3af">填地址/重量/材積</text>
+<text x="156" y="780" text-anchor="middle" font-size="10" fill="#9ca3af">→ 顯示費率列表</text>
+<text x="156" y="793" text-anchor="middle" font-size="9" fill="#d97706">不建立 SLS_Shipment</text>
+
+<!-- Cost calc -->
+<rect x="280" y="718" width="200" height="80" rx="6" fill="#f0f9ff" stroke="#bae6fd" stroke-width="1.5"/>
+<text x="380" y="736" text-anchor="middle" font-size="10" font-weight="600" fill="#0369a1">到岸成本試算</text>
+<text x="380" y="752" text-anchor="middle" font-size="10" fill="#6b7280">/cost</text>
+<text x="380" y="766" text-anchor="middle" font-size="10" fill="#9ca3af">FOB → 關稅/運費/保險</text>
+<text x="380" y="780" text-anchor="middle" font-size="10" fill="#9ca3af">→ Landed Cost + 毛利率</text>
+<text x="380" y="793" text-anchor="middle" font-size="9" fill="#0369a1">獨立試算，不影響主流程</text>
+
+<!-- Finance -->
+<rect x="504" y="718" width="220" height="80" rx="6" fill="#fdf4ff" stroke="#e9d5ff" stroke-width="1.5"/>
+<text x="614" y="736" text-anchor="middle" font-size="10" font-weight="600" fill="#7e22ce">對帳 / 付款</text>
+<text x="614" y="752" text-anchor="middle" font-size="10" fill="#6b7280">/finance</text>
+<text x="614" y="766" text-anchor="middle" font-size="10" fill="#9ca3af">Tab：應付帳款 ↔ 應收帳款</text>
+<text x="614" y="780" text-anchor="middle" font-size="10" fill="#9ca3af">記錄付款 / 記錄收款</text>
+<text x="614" y="793" text-anchor="middle" font-size="9" fill="#7e22ce">匯差自動計算</text>
+
+<!-- ═══════════════════════════════════════════════════════════
+     CROSS-LINK: SLS ↔ PO
+═══════════════════════════════════════════════════════════ -->
+
+<!-- Dotted cross arrow: SLS_Order ←→ PO_Order -->
+<line x1="460" y1="236" x2="1080" y2="236" stroke="#6b7280" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arr-gray)"/>
+<rect x="638" y="224" width="144" height="18" rx="3" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1"/>
+<text x="710" y="237" text-anchor="middle" font-size="9" fill="#6b7280">sourceType=1 時 PO 關聯銷售訂單</text>
+
+</svg>
+</div>
+
+</body>
+</html>

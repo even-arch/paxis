@@ -59,12 +59,12 @@ export default async function SalesPage({
         <h1 className="text-2xl font-bold text-gray-800">客戶訂單</h1>
         <div className="flex gap-2">
           <Link href="/sales/import"
-            className="bg-teal-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-teal-700">
-            AI 匯入客戶訂單
+            className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700">
+            ✨ AI 匯入
           </Link>
           <Link href="/sales/new"
-            className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm hover:bg-gray-50">
-            手動建立
+            className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50">
+            + 手動建立
           </Link>
         </div>
       </div>
@@ -72,7 +72,7 @@ export default async function SalesPage({
       <form method="GET" className="mb-4 flex gap-2">
         <input name="search" defaultValue={search}
           placeholder="搜尋訂單號、客戶名稱..."
-          className="border border-gray-300 rounded-md px-3 py-2 text-sm w-72 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+          className="border border-gray-300 rounded-md px-3 py-2 text-sm w-80 focus:outline-none focus:ring-2 focus:ring-blue-500" />
         <button type="submit" className="bg-gray-100 border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-200">搜尋</button>
         {(search || customerId) && (
           <Link href="/sales" className="border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-50 text-gray-500">清除</Link>

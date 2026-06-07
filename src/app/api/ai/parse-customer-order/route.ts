@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { decrypt } from '@/lib/crypto'
-import { callLLM, extractFileText, parseJsonResponse } from '@/lib/ai-llm'
+import { callLLM, buildMessagesForFile, parseJsonResponse } from '@/lib/ai-llm'
 
 export interface ParsedCustomerOrder {
   documentType?: 'PO' | 'ORDER' | null
@@ -125,33 +125,10 @@ export async function POST(req: NextRequest) {
       const buffer = Buffer.from(await file.arrayBuffer())
       const mimeType = file.type
 
-      if (mimeType.startsWith('image/')) {
-        const b64 = buffer.toString('base64')
-        if (provider === 'anthropic') {
-          inputMessages = [
-            { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: [
-              { type: 'image', source: { type: 'base64', media_type: mimeType, data: b64 } },
-              { type: 'text', text: '請解析這份客戶訂單，回傳 JSON。' },
-            ]},
-          ]
-        } else {
-          inputMessages = [
-            { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: [
-              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${b64}` } },
-              { type: 'text', text: '請解析這份客戶訂單，回傳 JSON。' },
-            ]},
-          ]
-        }
-      } else {
-        const text = await extractFileText(buffer, mimeType, file.name)
-        const truncated = text.length > 60000 ? text.slice(0, 60000) + '\n...[已截斷]' : text
-        inputMessages = [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: truncated },
-        ]
-      }
+      inputMessages = await buildMessagesForFile(
+        buffer, mimeType, file.name,
+        SYSTEM_PROMPT, '請解析這份客戶訂單，回傳 JSON。', provider,
+      )
     } else {
       const body = await req.json() as { text?: string }
       if (!body.text) return NextResponse.json({ error: '未收到內容' }, { status: 400 })

@@ -31,9 +31,13 @@ export default async function NewPurchasePage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">新增供應商訂單</h1>
-        <a href="/import" className="text-sm text-purple-600 hover:text-purple-800">
-          ✨ 改用 AI 匯入單據
+        <div>
+          <a href="/purchases" className="text-sm text-gray-400 hover:text-gray-600">← 採購訂單</a>
+          <h1 className="text-2xl font-bold text-gray-800 mt-1">手動建立採購訂單</h1>
+        </div>
+        <a href="/purchases/import"
+          className="border border-indigo-400 text-indigo-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-50">
+          ✨ 改用 AI 匯入
         </a>
       </div>
       <PurchaseForm suppliers={suppliers} products={products} salesOrders={openSalesOrders} />

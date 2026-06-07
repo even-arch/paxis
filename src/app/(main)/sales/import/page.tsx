@@ -26,8 +26,8 @@ export default async function SalesImportPage() {
           <p className="text-sm text-gray-500 mt-0.5">上傳客戶 PO 文件，AI 自動識別品項與客戶資訊</p>
         </div>
         <Link href="/sales/new"
-          className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm hover:bg-gray-50">
-          改用手動建立
+          className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50">
+          + 改用手動建立
         </Link>
       </div>
       <SalesImportWizard customers={customers} products={products} />

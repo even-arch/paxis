@@ -12,7 +12,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { decrypt } from '@/lib/crypto'
-import { callLLM, extractFileText, parseJsonResponse } from '@/lib/ai-llm'
+import { callLLM, buildMessagesForFile, parseJsonResponse } from '@/lib/ai-llm'
 
 export interface ParsedShipping {
   // 收件方
@@ -97,33 +97,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '請先在「設定 → AI 功能」設定 AI API Key' }, { status: 400 })
   }
 
-  // 解析 multipart
-  let fileText: string
+  // 解析 multipart + 呼叫 AI
   try {
     const form = await req.formData()
     const file = form.get('file') as File | null
     if (!file) return NextResponse.json({ error: '請上傳檔案' }, { status: 400 })
 
     const buffer = Buffer.from(await file.arrayBuffer())
-    fileText = await extractFileText(buffer, file.type, file.name)
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    return NextResponse.json({ error: `檔案解析失敗：${msg}` }, { status: 400 })
-  }
+    const messages = await buildMessagesForFile(
+      buffer, file.type, file.name,
+      SYSTEM_PROMPT, '請解析這份出貨文件，回傳 JSON。', aiProvider,
+    )
 
-  // 呼叫 AI
-  try {
-    const raw = await callLLM(aiProvider, apiKey, model, [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: `請解析以下文件內容：\n\n${fileText.slice(0, 8000)}` },
-    ], 2048)
-
+    const raw = await callLLM(aiProvider, apiKey, model, messages, 2048)
     const parsed = parseJsonResponse<ParsedShipping>(raw)
     parsed.items ??= []
 
     return NextResponse.json({ ok: true, data: parsed })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    return NextResponse.json({ error: `AI 解析失敗：${msg}` }, { status: 500 })
+    return NextResponse.json({ error: `解析失敗：${msg}` }, { status: 500 })
   }
 }

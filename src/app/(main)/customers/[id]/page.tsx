@@ -42,7 +42,7 @@ export default async function CustomerDetailPage({
     <div className="max-w-3xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <Link href="/customers" className="text-sm text-gray-400 hover:text-gray-600">← 客戶列表</Link>
+          <Link href="/customers" className="text-sm text-gray-400 hover:text-gray-600">← 客戶</Link>
           <h1 className="text-2xl font-bold text-gray-800 mt-1">{customer.name}</h1>
           {customer.shortName && <p className="text-sm text-gray-500">{customer.shortName}</p>}
         </div>

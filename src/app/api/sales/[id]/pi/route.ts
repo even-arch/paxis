@@ -20,8 +20,10 @@ export async function POST(req: NextRequest, {
 
   const orderId = Number(params.id)
   const body = await req.json() as {
+    piNo?: string | null             // 外部傳入（AI 匯入），否則自動產生
     estimatedShipDate?: string | null
     note?: string | null
+    source?: string | null           // 'MANUAL' | 'AI_IMPORT'，預設 MANUAL
     items: PIItem[]
   }
 
@@ -39,12 +41,17 @@ export async function POST(req: NextRequest, {
     return NextResponse.json({ error: '此訂單已完成或取消，無法發出 PI' }, { status: 400 })
   }
 
-  // 產生 PI 號：PI-YYYYMMDD-XXXX
-  const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-  const count = await prisma.sLS_PI.count()
-  const piNo = `PI-${datePart}-${String(count + 1).padStart(4, '0')}`
+  // PI 號：優先用傳入值（AI 匯入時帶入文件原始號碼），否則自動產生
+  let piNo = body.piNo?.trim() || null
+  if (!piNo) {
+    const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    const count = await prisma.sLS_PI.count()
+    piNo = `PI-${datePart}-${String(count + 1).padStart(4, '0')}`
+  }
 
-  // 建立 PI（在 transaction 中同步更新庫存）
+  const sourceLabel = body.source ?? 'MANUAL'
+
+  // 建立 PI
   const now = new Date()
 
   const pi = await prisma.sLS_PI.create({
@@ -53,7 +60,7 @@ export async function POST(req: NextRequest, {
       piNo,
       estimatedShipDate: body.estimatedShipDate ? new Date(body.estimatedShipDate) : null,
       status: 0,
-      source: 'MANUAL',
+      source: sourceLabel,
       performedBy: userId,
       performedAt: now,
       items: {
@@ -92,7 +99,7 @@ export async function POST(req: NextRequest, {
         quantityAfter: stock.quantity,
         reservedAfter: stock.reservedQty,
         slsPiId: pi.id,
-        source: 'MANUAL',
+        source: sourceLabel,
         performedBy: userId,
         performedAt: now,
         note: `預留 ${piNo}`,

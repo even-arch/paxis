@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 type OrderItem = {
   id: number
@@ -96,10 +97,16 @@ export default function SalesPIPanel({ orderId, orderStatus, items, pis }: Props
           <p className="text-xs text-gray-400 mt-0.5">發出 PI 正本後，系統自動預留對應庫存（reservedQty++）</p>
         </div>
         {canIssuePi && !showForm && (
-          <button onClick={() => setShowForm(true)}
-            className="bg-purple-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-purple-700">
-            + 發出 PI
-          </button>
+          <div className="flex gap-2">
+            <Link href={`/sales/${orderId}/pi-import`}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700">
+              ✨ 匯入 PI 文件
+            </Link>
+            <button onClick={() => setShowForm(true)}
+              className="border border-purple-300 text-purple-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-purple-50">
+              + 手動發出 PI
+            </button>
+          </div>
         )}
       </div>
 

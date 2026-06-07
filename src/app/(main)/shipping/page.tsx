@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -315,6 +315,9 @@ export default function ShippingPage() {
   const [pickupClose, setPickupClose] = useState('1800')
   const [pickupPhone, setPickupPhone] = useState('')
 
+  // 從 Excel 帶入的寄件方名稱（可能是供應商）
+  const [excelShipperName, setExcelShipperName] = useState<string | null>(null)
+
   // Save to PAXIS
   const [paxisSaving, setPaxisSaving] = useState(false)
   const [paxisSaved, setPaxisSaved] = useState<{ shipmentNo: string; shipmentId: number } | null>(null)
@@ -329,8 +332,113 @@ export default function ShippingPage() {
     trackingNumber: string; labelBase64: string; labelFormat: string
     chargedAmount?: number; chargedCurrency?: string; logId: number
     pickupConfirmation?: string; pickupDueDate?: string
+    allLabels?: Array<{ trackingNumber: string; labelBase64: string }>
   } | null>(null)
   const [shipmentError, setShipmentError] = useState('')
+
+  // ── 從出貨 Excel 匯入（shipment-import 頁傳來的 sessionStorage 資料）─────────────
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('ups_prefill')
+      if (!raw) return
+      sessionStorage.removeItem('ups_prefill')
+      const d = JSON.parse(raw) as {
+        totalCartons: number | null
+        totalGrossWeightKg: number | null
+        totalCft: number | null
+        totalAmount: number | null
+        currency: string | null
+        soldTo: string | null
+        shipperName: string | null
+        dimensionsCm: { l: number; w: number; h: number } | null
+        recipientAddress: {
+          name: string; addressLine: string; city: string
+          postalCode: string; countryCode: string
+        } | null
+        items: Array<{ itemNo: string; description: string; qty: number; unit: string; unitPrice: number | null; currency: string | null }>
+      }
+
+      const cartons = d.totalCartons ?? 1
+      const weightEach = d.totalGrossWeightKg != null
+        ? (d.totalGrossWeightKg / cartons).toFixed(2)
+        : ''
+      const cftEach = d.totalCft != null
+        ? (d.totalCft / cartons).toFixed(3)
+        : ''
+
+      const dims = d.dimensionsCm
+
+      // 若沒有明確 L/W/H，但有 ft³ → 反推正方體尺寸（同 handleCftInput 邏輯）
+      const backCalcDims = (cft: string): { l: string; w: string; h: string } => {
+        const cftNum = parseFloat(cft)
+        if (isNaN(cftNum) || cftNum <= 0) return { l: '', w: '', h: '' }
+        const cbm = cftNum / CBM_TO_CFT
+        const side = Math.cbrt(cbm * 1_000_000)
+        return { l: side.toFixed(1), w: side.toFixed(1), h: side.toFixed(1) }
+      }
+
+      const newPkgs = Array.from({ length: cartons }, (_, i): Package => {
+        const hasDims = dims != null
+        const calcDims = (!hasDims && cftEach) ? backCalcDims(cftEach) : null
+        const cbmEach = cftEach
+          ? (parseFloat(cftEach) / CBM_TO_CFT).toFixed(4)
+          : ''
+        return ({
+        grossWeightKg: weightEach,
+        netWeightKg: '',
+        lengthCm: hasDims ? String(dims!.l) : (calcDims?.l ?? ''),
+        widthCm:  hasDims ? String(dims!.w) : (calcDims?.w ?? ''),
+        heightCm: hasDims ? String(dims!.h) : (calcDims?.h ?? ''),
+        cbmStr: cbmEach,
+        cftStr: cftEach,
+        dimsFromCbm: !hasDims && !!cftEach,
+        quantity: '1',
+        packageType: 'package',
+        // 品項只填在第一箱，其餘留空
+        items: i === 0 && d.items?.length > 0
+          ? d.items.map(it => ({
+              sku: it.itemNo,
+              modelNo: '',
+              desc: it.description || '',
+              specification: '',
+              qty: String(it.qty),
+              unitPrice: it.unitPrice != null ? String(it.unitPrice) : '',
+              unit: it.unit || 'PC',
+              currencyCode: it.currency || 'EUR',
+            }))
+          : [emptyPackageItem()],
+      })
+      })
+      setPackages(newPkgs)
+
+      if (d.totalAmount != null) {
+        setDeclaredValue(d.totalAmount.toFixed(2))
+        setDeclaredCurrency(d.currency || 'EUR')
+      }
+
+      // 帶入收件方完整地址
+      if (d.recipientAddress) {
+        const r = d.recipientAddress
+        setDestination({
+          name:               r.name        || d.soldTo || '',
+          addressLine:        r.addressLine || '',
+          city:               r.city        || '',
+          stateProvinceCode:  '',
+          postalCode:         r.postalCode  || '',
+          countryCode:        r.countryCode || '',
+          taxId:              '',
+        })
+      } else if (d.soldTo) {
+        setDestination(prev => ({ ...prev, name: prev.name || d.soldTo! }))
+      }
+
+      // 若 CI 寄件方不是本公司，顯示提醒 banner
+      if (d.shipperName) {
+        setExcelShipperName(d.shipperName)
+      }
+    } catch { /* ignore bad sessionStorage data */ }
+  }, [])
 
   // ── 使用公司地址 ─────────────────────────────────────────────────────────────
 
@@ -620,6 +728,7 @@ export default function ShippingPage() {
           commercialInvNo: paxisCommercialInvNo || null,
           shippingMethod: selectedOption ? `UPS ${selectedOption.serviceName}` : null,
           trackingNo: shipmentResult?.trackingNumber ?? null,
+          source: 'UPS',
           items,
         }),
       })
@@ -802,7 +911,9 @@ export default function ShippingPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-5 py-6 px-4">
-      <h1 className="text-lg font-semibold text-gray-800">UPS 出貨查詢</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-semibold text-gray-800">UPS 出貨</h1>
+      </div>
 
       {/* ── Section A: 從 PI 匯入 / AI 解析 ── */}
       <div className="bg-white rounded-lg border p-5 space-y-3">
@@ -1037,6 +1148,19 @@ export default function ShippingPage() {
                 className="text-xs text-blue-600 hover:underline">從供應商帶入</button>
             </div>
           </div>
+          {/* 若 Excel 寄件方不是本公司，提醒確認 */}
+          {excelShipperName && (
+            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded px-3 py-2 text-xs text-amber-800">
+              <span className="mt-0.5">⚠️</span>
+              <span>
+                出貨文件上的寄件方為 <strong>{excelShipperName}</strong>。
+                若此批貨由供應商直送客戶，請按「從供應商帶入」填入實際寄件地址；
+                若由本公司出貨，按「使用公司地址」即可。
+              </span>
+              <button type="button" onClick={() => setExcelShipperName(null)}
+                className="ml-auto text-amber-400 hover:text-amber-700 shrink-0">✕</button>
+            </div>
+          )}
           <AddressBlock title="" value={origin} onChange={setOrigin} />
         </div>
         <div className="border-t pt-4">
@@ -1324,16 +1448,47 @@ export default function ShippingPage() {
         <div className="bg-white rounded-lg border p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-green-700">✓ 提單已建立</h2>
-            <button onClick={downloadLabel}
-              className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700">
-              ⬇ 下載標籤
-            </button>
+            <div className="flex gap-2 flex-wrap justify-end">
+              {/* 多箱時顯示每箱個別下載；單箱直接下載 */}
+              {shipmentResult.allLabels && shipmentResult.allLabels.length > 1
+                ? shipmentResult.allLabels.map((lbl, i) => (
+                    <button key={lbl.trackingNumber}
+                      onClick={() => {
+                        const fmt = (shipmentResult.labelFormat ?? 'GIF').toLowerCase()
+                        const mime = fmt === 'pdf' ? 'application/pdf' : `image/${fmt}`
+                        const url = `data:${mime};base64,${lbl.labelBase64}`
+                        const a = document.createElement('a')
+                        a.href = url; a.download = `UPS_${lbl.trackingNumber}.${fmt}`; a.click()
+                      }}
+                      className="text-xs px-2.5 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700">
+                      ⬇ 標籤 {i + 1}
+                    </button>
+                  ))
+                : (
+                    <button onClick={downloadLabel}
+                      className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700">
+                      ⬇ 下載標籤
+                    </button>
+                  )
+              }
+            </div>
           </div>
 
           <div className="bg-gray-50 rounded p-3 space-y-1 text-sm">
-            <p><span className="text-gray-500 text-xs">Tracking Number</span><br />
-              <span className="font-mono font-bold text-base">{shipmentResult.trackingNumber}</span>
-            </p>
+            {shipmentResult.allLabels && shipmentResult.allLabels.length > 1 ? (
+              <div>
+                <p className="text-gray-500 text-xs mb-1">Tracking Numbers（{shipmentResult.allLabels.length} 箱）</p>
+                {shipmentResult.allLabels.map((lbl, i) => (
+                  <p key={lbl.trackingNumber} className="font-mono font-bold text-sm">
+                    箱{i + 1}：{lbl.trackingNumber}
+                  </p>
+                ))}
+              </div>
+            ) : (
+              <p><span className="text-gray-500 text-xs">Tracking Number</span><br />
+                <span className="font-mono font-bold text-base">{shipmentResult.trackingNumber}</span>
+              </p>
+            )}
             {shipmentResult.chargedAmount && (
               <p className="text-xs text-gray-500">
                 費用：{shipmentResult.chargedCurrency} {shipmentResult.chargedAmount.toFixed(2)}

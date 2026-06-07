@@ -25,8 +25,8 @@ export default async function SalesNewPage() {
           <h1 className="text-2xl font-bold text-gray-800 mt-1">手動建立客戶訂單</h1>
         </div>
         <Link href="/sales/import"
-          className="border border-teal-400 text-teal-700 px-4 py-2 rounded-md text-sm hover:bg-teal-50">
-          改用 AI 匯入
+          className="border border-indigo-400 text-indigo-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-50">
+          ✨ 改用 AI 匯入
         </Link>
       </div>
       <SalesOrderForm customers={customers} products={products} />

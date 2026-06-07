@@ -5,27 +5,71 @@ import { usePathname } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
 import { cn } from '@/lib/utils'
 
-const navItems = [
-  { label: '總覽', href: '/dashboard', icon: '📊' },
-  { label: '商品管理', href: '/products', icon: '📦' },
-  { label: '供應商', href: '/suppliers', icon: '🏭' },
-  { label: '客戶', href: '/customers', icon: '🤝' },
-  { label: '客戶訂單', href: '/sales', icon: '📤' },
-  { label: '供應商訂單', href: '/purchases', icon: '🛒' },
-  { label: '庫存管理', href: '/inventory', icon: '🗃️' },
-  { label: '對帳 / 付款', href: '/finance', icon: '💳' },
-  { label: '到岸成本試算', href: '/cost', icon: '🧮' },
-  { label: '匯入出貨文件', href: '/sales/shipment-import', icon: '📥' },
-  { label: 'UPS 出貨查詢', href: '/shipping', icon: '🚚' },
+type NavItem = { label: string; href: string; icon: string; exact?: boolean }
+type NavGroup = { section: string; items: NavItem[] }
+
+const navGroups: NavGroup[] = [
+  {
+    section: '',
+    items: [
+      { label: '總覽', href: '/dashboard', icon: '📊', exact: true },
+    ],
+  },
+  {
+    section: '商品與庫存',
+    items: [
+      { label: '商品管理', href: '/products', icon: '📦' },
+      { label: '庫存管理', href: '/inventory', icon: '🗃️' },
+    ],
+  },
+  {
+    section: '客戶端',
+    items: [
+      { label: '客戶', href: '/customers', icon: '🤝' },
+      { label: '客戶訂單', href: '/sales', icon: '📋' },
+      { label: '匯入出貨文件', href: '/sales/shipment-import', icon: '🗂️' },
+    ],
+  },
+  {
+    section: '供應商端',
+    items: [
+      { label: '供應商', href: '/suppliers', icon: '🏭' },
+      { label: '採購訂單', href: '/purchases', icon: '🛒' },
+    ],
+  },
+  {
+    section: '物流',
+    items: [
+      { label: 'UPS 出貨', href: '/shipping', icon: '🚚' },
+    ],
+  },
+  {
+    section: '財務',
+    items: [
+      { label: '對帳 / 付款', href: '/finance', icon: '💳' },
+      { label: '到岸成本試算', href: '/cost', icon: '🧮' },
+    ],
+  },
 ]
 
-const settingsItems = [
+const settingsItems: NavItem[] = [
   { label: '公司資料', href: '/settings/company', icon: '🏢' },
   { label: 'AI 功能', href: '/settings/ai', icon: '✨' },
   { label: 'Email 寄信', href: '/settings/email', icon: '📧' },
   { label: 'Patisco 同步', href: '/settings/patisco', icon: '🔗' },
   { label: '個人設定', href: '/settings/profile', icon: '👤' },
+  { label: '管理後台', href: '/admin', icon: '⚙️' },
 ]
+
+function isActive(pathname: string, item: NavItem): boolean {
+  if (item.exact) return pathname === item.href
+  if (pathname === item.href) return true
+  // 「匯入出貨文件」是精確路徑，不要讓 /sales 把它吃掉
+  if (item.href === '/sales') {
+    return pathname.startsWith('/sales/') && pathname !== '/sales/shipment-import'
+  }
+  return pathname.startsWith(item.href + '/')
+}
 
 export default function Sidebar({ companyName = 'PAXIS' }: { companyName?: string }) {
   const pathname = usePathname()
@@ -39,20 +83,31 @@ export default function Sidebar({ companyName = 'PAXIS' }: { companyName?: strin
       </div>
 
       <nav className="flex-1 py-4 px-2 flex flex-col gap-0.5 overflow-y-auto">
-        {navItems.map(item => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={cn(
-              'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
-              pathname.startsWith(item.href)
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-300 hover:bg-gray-800',
+        {navGroups.map(group => (
+          <div key={group.section}>
+            {group.section && (
+              <div className="mt-4 mb-1 px-3">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  {group.section}
+                </span>
+              </div>
             )}
-          >
-            <span>{item.icon}</span>
-            <span>{item.label}</span>
-          </Link>
+            {group.items.map(item => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
+                  isActive(pathname, item)
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-300 hover:bg-gray-800',
+                )}
+              >
+                <span>{item.icon}</span>
+                <span>{item.label}</span>
+              </Link>
+            ))}
+          </div>
         ))}
 
         <div className="mt-4 mb-1 px-3">
@@ -64,7 +119,7 @@ export default function Sidebar({ companyName = 'PAXIS' }: { companyName?: strin
             href={item.href}
             className={cn(
               'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
-              pathname.startsWith(item.href)
+              isActive(pathname, item)
                 ? 'bg-blue-600 text-white'
                 : 'text-gray-300 hover:bg-gray-800',
             )}

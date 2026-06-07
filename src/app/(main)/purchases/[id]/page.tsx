@@ -79,7 +79,7 @@ export default async function PurchaseDetailPage({
     <div className="max-w-4xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <Link href="/purchases" className="text-sm text-gray-400 hover:text-gray-600">← 供應商訂單列表</Link>
+          <Link href="/purchases" className="text-sm text-gray-400 hover:text-gray-600">← 採購訂單</Link>
           <div className="flex items-center gap-3 mt-1">
             <h1 className="text-2xl font-bold text-gray-800 font-mono">{order.poNo}</h1>
             <span className={`px-2 py-0.5 rounded text-xs font-medium ${badge.color}`}>{badge.label}</span>

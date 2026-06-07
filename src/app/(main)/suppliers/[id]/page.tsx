@@ -50,7 +50,7 @@ export default async function SupplierDetailPage({
     <div className="max-w-3xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <Link href="/suppliers" className="text-sm text-gray-400 hover:text-gray-600">← 供應商列表</Link>
+          <Link href="/suppliers" className="text-sm text-gray-400 hover:text-gray-600">← 供應商</Link>
           <h1 className="text-2xl font-bold text-gray-800 mt-1">{supplier.name}</h1>
           {supplier.shortName && <p className="text-sm text-gray-500">{supplier.shortName}</p>}
         </div>

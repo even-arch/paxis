@@ -34,6 +34,7 @@ export async function POST(req: NextRequest, {
     packingListNo?: string | null
     commercialInvNo?: string | null
     note?: string | null
+    source?: string | null   // 'MANUAL' | 'AI_IMPORT' | 'UPS' — 預設 MANUAL
     items: ShipItem[]
   }
 
@@ -62,6 +63,8 @@ export async function POST(req: NextRequest, {
     }
   }
 
+  const sourceLabel = body.source ?? 'MANUAL'
+
   // 產生出貨單號：SHP-YYYYMMDD-XXXX
   const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
   const count = await prisma.sLS_Shipment.count()
@@ -83,7 +86,7 @@ export async function POST(req: NextRequest, {
       packingListNo: body.packingListNo ?? null,
       commercialInvNo: body.commercialInvNo ?? null,
       note: body.note ?? null,
-      source: 'MANUAL',
+      source: sourceLabel,
       performedBy: userId,
       performedAt: now,
       items: {
