@@ -17,7 +17,8 @@ interface ShipItem {
 
 export async function POST(req: NextRequest, {
   params }: Params) {
-    const session = await getServerSession(authOptions)
+  try {
+  const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const userId = parseInt((session.user as { id?: string })?.id ?? '', 10)
@@ -109,9 +110,15 @@ export async function POST(req: NextRequest, {
     const orderItem = order.items.find(i => i.id === shipItem.slsItemId)
     if (!orderItem) continue
 
-    const stock = await prisma.iNV_Stock.update({
+    const stock = await prisma.iNV_Stock.upsert({
       where: { productId: orderItem.productId },
-      data: {
+      create: {
+        productId: orderItem.productId,
+        quantity: -shipItem.quantity,
+        reservedQty: hasPi ? -shipItem.quantity : 0,
+        safetyStock: 0,
+      },
+      update: {
         quantity: { decrement: shipItem.quantity },
         ...(hasPi ? { reservedQty: { decrement: shipItem.quantity } } : {}),
       },
@@ -185,4 +192,9 @@ export async function POST(req: NextRequest, {
   })
 
   return NextResponse.json({ ok: true, shipmentNo, shipmentId: shipment.id }, { status: 201 })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('[POST /api/sales/[id]/shipment]', msg)
+    return NextResponse.json({ error: `出貨記錄失敗：${msg}` }, { status: 500 })
+  }
 }

@@ -13,7 +13,8 @@ interface MatchedOrder {
   customerName: string | null
   currencyCode: string
   exchangeRate: string | null  // 訂單建立時登記的匯率
-  items: Array<{ id: number; sku: string | null; quantity: number; unit: string }>
+  totalAmountForeign: number | null  // 訂單外幣總額
+  items: Array<{ id: number; sku: string | null; quantity: number; unit: string; unitPrice: string }>
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -92,17 +93,21 @@ export default function ShipmentImportPage() {
 
       const detailRes = await fetch(`/api/sales/${found.id}`)
       const detail = await detailRes.json()
+      const detailItems = (detail.items ?? []) as Array<{ id: number; product: { sku: string | null }; quantity: number; unit: string; unitPrice: string }>
+      const totalAmountForeign = detailItems.reduce((sum, it) => sum + it.quantity * parseFloat(it.unitPrice || '0'), 0)
       setMatchedOrder({
         id: detail.id,
         orderNo: detail.orderNo,
         customerName: detail.customer?.name ?? detail.patiscoBuyerName ?? null,
         currencyCode: detail.currencyCode ?? 'EUR',
         exchangeRate: detail.exchangeRate ?? null,
-        items: (detail.items ?? []).map((it: { id: number; product: { sku: string | null }; quantity: number; unit: string }) => ({
+        totalAmountForeign: totalAmountForeign || null,
+        items: detailItems.map(it => ({
           id: it.id,
           sku: it.product?.sku ?? null,
           quantity: it.quantity,
           unit: it.unit,
+          unitPrice: it.unitPrice,
         })),
       })
     } catch {
@@ -125,7 +130,12 @@ export default function ShipmentImportPage() {
     ? eurTotal * orderExRate
     : null
 
-  // 依使用者填入的實際 TWD 付款金額反算匯率
+  // 訂單外幣總額 × 訂單匯率 → 訂單 TWD 金額
+  const orderTwdEstimate = (matchedOrder?.totalAmountForeign != null && orderExRate != null)
+    ? matchedOrder.totalAmountForeign * orderExRate
+    : null
+
+  // 依使用者填入的實際 TWD 收款金額反算出貨匯率
   const twdTotalNum = twdTotal.trim() !== '' ? parseFloat(twdTotal) : null
   const impliedRate = (twdTotalNum != null && eurTotal != null && eurTotal > 0)
     ? twdTotalNum / eurTotal
@@ -183,9 +193,10 @@ export default function ShipmentImportPage() {
           items,
         }),
       })
-      const resData = await res.json()
-      if (!res.ok) throw new Error(resData.error ?? '儲存失敗')
-      setSavedShipmentNo(resData.shipmentNo)
+      let resData: { shipmentNo?: string; error?: string } = {}
+      try { resData = await res.json() } catch { /* empty body */ }
+      if (!res.ok) throw new Error(resData.error ?? `HTTP ${res.status} 儲存失敗`)
+      setSavedShipmentNo(resData.shipmentNo ?? 'SHP-???')
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : '儲存失敗')
     } finally {
@@ -240,18 +251,18 @@ export default function ShipmentImportPage() {
       {/* 上傳區 */}
       {!parsed && (
         <div>
-          <input ref={fileRef} type="file" accept=".xls,.xlsx" className="hidden" onChange={handleFile} />
+          <input ref={fileRef} type="file" accept=".xls,.xlsx,.pdf,image/*" className="hidden" onChange={handleFile} />
           {parsing ? (
-            <div className="bg-teal-50 border-2 border-dashed border-teal-300 rounded-xl p-12 text-center">
-              <p className="text-teal-700 font-medium">⏳ 解析中，請稍候…</p>
+            <div className="bg-indigo-50 border-2 border-dashed border-indigo-300 rounded-xl p-12 text-center">
+              <p className="text-indigo-700 font-medium">⏳ 解析中，請稍候…（PDF 會先轉圖片，需要稍等）</p>
             </div>
           ) : (
             <button type="button" onClick={() => fileRef.current?.click()}
-              className="w-full flex flex-col items-center gap-4 bg-white border-2 border-dashed border-blue-300 rounded-xl p-12 hover:border-blue-500 hover:bg-blue-50 transition-all text-center">
-              <span className="text-5xl">📊</span>
+              className="w-full flex flex-col items-center gap-4 bg-white border-2 border-dashed border-indigo-300 rounded-xl p-12 hover:border-indigo-500 hover:bg-indigo-50 transition-all text-center">
+              <span className="text-5xl">📄</span>
               <div>
-                <p className="font-semibold text-gray-800 text-lg">點擊上傳出貨 Excel</p>
-                <p className="text-sm text-gray-500 mt-1">支援 .xls / .xlsx，需含 Invoice 和 PackingList 兩個分頁</p>
+                <p className="font-semibold text-gray-800 text-lg">點擊上傳出貨文件</p>
+                <p className="text-sm text-gray-500 mt-1">PDF（AI Vision 解析）或 Excel（.xls / .xlsx）</p>
               </div>
             </button>
           )}
@@ -432,18 +443,28 @@ export default function ShipmentImportPage() {
             )}
           </div>
 
-          {/* 匯率計算 */}
+          {/* 出貨匯率計算 */}
           {eurTotal != null && (
             <div className="bg-white rounded-lg border p-5 space-y-4">
               <div>
-                <h2 className="text-sm font-semibold text-gray-800">匯率計算</h2>
+                <h2 className="text-sm font-semibold text-gray-800">出貨匯率計算</h2>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  CI 報價幣別 {parsed.currency ?? 'EUR'}，輸入實際 TWD 收款金額可反算本次使用的匯率。
+                  輸入實際 TWD 收款金額，系統自動計算本次出貨使用的匯率。
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-                {/* CI EUR 總額（唯讀） */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 items-end">
+                {/* 訂單外幣金額（唯讀） */}
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">訂單金額（{matchedOrder?.currencyCode ?? 'EUR'}）</p>
+                  <div className="bg-gray-50 border rounded px-3 py-2 text-sm font-mono text-gray-600">
+                    {matchedOrder?.totalAmountForeign != null
+                      ? `${matchedOrder.currencyCode} ${matchedOrder.totalAmountForeign.toFixed(2)}`
+                      : '—'}
+                  </div>
+                </div>
+
+                {/* CI 總金額（唯讀） */}
                 <div>
                   <p className="text-xs text-gray-500 mb-1">CI 總金額（{parsed.currency ?? 'EUR'}）</p>
                   <div className="bg-gray-50 border rounded px-3 py-2 text-sm font-mono font-medium text-gray-800">
@@ -458,20 +479,20 @@ export default function ShipmentImportPage() {
                     type="number"
                     value={twdTotal}
                     onChange={e => setTwdTotal(e.target.value)}
-                    placeholder="例：1,234,567"
+                    placeholder={orderTwdEstimate != null ? `估 ${Math.round(orderTwdEstimate).toLocaleString()}` : '輸入 TWD'}
                     className="w-full border rounded px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
 
-                {/* 計算結果 */}
+                {/* 出貨匯率 */}
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">實際匯率（TWD/{parsed.currency ?? 'EUR'}）</p>
+                  <p className="text-xs text-gray-500 mb-1">出貨匯率（TWD/{parsed.currency ?? 'EUR'}）</p>
                   <div className={`border rounded px-3 py-2 text-sm font-mono font-bold ${
                     impliedRate != null ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-gray-50 text-gray-400'
                   }`}>
                     {impliedRate != null
                       ? impliedRate.toFixed(4)
-                      : (twdByOrderRate != null && orderExRate != null)
+                      : orderExRate != null
                         ? `${orderExRate} (訂單登記)`
                         : '— 請輸入 TWD 金額'}
                   </div>
@@ -481,25 +502,23 @@ export default function ShipmentImportPage() {
               {/* 比對說明 */}
               {impliedRate != null && orderExRate != null && (
                 <div className="text-xs text-gray-500 bg-gray-50 rounded p-3 space-y-0.5">
-                  <p>訂單登記匯率：<span className="font-mono font-medium">{orderExRate}</span>
-                    {' '}→ 當時估算 TWD <span className="font-mono font-medium">{(eurTotal * orderExRate).toFixed(0)}</span>
+                  <p>
+                    訂單登記匯率：<span className="font-mono font-medium">{orderExRate}</span>
+                    {orderTwdEstimate != null && <>
+                      {' '}→ 訂單估算 TWD{' '}
+                      <span className="font-mono font-medium">{Math.round(orderTwdEstimate).toLocaleString()}</span>
+                    </>}
                   </p>
-                  <p>本次實際匯率：<span className="font-mono font-medium">{impliedRate.toFixed(4)}</span>
-                    {' '}→ 實際收款 TWD <span className="font-mono font-medium">{Number(twdTotalNum).toLocaleString()}</span>
+                  <p>
+                    本次出貨匯率：<span className="font-mono font-medium">{impliedRate.toFixed(4)}</span>
+                    {' '}→ 實際收款 TWD{' '}
+                    <span className="font-mono font-medium">{Number(twdTotalNum).toLocaleString()}</span>
                     {' '}
                     <span className={impliedRate > orderExRate ? 'text-green-600' : 'text-red-500'}>
                       ({impliedRate > orderExRate ? '▲' : '▼'} 匯率差 {Math.abs(impliedRate - orderExRate).toFixed(4)})
                     </span>
                   </p>
                 </div>
-              )}
-
-              {/* 只有訂單匯率，沒輸入 TWD */}
-              {twdTotal === '' && twdByOrderRate != null && orderExRate != null && (
-                <p className="text-xs text-gray-400">
-                  依訂單登記匯率 {orderExRate} 估算：
-                  {parsed.currency} {eurTotal.toFixed(2)} ≈ TWD {twdByOrderRate.toFixed(0)}
-                </p>
               )}
             </div>
           )}

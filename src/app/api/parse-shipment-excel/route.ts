@@ -8,6 +8,9 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/db'
+import { decrypt } from '@/lib/crypto'
+import { callLLM, buildMessagesForFile, parseJsonResponse } from '@/lib/ai-llm'
 
 interface ParsedItem {
   itemNo: string        // SKU / Item No
@@ -29,6 +32,15 @@ interface AdditionalCharge {
   currency: string
 }
 
+export interface ParsedAddress {
+  name: string
+  addressLine: string
+  city: string
+  postalCode: string
+  countryCode: string   // 2-letter ISO，能猜就猜
+  raw: string           // 原始多行文字，供 fallback
+}
+
 export interface ParsedShipmentExcel {
   invoiceNo: string | null
   packingListNo: string | null
@@ -36,6 +48,9 @@ export interface ParsedShipmentExcel {
   shipmentDate: string | null   // YYYY-MM-DD
   soldTo: string | null
   deliverTo: string | null
+  soldToAddress: ParsedAddress | null   // 完整收件地址
+  deliverToAddress: ParsedAddress | null
+  shipperName: string | null            // CI 上的寄件方名稱（可能是供應商）
   origin: string | null
   destination: string | null
   paymentTerms: string | null
@@ -49,6 +64,7 @@ export interface ParsedShipmentExcel {
   totalGrossWeightKg: number | null
   totalCft: number | null
   dimensions: string | null
+  dimensionsCm: { l: number; w: number; h: number } | null  // 解析後的 L×W×H（公分）
   additionalInfo: string | null
 }
 
@@ -79,6 +95,66 @@ function parseDate(s: string): string | null {
   return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`
 }
 
+/** 從 "L: 60 × W: 40 × H: 30 CM" 或 "L:60 W:40 H:30" 解析出 l/w/h（公分） */
+function parseDimensionsCm(s: string | null): { l: number; w: number; h: number } | null {
+  if (!s) return null
+  const l = s.match(/L[:\s]+([\d.]+)/i)
+  const w = s.match(/W[:\s]+([\d.]+)/i)
+  const h = s.match(/H[:\s]+([\d.]+)/i)
+  if (!l || !w || !h) return null
+  const lv = parseFloat(l[1]), wv = parseFloat(w[1]), hv = parseFloat(h[1])
+  if (isNaN(lv) || isNaN(wv) || isNaN(hv)) return null
+  return { l: lv, w: wv, h: hv }
+}
+
+/**
+ * 從多行地址文字解析出結構化地址
+ * 典型歐洲格式：
+ *   Company Name
+ *   Street 123
+ *   12345 City
+ *   GERMANY
+ */
+function parseAddress(raw: string | null): ParsedAddress | null {
+  if (!raw || !raw.trim()) return null
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean)
+  if (lines.length === 0) return null
+
+  const name = lines[0]
+  const addressLine = lines[1] ?? ''
+
+  // 試著從後面幾行找國家碼（2字母純英文行）和郵遞區號（含數字的行）
+  let countryCode = ''
+  let postalCode = ''
+  let city = ''
+
+  // 從最後一行往前找
+  for (let i = lines.length - 1; i >= 2; i--) {
+    const line = lines[i]
+    // 純字母 2-3 字 → 可能是國家名
+    if (!countryCode && /^[A-Z]{2,3}$/.test(line)) {
+      countryCode = line.substring(0, 2)
+      continue
+    }
+    // 含數字 → 郵遞區號 + 城市（格式: "12345 City" 或 "City 12345"）
+    if (!postalCode && /\d{4,6}/.test(line)) {
+      const m = line.match(/(\d{4,6})/)
+      if (m) postalCode = m[1]
+      city = line.replace(postalCode, '').replace(/[,\s]+$/, '').replace(/^[,\s]+/, '').trim()
+      continue
+    }
+    // 剩餘行 → 城市候補
+    if (!city) city = line
+  }
+
+  // fallback：若只有 2 行，第 2 行當地址
+  if (lines.length === 2) {
+    return { name, addressLine: lines[1], city: '', postalCode: '', countryCode: '', raw }
+  }
+
+  return { name, addressLine, city, postalCode, countryCode, raw }
+}
+
 // ── Invoice Tab parser ────────────────────────────────────────────────────────
 
 function parseInvoice(rows: unknown[][]): Partial<ParsedShipmentExcel> & { items: ParsedItem[] } {
@@ -102,18 +178,23 @@ function parseInvoice(rows: unknown[][]): Partial<ParsedShipmentExcel> & { items
 
     // SOLD TO
     if (c0 === 'SOLD TO' && !result.soldTo) {
-      result.soldTo = str(row[1]).split('\n')[0]
+      const raw = str(row[1])
+      result.soldTo = raw.split('\n')[0]
+      result.soldToAddress = parseAddress(raw)
     }
 
     // DELIVER TO
     if (c0 === 'DELIVER TO' && !result.deliverTo) {
-      result.deliverTo = str(row[1]).split('\n')[0]
+      const raw = str(row[1])
+      result.deliverTo = raw.split('\n')[0]
+      result.deliverToAddress = parseAddress(raw)
     }
 
-    // Shipment: 裡有日期 & 原產地 & 目的地
+    // Shipment: 裡有寄件方 & 日期 & 原產地 & 目的地
     if (c0 === 'Shipment:' && !result.shipmentDate) {
       const lines = str(row[1]).split('\n').map(l => l.trim()).filter(Boolean)
       // lines: [shipper, date, origin, destination]
+      if (lines[0]) result.shipperName = lines[0]
       if (lines[1]) result.shipmentDate = parseDate(lines[1])
       if (lines[2]) result.origin = lines[2]
       if (lines[3]) result.destination = lines[3]
@@ -257,6 +338,47 @@ function parsePackingList(rows: unknown[][]): Partial<ParsedShipmentExcel> & { p
   return result
 }
 
+// ── AI prompt for PDF/image parsing ─────────────────────────────────────────
+
+const AI_SYSTEM_PROMPT = `你是專業的出口文件解析助理，負責從 Commercial Invoice（CI）或 Packing List（PL）中提取出貨資訊。
+
+請解析文件並回傳以下 JSON（所有找不到的欄位填 null，不要猜測）：
+{
+  "invoiceNo": "CI 號碼",
+  "packingListNo": "PL 號碼",
+  "orderNo": "客戶訂單號",
+  "shipmentDate": "YYYY-MM-DD",
+  "soldTo": "買方公司名稱",
+  "deliverTo": "收貨方名稱",
+  "shipperName": "寄件方名稱",
+  "origin": "出貨地/裝載港",
+  "destination": "目的地",
+  "paymentTerms": "付款條件",
+  "currency": "幣別如EUR/USD",
+  "goodsTotal": 貨品小計金額（數字）,
+  "additionalCharges": [{"description":"費用名稱","amount":金額,"currency":"幣別"}],
+  "totalAmount": 含附加費用的總金額（數字）,
+  "items": [
+    {
+      "itemNo": "SKU/料號",
+      "description": "完整描述",
+      "qty": 數量,
+      "unit": "單位如PCS/SET",
+      "unitPrice": 單價（數字）,
+      "currency": "幣別",
+      "grossWeightKg": 毛重（數字或null）,
+      "cft": 材積立方英尺（數字或null）
+    }
+  ],
+  "totalCartons": 總箱數（數字）,
+  "totalGrossWeightKg": 總毛重（數字）,
+  "totalNetWeightKg": 總淨重（數字）,
+  "totalCft": 總材積ft³（數字）,
+  "dimensions": "箱子尺寸如L:60 W:40 H:30 CM"
+}
+
+只回傳 JSON，不要加任何說明文字。`
+
 // ── Route handler ─────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -266,11 +388,80 @@ export async function POST(req: NextRequest) {
   try {
     const form = await req.formData()
     const file = form.get('file') as File | null
-    if (!file) return NextResponse.json({ error: '請上傳 Excel 檔案' }, { status: 400 })
+    if (!file) return NextResponse.json({ error: '請上傳檔案' }, { status: 400 })
 
-    const ext = file.name.split('.').pop()?.toLowerCase()
-    if (!['xls', 'xlsx'].includes(ext ?? '')) {
-      return NextResponse.json({ error: '請上傳 .xls 或 .xlsx 檔案' }, { status: 400 })
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+    const isPdf = ext === 'pdf' || file.type === 'application/pdf'
+    const isImage = file.type.startsWith('image/')
+
+    // PDF / 圖片 → AI 解析
+    if (isPdf || isImage) {
+      const user = await prisma.sYS_User.findUnique({
+        where: { id: Number(session.user.id) },
+        select: { aiProvider: true, encryptedAiKey: true, aiParseModel: true },
+      })
+      if (!user?.aiProvider || !user?.encryptedAiKey) {
+        return NextResponse.json({ error: '請先在「設定 → AI 功能」登記 API Key' }, { status: 400 })
+      }
+      const apiKey = decrypt(user.encryptedAiKey)
+      const provider = user.aiProvider
+      const model = user.aiParseModel || (provider === 'anthropic' ? 'claude-opus-4-8' : 'gpt-4o')
+
+      const buffer = Buffer.from(await file.arrayBuffer())
+      const messages = await buildMessagesForFile(
+        buffer, file.type, file.name,
+        AI_SYSTEM_PROMPT, '請解析這份出貨文件，回傳 JSON。', provider,
+      )
+      const raw = await callLLM(provider, apiKey, model, messages)
+      const ai = parseJsonResponse<Partial<ParsedShipmentExcel> & { items?: unknown[] }>(raw)
+
+      // 把 AI 結果正規化成 ParsedShipmentExcel 形狀
+      const result: ParsedShipmentExcel = {
+        invoiceNo: (ai.invoiceNo as string | null) ?? null,
+        packingListNo: (ai.packingListNo as string | null) ?? null,
+        orderNo: (ai.orderNo as string | null) ?? null,
+        shipmentDate: (ai.shipmentDate as string | null) ?? null,
+        soldTo: (ai.soldTo as string | null) ?? null,
+        deliverTo: (ai.deliverTo as string | null) ?? null,
+        soldToAddress: null,
+        deliverToAddress: null,
+        shipperName: (ai.shipperName as string | null) ?? null,
+        origin: (ai.origin as string | null) ?? null,
+        destination: (ai.destination as string | null) ?? null,
+        paymentTerms: (ai.paymentTerms as string | null) ?? null,
+        currency: (ai.currency as string) ?? 'USD',
+        items: Array.isArray(ai.items) ? (ai.items as Record<string, unknown>[]).map(it => ({
+          itemNo: String(it.itemNo ?? ''),
+          description: String(it.description ?? ''),
+          qty: Number(it.qty ?? 0),
+          unit: String(it.unit ?? 'PCS'),
+          unitPrice: it.unitPrice != null ? Number(it.unitPrice) : null,
+          currency: String(it.currency ?? ai.currency ?? 'USD'),
+          amount: it.amount != null ? Number(it.amount) : null,
+          netWeightKg: it.netWeightKg != null ? Number(it.netWeightKg) : null,
+          grossWeightKg: it.grossWeightKg != null ? Number(it.grossWeightKg) : null,
+          cft: it.cft != null ? Number(it.cft) : null,
+          cartonNo: null,
+        })) : [],
+        goodsTotal: (ai.goodsTotal as number | null) ?? null,
+        additionalCharges: Array.isArray(ai.additionalCharges)
+          ? (ai.additionalCharges as { description: string; amount: number; currency: string }[])
+          : [],
+        totalAmount: (ai.totalAmount as number | null) ?? null,
+        totalCartons: (ai.totalCartons as number | null) ?? null,
+        totalNetWeightKg: (ai.totalNetWeightKg as number | null) ?? null,
+        totalGrossWeightKg: (ai.totalGrossWeightKg as number | null) ?? null,
+        totalCft: (ai.totalCft as number | null) ?? null,
+        dimensions: (ai.dimensions as string | null) ?? null,
+        dimensionsCm: parseDimensionsCm((ai.dimensions as string | null) ?? null),
+        additionalInfo: null,
+      }
+      return NextResponse.json({ ok: true, data: result })
+    }
+
+    // Excel → 程式解析（原有邏輯）
+    if (!['xls', 'xlsx'].includes(ext)) {
+      return NextResponse.json({ error: '不支援的檔案格式，請上傳 PDF 或 Excel' }, { status: 400 })
     }
 
     const buf = Buffer.from(await file.arrayBuffer())
@@ -331,6 +522,9 @@ export async function POST(req: NextRequest) {
       shipmentDate: invoiceData.shipmentDate ?? null,
       soldTo: invoiceData.soldTo ?? null,
       deliverTo: invoiceData.deliverTo ?? null,
+      soldToAddress: invoiceData.soldToAddress ?? null,
+      deliverToAddress: invoiceData.deliverToAddress ?? null,
+      shipperName: invoiceData.shipperName ?? null,
       origin: invoiceData.origin ?? null,
       destination: invoiceData.destination ?? null,
       paymentTerms: invoiceData.paymentTerms ?? null,
@@ -344,6 +538,7 @@ export async function POST(req: NextRequest) {
       totalGrossWeightKg: plData.totalGrossWeightKg ?? null,
       totalCft: plData.totalCft ?? null,
       dimensions: plData.dimensions ?? null,
+      dimensionsCm: parseDimensionsCm(plData.dimensions ?? null),
       additionalInfo: invoiceData.additionalInfo ?? null,
     }
 
