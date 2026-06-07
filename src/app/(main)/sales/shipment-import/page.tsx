@@ -49,6 +49,7 @@ export default function ShipmentImportPage() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [savedShipmentNo, setSavedShipmentNo] = useState<string | null>(null)
+  const [savedOrderId, setSavedOrderId] = useState<number | null>(null)
 
   // ── 上傳解析 ─────────────────────────────────────────────────────────────────
 
@@ -210,6 +211,7 @@ export default function ShipmentImportPage() {
       try { resData = await res.json() } catch { /* empty body */ }
       if (!res.ok) throw new Error(resData.error ?? `HTTP ${res.status} 儲存失敗`)
       setSavedShipmentNo(resData.shipmentNo ?? 'SHP-???')
+      setSavedOrderId(matchedOrder.id)
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : '儲存失敗')
     } finally {
@@ -222,27 +224,47 @@ export default function ShipmentImportPage() {
   if (savedShipmentNo) {
     return (
       <div className="max-w-lg space-y-5">
-        <div className="bg-green-50 border border-green-300 rounded-xl p-6 text-center space-y-2">
-          <div className="text-4xl">✅</div>
-          <h2 className="text-lg font-semibold text-green-800">出貨記錄已建立</h2>
-          <p className="text-sm text-gray-600">
-            出貨單號：<span className="font-mono font-bold">{savedShipmentNo}</span>
-          </p>
-          <p className="text-xs text-gray-400">庫存已扣減，應收帳款已建立</p>
+        <div className="bg-green-50 border-2 border-green-400 rounded-xl p-6 space-y-3">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">✅</span>
+            <div>
+              <h2 className="text-lg font-bold text-green-800">出貨記錄已建立成功</h2>
+              <p className="text-sm text-green-700">庫存已扣減，應收帳款已建立</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg border border-green-200 px-4 py-3 space-y-1 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-500">出貨單號</span>
+              <span className="font-mono font-bold text-gray-800">{savedShipmentNo}</span>
+            </div>
+            {matchedOrder && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">訂單</span>
+                <span className="font-mono text-gray-700">{matchedOrder.orderNo}</span>
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex gap-3">
+          {savedOrderId && (
+            <button type="button"
+              onClick={() => router.push(`/sales/${savedOrderId}`)}
+              className="flex-1 bg-blue-600 text-white py-2.5 rounded-md text-sm font-medium hover:bg-blue-700">
+              → 查看這張訂單
+            </button>
+          )}
           <button type="button"
             onClick={() => router.push(`/sales`)}
-            className="flex-1 bg-teal-600 text-white py-2 rounded-md text-sm font-medium hover:bg-teal-700">
-            前往客戶訂單列表
+            className="flex-1 bg-teal-600 text-white py-2.5 rounded-md text-sm font-medium hover:bg-teal-700">
+            客戶訂單列表
           </button>
           <button type="button"
             onClick={() => {
-              setParsed(null); setMatchedOrder(null); setSavedShipmentNo(null)
+              setParsed(null); setMatchedOrder(null); setSavedShipmentNo(null); setSavedOrderId(null)
               setActualShipDate(''); setShippingMethod(''); setPortOfLoading('')
               setPortOfDischarge(''); setTrackingNo(''); setTwdTotal('')
             }}
-            className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-md text-sm hover:bg-gray-50">
+            className="border border-gray-300 text-gray-700 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50">
             再匯入一份
           </button>
         </div>

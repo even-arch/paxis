@@ -122,9 +122,9 @@ export default async function InventoryPage({
                 <span className="text-blue-600">可用庫存</span>
                 <span className="text-gray-400 text-xs ml-1 font-normal">= 實際 − 預留</span>
               </th>
+              <th className="text-right px-4 py-3 font-medium text-teal-600">採購在途</th>
               <th className="text-right px-4 py-3 font-medium text-gray-600">實際庫存</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-600 text-purple-600">預留中</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-600 text-teal-600">採購在途</th>
+              <th className="text-right px-4 py-3 font-medium text-purple-600">預留中</th>
               <th className="text-right px-4 py-3 font-medium text-gray-600">安全庫存</th>
               <th className="text-right px-4 py-3 font-medium text-gray-600">加權成本</th>
               <th className="text-center px-4 py-3 font-medium text-gray-600">狀態</th>
@@ -155,21 +155,21 @@ export default async function InventoryPage({
                     </span>
                     <span className="text-gray-400 text-xs ml-1">{row.unit ?? ''}</span>
                   </td>
+                  {/* 採購在途（PO 已下，貨未到） */}
+                  <td className="px-4 py-3 text-right">
+                    {row.pendingQty > 0
+                      ? <span className="text-teal-600 font-medium">+{row.pendingQty.toLocaleString()}</span>
+                      : <span className="text-gray-300">—</span>
+                    }
+                  </td>
                   {/* 實際庫存 */}
                   <td className="px-4 py-3 text-right text-gray-600">
                     {row.quantity.toLocaleString()}
                   </td>
-                  {/* 預留中（PI 已發） */}
+                  {/* 預留中（PI 已發，尚未出貨） */}
                   <td className="px-4 py-3 text-right">
                     {row.reservedQty > 0
                       ? <span className="text-purple-600 font-medium">{row.reservedQty.toLocaleString()}</span>
-                      : <span className="text-gray-300">—</span>
-                    }
-                  </td>
-                  {/* 採購在途 */}
-                  <td className="px-4 py-3 text-right">
-                    {row.pendingQty > 0
-                      ? <span className="text-teal-600 font-medium">+{row.pendingQty.toLocaleString()}</span>
                       : <span className="text-gray-300">—</span>
                     }
                   </td>

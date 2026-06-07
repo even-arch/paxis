@@ -52,8 +52,11 @@ export async function POST(req: NextRequest, {
   })
 
   if (!order) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  if (order.status === 4 || order.status === 5) {
-    return NextResponse.json({ error: '此訂單已完成或取消' }, { status: 400 })
+  if (order.status === 5) {
+    return NextResponse.json({ error: '此訂單已取消，無法建立出貨記錄' }, { status: 400 })
+  }
+  if (order.status === 4) {
+    return NextResponse.json({ error: `此訂單已完成（全部品項已出貨），若需補錄出貨請先至訂單頁確認。訂單：${order.orderNo}` }, { status: 400 })
   }
 
   // 若有指定 PI，驗證它屬於此訂單且有效
