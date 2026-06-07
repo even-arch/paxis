@@ -95,6 +95,7 @@ interface Contact {
   city: string | null
   countryCode: string | null
   postalCode: string | null
+  taxId: string | null
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -851,7 +852,7 @@ export default function ShippingPage() {
       stateProvinceCode: '',
       postalCode: c.postalCode ?? '',
       countryCode: c.countryCode ?? '',
-      taxId: '',
+      taxId: c.taxId ?? '',
     }
     if (picker.field === 'origin') setOrigin(addr)
     else setDestination(addr)
