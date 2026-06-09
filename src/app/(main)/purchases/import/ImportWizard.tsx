@@ -85,15 +85,32 @@ export default function ImportWizard({
   const [error,   setError]   = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
+  // ─── 多檔案佇列 ──────────────────────────────────────────────────────────────
+  const [fileQueue,   setFileQueue]   = useState<File[]>([])
+  const [queueIndex,  setQueueIndex]  = useState(0)
+  // 已成功處理的單號列表（用於最終摘要）
+  const [doneList,    setDoneList]    = useState<{ poNo: string; id: number }[]>([])
+
   const stepLabels = ['上傳單據', '存入產品', '存入供應商', '建立供應商訂單']
   const stepIdx = { upload: 0, products: 1, supplier: 2, po: 3 }[mode]
 
-  // ─── 步驟 0：上傳 & AI 解析 ─────────────────────────────────────────────────
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+  // 重置精靈內部狀態（準備處理下一個檔案）
+  function resetWizardState() {
+    setMode('upload')
+    setProductDrafts([])
+    setSupplierDraft({ name: '', shortName: '', email: '', phone: '', address: '', city: '', country: '', postalCode: '', taxId: '', contactPerson: '', paymentTerms: '', currencyCode: 'USD', matchedId: null, matchedSupplier: null })
+    setSavedProducts([])
+    setSavedSupplier(null)
+    setSourceType('0'); setDocRefNo(''); setCurrencyCode('USD'); setExchangeRate('')
+    setExpectedDate(''); setPort(''); setShipVia(''); setNote(''); setDocDate('')
+    setPoItems([])
+    setSupplierCandidates([]); setShowCandidatePicker(false)
+    setError('')
+  }
+
+  // 直接以 File 物件啟動 AI 解析
+  async function processFile(file: File) {
     setLoading(true); setError('')
-    e.target.value = ''
     try {
       const fd = new FormData(); fd.append('file', file)
       const res  = await fetch('/api/ai/parse-invoice', { method: 'POST', body: fd })
@@ -164,6 +181,31 @@ export default function ImportWizard({
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
+    }
+  }
+
+  // ─── 多檔案入口：收集所有選取的檔案，啟動第一個 ────────────────────────────
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    if (files.length === 0) return
+    e.target.value = ''
+    setFileQueue(files)
+    setQueueIndex(0)
+    setDoneList([])
+    processFile(files[0])
+  }
+
+  // 跳過目前這個檔案，處理下一個
+  function skipCurrent() {
+    const nextIdx = queueIndex + 1
+    if (nextIdx < fileQueue.length) {
+      resetWizardState()
+      setQueueIndex(nextIdx)
+      processFile(fileQueue[nextIdx])
+    } else {
+      // 沒有下一個，回到上傳畫面
+      setFileQueue([]); setQueueIndex(0); setDoneList([])
+      resetWizardState()
     }
   }
 
@@ -320,8 +362,17 @@ export default function ImportWizard({
       })
       const json = await res.json() as { id?: number; error?: string }
       if (!res.ok) throw new Error(json.error ?? `建立失敗 (HTTP ${res.status})`)
-      router.push(`/purchases/${json.id}`)
-      router.refresh()
+      // 多檔佇列：如果還有下一個檔案，繼續處理；否則跳轉到詳情頁
+      const nextIdx = queueIndex + 1
+      setDoneList(prev => [...prev, { poNo: poNo, id: json.id! }])
+      if (nextIdx < fileQueue.length) {
+        setQueueIndex(nextIdx)
+        resetWizardState()
+        processFile(fileQueue[nextIdx])
+      } else {
+        router.push(`/purchases/${json.id}`)
+        router.refresh()
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -356,13 +407,54 @@ export default function ImportWizard({
     </div>
   )
 
+  // 多檔佇列進度列（只在批次模式顯示）
+  const QueueBar = () => {
+    if (fileQueue.length <= 1) return null
+    const total = fileQueue.length
+    const current = queueIndex + 1
+    const pct = Math.round(((current - 1) / total) * 100)
+    return (
+      <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-sm font-medium text-blue-800">
+            正在處理第 {current} / {total} 個檔案
+            {fileQueue[queueIndex] && (
+              <span className="ml-2 text-blue-500 font-normal text-xs">
+                {fileQueue[queueIndex].name}
+              </span>
+            )}
+          </span>
+          <button
+            type="button"
+            onClick={skipCurrent}
+            className="text-xs text-blue-500 hover:text-blue-700 underline">
+            跳過此檔案
+          </button>
+        </div>
+        <div className="h-1.5 bg-blue-100 rounded-full overflow-hidden">
+          <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+        </div>
+        {doneList.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {doneList.map((d, i) => (
+              <span key={i} className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                ✓ {d.poNo}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   // ══════════════════════════════════════════════════════════════════════════════
   // 步驟 0：上傳
   // ══════════════════════════════════════════════════════════════════════════════
   if (mode === 'upload') {
     return (
       <div className="max-w-2xl">
-        <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.txt" className="hidden" onChange={handleFile} />
+        <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.txt" className="hidden" onChange={handleFile} />
+        <QueueBar />
         <ErrBar />
         {loading ? (
           <div className="bg-purple-50 border border-purple-200 rounded-xl p-12 text-center">
@@ -390,6 +482,7 @@ export default function ImportWizard({
   if (mode === 'products') {
     return (
       <div className="max-w-5xl space-y-4">
+        <QueueBar />
         <StepBar />
         <ErrBar />
         <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -516,6 +609,7 @@ export default function ImportWizard({
     const ms = supplierDraft.matchedSupplier
     return (
       <div className="max-w-2xl space-y-4">
+        <QueueBar />
         <StepBar />
 
         {/* 步驟 1 已完成的摘要 */}
@@ -668,6 +762,7 @@ export default function ImportWizard({
 
   return (
     <form onSubmit={submitPO} className="space-y-6 max-w-4xl">
+      <QueueBar />
       <StepBar />
 
       {/* 已完成摘要 */}

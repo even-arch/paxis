@@ -81,6 +81,11 @@ export default function SalesImportWizard({
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  // 多檔佇列
+  const [fileQueue,  setFileQueue]  = useState<File[]>([])
+  const [queueIndex, setQueueIndex] = useState(0)
+  const [doneList,   setDoneList]   = useState<{ orderNo: string; id: number }[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
 
   const stepLabels = isPI
@@ -88,14 +93,37 @@ export default function SalesImportWizard({
     : ['上傳訂單', '確認產品', '確認客戶', '建立客戶訂單']
   const stepIdx = ({ upload: 0, products: 1, customer: 2, order: 3, success: 3 } as Record<Mode, number>)[mode]
 
-  // ─── 步驟 0：上傳 & AI 解析 ─────────────────────────────────────────────────
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+  // ─── 重置向導狀態（切換到下一個檔案時使用）──────────────────────────────────
+  function resetWizardState() {
+    setMode('upload')
+    setProductDrafts([])
+    setCustomerDraft({ name: '', shortName: '', email: '', phone: '', address: '', city: '', country: '', postalCode: '', taxId: '', contactPerson: '', paymentTerms: '', currencyCode: 'USD', matchedId: null, matchedCustomer: null })
+    setSavedProducts([])
+    setSavedCustomer(null)
+    setOrderRefNo('')
+    setDocDate('')
+    setCurrencyCode('USD')
+    setExchangeRate('')
+    setRequestedShipDate('')
+    setPaymentTerms('')
+    setNote('')
+    setOrderItems([])
+    setCreatedOrderId(null)
+    setCreatingPi(false)
+    setCreatedPiNo(null)
+    setPiError('')
+    setIsPI(false)
+    setImportedPiNo('')
+    setEstimatedShipDate('')
+    setError('')
+  }
+
+  // ─── 步驟 0：AI 解析單一檔案 ─────────────────────────────────────────────────
+  async function processFile(file: File) {
     setLoading(true); setError('')
-    e.target.value = ''
     try {
-      const fd = new FormData(); fd.append('file', file)
+      const fd = new FormData()
+      fd.append('file', file)
       const res = await fetch('/api/ai/parse-customer-order', { method: 'POST', body: fd })
       const json = await res.json() as { data?: ParsedCustomerOrder; error?: string }
       if (!res.ok) throw new Error(json.error ?? `解析失敗 (HTTP ${res.status})`)
@@ -169,6 +197,29 @@ export default function SalesImportWizard({
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
+    }
+  }
+
+  // ─── 多檔案入口 ────────────────────────────────────────────────────────────
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    if (files.length === 0) return
+    e.target.value = ''
+    setFileQueue(files)
+    setQueueIndex(0)
+    setDoneList([])
+    processFile(files[0])
+  }
+
+  function skipCurrent() {
+    const nextIdx = queueIndex + 1
+    if (nextIdx < fileQueue.length) {
+      resetWizardState()
+      setQueueIndex(nextIdx)
+      processFile(fileQueue[nextIdx])
+    } else {
+      setFileQueue([]); setQueueIndex(0); setDoneList([])
+      resetWizardState()
     }
   }
 
@@ -335,7 +386,17 @@ export default function SalesImportWizard({
         }
       }
 
-      setMode('success')
+      // 多檔佇列：記錄完成，自動前進或顯示 success
+      const nextIdx = queueIndex + 1
+      setDoneList(prev => [...prev, { orderNo: orderRefNo || `#${newOrderId}`, id: newOrderId }])
+      if (!isPI && nextIdx < fileQueue.length) {
+        // 非 PI 文件：直接前進到下一個
+        setQueueIndex(nextIdx)
+        resetWizardState()
+        processFile(fileQueue[nextIdx])
+      } else {
+        setMode('success')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -400,11 +461,49 @@ export default function SalesImportWizard({
     </div>
   )
 
+  const QueueBar = () => {
+    if (fileQueue.length <= 1) return null
+    const total = fileQueue.length
+    const current = queueIndex + 1
+    const pct = Math.round(((current - 1) / total) * 100)
+    return (
+      <div className="mb-4 bg-teal-50 border border-teal-200 rounded-lg px-4 py-3">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-sm font-medium text-teal-800">
+            正在處理第 {current} / {total} 個檔案
+            {fileQueue[queueIndex] && (
+              <span className="ml-2 text-teal-500 font-normal text-xs">
+                {fileQueue[queueIndex].name}
+              </span>
+            )}
+          </span>
+          <button type="button" onClick={skipCurrent}
+            className="text-xs text-teal-500 hover:text-teal-700 underline">
+            跳過此檔案
+          </button>
+        </div>
+        <div className="h-1.5 bg-teal-100 rounded-full overflow-hidden">
+          <div className="h-full bg-teal-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+        </div>
+        {doneList.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {doneList.map((d, i) => (
+              <span key={i} className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                ✓ {d.orderNo}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   // ══ 步驟 0：上傳 ══
   if (mode === 'upload') {
     return (
       <div className="max-w-2xl">
-        <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.txt" className="hidden" onChange={handleFile} />
+        <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.txt" className="hidden" onChange={handleFile} />
+        <QueueBar />
         <ErrBar />
         {loading ? (
           <div className="bg-teal-50 border border-teal-200 rounded-xl p-12 text-center">
@@ -440,6 +539,7 @@ export default function SalesImportWizard({
   if (mode === 'products') {
     return (
       <div className="max-w-5xl space-y-4">
+        <QueueBar />
         <StepBar />
         <ErrBar />
         <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -570,6 +670,7 @@ export default function SalesImportWizard({
     const mc = customerDraft.matchedCustomer
     return (
       <div className="max-w-2xl space-y-4">
+        <QueueBar />
         <StepBar />
         <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-700">
           ✓ 已寫入 {savedProducts.filter(s => s.isNew).length} 筆新產品，{savedProducts.filter(s => !s.isNew).length} 筆沿用現有。
@@ -759,6 +860,7 @@ export default function SalesImportWizard({
 
   return (
     <form onSubmit={submitOrder} className="space-y-6 max-w-4xl">
+      <QueueBar />
       <StepBar />
 
       <div className="grid grid-cols-2 gap-3">
