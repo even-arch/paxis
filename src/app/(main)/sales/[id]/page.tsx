@@ -89,14 +89,11 @@ export default async function SalesDetailPage({
   const isDraft = order.status === 0
   const customerName = order.customer?.name ?? order.patiscoBuyerName ?? '（未關聯客戶）'
 
-  // 草稿狀態才需要產品清單（for 新增品項）
-  const products = isDraft
-    ? await prisma.pRD_Product.findMany({
-        where: { isActive: true },
-        select: { id: true, name: true, sku: true, unit: true },
-        orderBy: { name: 'asc' },
-      })
-    : []
+  const products = await prisma.pRD_Product.findMany({
+    where: { isActive: true },
+    select: { id: true, name: true, sku: true, unit: true },
+    orderBy: { name: 'asc' },
+  })
   const totalAmount = order.items.reduce((s, i) => s + parseFloat(i.unitPrice.toString()) * i.quantity, 0)
 
   // 組裝 SalesChainPanel 所需資料
@@ -210,7 +207,6 @@ export default async function SalesDetailPage({
             <tbody className="divide-y divide-gray-50">
               {order.items.map(item => {
                 const lineTotal = parseFloat(item.unitPrice.toString()) * item.quantity
-                const canEdit = item.shippedQty === 0
                 return (
                   <tr key={item.id}>
                     <td className="px-4 py-3">
@@ -229,19 +225,15 @@ export default async function SalesDetailPage({
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {canEdit ? (
-                        <span className="inline-flex items-center gap-2">
-                          <EditItemButton
-                            apiUrl={`/api/sales/${order.id}/items?itemId=${item.id}`}
-                            initQty={item.quantity}
-                            initPrice={item.unitPrice.toString()}
-                            initUnit={item.unit ?? item.product.unit ?? 'PCS'}
-                          />
-                          <DeleteSalesItemButton orderId={order.id} itemId={item.id} />
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-300">已出貨</span>
-                      )}
+                      <span className="inline-flex items-center gap-2">
+                        <EditItemButton
+                          apiUrl={`/api/sales/${order.id}/items?itemId=${item.id}`}
+                          initQty={item.quantity}
+                          initPrice={item.unitPrice.toString()}
+                          initUnit={item.unit ?? item.product.unit ?? 'PCS'}
+                        />
+                        <DeleteSalesItemButton orderId={order.id} itemId={item.id} />
+                      </span>
                     </td>
                   </tr>
                 )
@@ -257,17 +249,14 @@ export default async function SalesDetailPage({
               </tr>
             </tfoot>
           </table>
-          {/* 草稿狀態：可新增品項 */}
-          {isDraft && (
-            <div className="px-4 pb-4">
-              <AddItemPanel
-                apiUrl={`/api/sales/${order.id}/items`}
-                products={products}
-                currency={order.currencyCode}
-                orderId={order.id}
-              />
-            </div>
-          )}
+          <div className="px-4 pb-4">
+            <AddItemPanel
+              apiUrl={`/api/sales/${order.id}/items`}
+              products={products}
+              currency={order.currencyCode}
+              orderId={order.id}
+            />
+          </div>
         </div>
 
         {/* 客戶 PO 關聯面板 */}

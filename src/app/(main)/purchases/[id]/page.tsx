@@ -73,14 +73,11 @@ export default async function PurchaseDetailPage({
   const isDraft = order.status === 0
   const canReceive = order.status === 1 || order.status === 2
 
-  // 草稿狀態才需要產品清單（for 新增品項）
-  const products = isDraft
-    ? await prisma.pRD_Product.findMany({
-        where: { isActive: true },
-        select: { id: true, name: true, sku: true, unit: true },
-        orderBy: { name: 'asc' },
-      })
-    : []
+  const products = await prisma.pRD_Product.findMany({
+    where: { isActive: true },
+    select: { id: true, name: true, sku: true, unit: true },
+    orderBy: { name: 'asc' },
+  })
 
   const totalAmount = order.items.reduce((sum, item) => {
     return sum + (parseFloat(item.unitPrice.toString()) * item.quantity)
@@ -227,19 +224,15 @@ export default async function PurchaseDetailPage({
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {isDraft ? (
-                        <span className="inline-flex items-center gap-2">
-                          <EditItemButton
-                            apiUrl={`/api/purchases/${order.id}/items?itemId=${item.id}`}
-                            initQty={item.quantity}
-                            initPrice={item.unitPrice.toString()}
-                            initUnit={item.unit ?? item.product.unit ?? 'PCS'}
-                          />
-                          <DeletePoItemButton orderId={order.id} itemId={item.id} />
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-300">已確認</span>
-                      )}
+                      <span className="inline-flex items-center gap-2">
+                        <EditItemButton
+                          apiUrl={`/api/purchases/${order.id}/items?itemId=${item.id}`}
+                          initQty={item.quantity}
+                          initPrice={item.unitPrice.toString()}
+                          initUnit={item.unit ?? item.product.unit ?? 'PCS'}
+                        />
+                        <DeletePoItemButton orderId={order.id} itemId={item.id} />
+                      </span>
                     </td>
                   </tr>
                 )
@@ -255,17 +248,14 @@ export default async function PurchaseDetailPage({
               </tr>
             </tfoot>
           </table>
-          {/* 草稿狀態：可新增品項 */}
-          {isDraft && (
-            <div className="px-4 pb-4">
-              <AddItemPanel
-                apiUrl={`/api/purchases/${order.id}/items`}
-                products={products}
-                currency={order.currencyCode}
-                orderId={order.id}
-              />
-            </div>
-          )}
+          <div className="px-4 pb-4">
+            <AddItemPanel
+              apiUrl={`/api/purchases/${order.id}/items`}
+              products={products}
+              currency={order.currencyCode}
+              orderId={order.id}
+            />
+          </div>
         </div>
 
         {/* 入庫紀錄 */}
