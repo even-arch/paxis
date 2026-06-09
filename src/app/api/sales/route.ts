@@ -57,12 +57,14 @@ export async function POST(req: NextRequest) {
     source?: string
     patiscoDocId?: string | null
     patiscoDocNo?: string | null
+    orderDate?: string | null
     items: {
       productId: number
       quantity: number
       unitPrice: string
       unit?: string | null
       note?: string | null
+      productNameSnapshot?: string | null
     }[]
   }
 
@@ -84,6 +86,7 @@ export async function POST(req: NextRequest) {
       orderNo,
       customerId: body.customerId ?? null,
       patiscoBuyerName: body.patiscoBuyerName ?? null,
+      orderDate: body.orderDate ? new Date(body.orderDate) : null,
       status: 1, // 直接設為「已確認」（AI 匯入或手動建立都是確認狀態）
       currencyCode: body.currencyCode,
       exchangeRate: body.exchangeRate || '1',
@@ -104,6 +107,7 @@ export async function POST(req: NextRequest) {
           unitPrice: i.unitPrice,
           unit: i.unit ?? null,
           note: i.note ?? null,
+          productNameSnapshot: i.productNameSnapshot ?? null,
         })),
       },
     },

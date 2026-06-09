@@ -44,7 +44,6 @@ export default async function InventoryPage({
     id: number; name: string; sku: string | null; unit: string | null
     quantity: number; reservedQty: number; availableQty: number
     safetyStock: number; pendingQty: number
-    avgUnitCost: string | null
   }
 
   let rows: Row[] = products.map(p => {
@@ -57,7 +56,6 @@ export default async function InventoryPage({
       quantity, reservedQty, availableQty,
       safetyStock: s?.safetyStock ?? p.safetyStock ?? 0,
       pendingQty: pendingMap.get(p.id) ?? 0,
-      avgUnitCost: s?.avgUnitCost ? s.avgUnitCost.toString() : null,
     }
   })
 
@@ -177,10 +175,8 @@ export default async function InventoryPage({
                   <td className="px-4 py-3 text-right text-gray-500">
                     {row.safetyStock > 0 ? row.safetyStock.toLocaleString() : <span className="text-gray-300">—</span>}
                   </td>
-                  {/* 加權成本 */}
-                  <td className="px-4 py-3 text-right text-gray-500 text-xs">
-                    {row.avgUnitCost ? `TWD ${parseFloat(row.avgUnitCost).toFixed(2)}` : <span className="text-gray-300">—</span>}
-                  </td>
+                  {/* 加權成本（已移至 COST 模組）*/}
+                  <td className="px-4 py-3 text-right text-gray-300 text-xs">—</td>
                   {/* 狀態 */}
                   <td className="px-4 py-3 text-center">
                     {isZero

@@ -23,7 +23,12 @@ export async function GET(req: NextRequest) {
       shipment: {
         select: {
           shipmentNo: true, actualShipDate: true,
-          order: { select: { id: true, orderNo: true } },
+          // PI 清單取代原本的單一 order（一張出貨可含多張 PI）
+          pis: {
+            select: {
+              pi: { select: { id: true, piNo: true, order: { select: { id: true, orderNo: true } } } },
+            },
+          },
         },
       },
     },

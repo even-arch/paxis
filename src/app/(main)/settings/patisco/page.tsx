@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import { formatDate } from '@/lib/utils'
 import PatiscoConfigForm from './PatiscoConfigForm'
+import CompanyAliasPanel from './CompanyAliasPanel'
 
 export default async function PatiscoSyncPage() {
     const config = await prisma.sYS_PatiscoConfig.findFirst({
@@ -18,6 +19,7 @@ export default async function PatiscoSyncPage() {
     partial: logs.filter(l => l.status === 'partial').length,
     error: logs.filter(l => l.status === 'error').length,
     skipped: logs.filter(l => l.status === 'skipped').length,
+    needs_confirm: logs.filter(l => l.status === 'needs_confirm').length,
   }
 
   const configData = config ? {
@@ -47,6 +49,9 @@ export default async function PatiscoSyncPage() {
       {/* 設定表單 */}
       <PatiscoConfigForm initialConfig={configData} />
 
+      {/* 公司別名管理 */}
+      <CompanyAliasPanel />
+
       {/* 同步統計 */}
       {logs.length > 0 && (
         <>
@@ -56,6 +61,7 @@ export default async function PatiscoSyncPage() {
               { label: '部分', value: stats.partial, cls: 'bg-yellow-100 text-yellow-700' },
               { label: '錯誤', value: stats.error, cls: 'bg-red-100 text-red-600' },
               { label: '已跳過', value: stats.skipped, cls: 'bg-gray-100 text-gray-600' },
+              { label: '待確認', value: stats.needs_confirm, cls: 'bg-amber-100 text-amber-700' },
             ].map(s => (
               <div key={s.label} className="bg-white rounded-lg shadow p-4 text-center">
                 <p className="text-xs text-gray-500">{s.label}</p>
@@ -87,6 +93,7 @@ export default async function PatiscoSyncPage() {
                     partial: 'bg-yellow-100 text-yellow-700',
                     error: 'bg-red-100 text-red-600',
                     skipped: 'bg-gray-100 text-gray-500',
+                    needs_confirm: 'bg-amber-100 text-amber-700',
                   }
                   return (
                     <tr key={log.id} className="hover:bg-gray-50">

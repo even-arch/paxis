@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
       currencyCode: body.currencyCode,
       exchangeRate: String(body.exchangeRate || '1'),
       totalAmount: body.totalAmount ? String(body.totalAmount) : null,
+      orderDate: body.orderDate ? new Date(body.orderDate) : null,
       expectedDate: body.expectedDate ? new Date(body.expectedDate) : null,
       port: body.port || null,
       shipVia: body.shipVia || null,
@@ -68,13 +69,14 @@ export async function POST(req: NextRequest) {
       items: body.items?.length
         ? {
             create: body.items.map((item: {
-              productId: number; quantity: number; unitPrice: number; unit?: string; note?: string
+              productId: number; quantity: number; unitPrice: number; unit?: string; note?: string; productNameSnapshot?: string | null
             }) => ({
               productId: Number(item.productId),
               quantity: Number(item.quantity),
               unitPrice: String(item.unitPrice),
               unit: item.unit || null,
               note: item.note || null,
+              productNameSnapshot: item.productNameSnapshot || null,
             })),
           }
         : undefined,

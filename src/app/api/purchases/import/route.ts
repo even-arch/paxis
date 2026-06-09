@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { generatePoNo } from '@/lib/utils'
 
 export interface ImportPurchaseInput {
   // 產品（已經過用戶確認）
@@ -135,7 +136,9 @@ export async function POST(req: NextRequest) {
 
     // ── 3. 建立供應商訂單 ──────────────────────────────────────────────────────────
     const po = body.po
-    const poNo = `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 9000) + 1000}`
+
+    // 原始單號優先（供應商給的號碼不可修改）；無號碼時才由系統生成內部流水號供識別
+    const poNo = po.docRefNo?.trim() || generatePoNo()
 
     const order = await prisma.pO_Order.create({
       data: {
@@ -149,7 +152,7 @@ export async function POST(req: NextRequest) {
         expectedDate: po.expectedDate ? new Date(po.expectedDate) : null,
         port:         po.port || null,
         shipVia:      po.shipVia || null,
-        note:         [po.docRefNo ? `單據號：${po.docRefNo}` : '', po.note].filter(Boolean).join('\n') || null,
+        note:         po.note || null,
         items: {
           create: resolvedItems.map(ri => ({
             productId: ri.productId,

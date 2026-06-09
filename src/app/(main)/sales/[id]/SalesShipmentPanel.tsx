@@ -50,6 +50,7 @@ type ExistingShipment = {
   source: string
   performedAt: string
   performerName: string | null
+  piNos: string[]   // 此出貨關聯的所有 PI 號碼（追溯用）
   items: ShipmentItem[]
 }
 
@@ -79,8 +80,26 @@ export default function SalesShipmentPanel({ orderId, orderStatus, items, active
       quantity: String(Math.max(0, i.quantity - i.shippedQty)),
     }))
   )
+  const [ciExchangeRate, setCiExchangeRate] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  // 刪除出貨記錄
+  const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+
+  async function handleDeleteShipment(shipmentId: number) {
+    setDeleteLoading(true)
+    try {
+      const res = await fetch(`/api/sales/${orderId}/shipment?shipmentId=${shipmentId}`, { method: 'DELETE' })
+      const json = await res.json() as { error?: string }
+      if (!res.ok) { setError(json.error ?? '刪除失敗'); return }
+      setDeletingId(null)
+      router.refresh()
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
 
   // 出貨詳細展開狀態
   const [expandedDetail, setExpandedDetail] = useState<number | null>(null)
@@ -184,12 +203,13 @@ export default function SalesShipmentPanel({ orderId, orderStatus, items, active
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          piId: selectedPiId ? Number(selectedPiId) : null,
+          piIds: selectedPiId ? [Number(selectedPiId)] : [],
           actualShipDate,
           shippingMethod: shippingMethod || null,
           portOfLoading: portOfLoading || null,
           portOfDischarge: portOfDischarge || null,
           trackingNo: trackingNo || null,
+          ciExchangeRate: ciExchangeRate ? Number(ciExchangeRate) : null,
           note: note || null,
           items: itemsToShip.map(i => ({ slsItemId: i.slsItemId, quantity: Number(i.quantity) })),
         }),
@@ -283,6 +303,17 @@ export default function SalesShipmentPanel({ orderId, orderStatus, items, active
                 className={inp} placeholder="USLAX / DEHAM" />
             </div>
 
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                CI 出貨匯率（選填）
+                <span className="text-gray-400 font-normal ml-1">Commercial Invoice 上使用的匯率</span>
+              </label>
+              <input type="number" step="0.0001" min="0" value={ciExchangeRate}
+                onChange={e => setCiExchangeRate(e.target.value)}
+                className={inp} placeholder="例：35.5000" />
+              <p className="text-xs text-gray-400 mt-1">填入可準確計算匯差；不填則沿用訂單匯率</p>
+            </div>
+
             <div className="md:col-span-2">
               <label className="block text-xs font-medium text-gray-600 mb-1">備註</label>
               <input type="text" value={note} onChange={e => setNote(e.target.value)} className={inp} />
@@ -370,6 +401,14 @@ export default function SalesShipmentPanel({ orderId, orderStatus, items, active
                     {s.packingListNo && <span>P/L 號：<span className="font-mono text-gray-700">{s.packingListNo}</span></span>}
                     {s.commercialInvNo && <span>C/I 號：<span className="font-mono text-gray-700">{s.commercialInvNo}</span></span>}
                   </div>
+                  {/* PI 號碼追溯（對外核對用，不可更動） */}
+                  {s.piNos.length > 0 && (
+                    <div className="text-xs text-gray-500 mb-1">
+                      PI：{s.piNos.map((no, i) => (
+                        <span key={i} className="font-mono text-indigo-600 mr-2">{no}</span>
+                      ))}
+                    </div>
+                  )}
                   {/* 品項摘要 */}
                   <div className="text-xs text-gray-400">
                     {s.items.map(it => (
@@ -405,6 +444,22 @@ export default function SalesShipmentPanel({ orderId, orderStatus, items, active
                   <div className="text-right text-xs text-gray-400">
                     <div>操作：{s.performerName ?? '-'}</div>
                     <div>{new Date(s.performedAt).toLocaleDateString('zh-TW')}</div>
+                    {/* 刪除出貨記錄 */}
+                    {deletingId === s.id ? (
+                      <div className="mt-1 flex items-center gap-1 justify-end">
+                        <button onClick={() => handleDeleteShipment(s.id)} disabled={deleteLoading}
+                          className="text-xs bg-red-600 text-white px-2 py-0.5 rounded hover:bg-red-700 disabled:opacity-50">
+                          {deleteLoading ? '…' : '確認刪除'}
+                        </button>
+                        <button onClick={() => setDeletingId(null)}
+                          className="text-xs text-gray-400 hover:text-gray-600">取消</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setDeletingId(s.id)}
+                        className="mt-1 text-xs text-red-400 hover:text-red-600 hover:underline">
+                        刪除此出貨
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

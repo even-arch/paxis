@@ -12,6 +12,18 @@ type Payable = {
   note: string | null
   supplier: { id: number; name: string; shortName: string | null }
   receipt: { receiptNo: string; performedAt: string; order: { id: number; poNo: string } }
+  // 費用明細
+  customsFeeTWD:      string | null
+  truckingFeeTWD:     string | null
+  containerFeeTWD:    string | null
+  bankFeePct:         string | null
+  portServiceFeeTWD:  string | null
+  wireTransferFeeTWD: string | null
+  commissionTWD:      string | null
+  otherAdjustmentTWD:  string | null
+  otherAdjustmentNote: string | null
+  vatPct:              string | null
+  finalWireAmountTWD:  string | null
 }
 
 type Receivable = {
@@ -30,7 +42,11 @@ type Receivable = {
   note: string | null
   customer: { id: number; name: string; shortName: string | null } | null
   customerName: string | null
-  shipment: { shipmentNo: string; actualShipDate: string; order: { id: number; orderNo: string } }
+  shipment: {
+    shipmentNo: string
+    actualShipDate: string
+    pis: { pi: { id: number; piNo: string; order: { id: number; orderNo: string } } }[]
+  }
 }
 
 const STATUS_PAY = ['未付', '部分付清', '已付清']
@@ -70,6 +86,18 @@ export default function FinancePage() {
   const [payDateInput, setPayDateInput] = useState('')
   const [payNote, setPayNote] = useState('')
   const [saving, setSaving] = useState(false)
+  // 費用明細 state
+  const [feeCustoms,      setFeeCustoms]      = useState('')
+  const [feeTrucking,     setFeeTrucking]      = useState('')
+  const [feeContainer,    setFeeContainer]     = useState('')
+  const [feeBankPct,      setFeeBankPct]       = useState('')
+  const [feePort,         setFeePort]          = useState('')
+  const [feeWire,         setFeeWire]          = useState('')
+  const [feeCommission,   setFeeCommission]    = useState('')
+  const [feeOtherAmt,     setFeeOtherAmt]      = useState('')
+  const [feeOtherNote,    setFeeOtherNote]     = useState('')
+  const [feeVatPct,       setFeeVatPct]        = useState('5')
+  const [showFeePanel,    setShowFeePanel]     = useState(false)
 
   // 收款對話框
   const [recDialog, setRecDialog] = useState<Receivable | null>(null)
@@ -91,13 +119,68 @@ export default function FinancePage() {
 
   useEffect(() => { load() }, [load])
 
+  // 費用計算輔助函式
+  function calcFees(base: number) {
+    const customs    = parseFloat(feeCustoms)    || 0
+    const trucking   = parseFloat(feeTrucking)   || 0
+    const container  = parseFloat(feeContainer)  || 0
+    const bankAmt    = base * (parseFloat(feeBankPct) || 0) / 100
+    const port       = parseFloat(feePort)        || 0
+    const wire       = parseFloat(feeWire)        || 0
+    const commission = parseFloat(feeCommission)  || 0
+    const other      = parseFloat(feeOtherAmt)    || 0
+    const totalDeduction = customs + trucking + container + bankAmt + port + wire + commission + other
+    const netPayable = base - totalDeduction
+    const vatAmt     = netPayable * (parseFloat(feeVatPct) || 0) / 100
+    const finalWire  = netPayable + vatAmt
+    return { customs, trucking, container, bankAmt, port, wire, commission, other, totalDeduction, netPayable, vatAmt, finalWire }
+  }
+
+  function openPayDialog(p: Payable) {
+    setPayDialog(p)
+    setPayInput(p.finalWireAmountTWD ? p.finalWireAmountTWD : p.amountTWD)
+    setPayDateInput('')
+    setPayNote(p.note ?? '')
+    // 預填已存的費用明細
+    setFeeCustoms(p.customsFeeTWD      ? String(Number(p.customsFeeTWD))      : '')
+    setFeeTrucking(p.truckingFeeTWD    ? String(Number(p.truckingFeeTWD))     : '')
+    setFeeContainer(p.containerFeeTWD  ? String(Number(p.containerFeeTWD))    : '')
+    setFeeBankPct(p.bankFeePct         ? String(Number(p.bankFeePct))          : '')
+    setFeePort(p.portServiceFeeTWD     ? String(Number(p.portServiceFeeTWD))   : '')
+    setFeeWire(p.wireTransferFeeTWD    ? String(Number(p.wireTransferFeeTWD))  : '')
+    setFeeCommission(p.commissionTWD   ? String(Number(p.commissionTWD))       : '')
+    setFeeOtherAmt(p.otherAdjustmentTWD ? String(Number(p.otherAdjustmentTWD)) : '')
+    setFeeOtherNote(p.otherAdjustmentNote ?? '')
+    setFeeVatPct(p.vatPct              ? String(Number(p.vatPct))              : '5')
+    setShowFeePanel(false)
+  }
+
   async function submitPay() {
     if (!payDialog) return
     setSaving(true)
+    const base = Number(payDialog.amountTWD)
+    const fees = calcFees(base)
     await fetch(`/api/finance/payables/${payDialog.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paidAmountTWD: Number(payInput), paidAt: payDateInput || undefined, note: payNote || undefined }),
+      body: JSON.stringify({
+        // 費用明細
+        customsFeeTWD:      feeCustoms      ? Number(feeCustoms)   : null,
+        truckingFeeTWD:     feeTrucking     ? Number(feeTrucking)  : null,
+        containerFeeTWD:    feeContainer    ? Number(feeContainer) : null,
+        bankFeePct:         feeBankPct      ? Number(feeBankPct)   : null,
+        portServiceFeeTWD:  feePort         ? Number(feePort)      : null,
+        wireTransferFeeTWD: feeWire         ? Number(feeWire)      : null,
+        commissionTWD:      feeCommission   ? Number(feeCommission): null,
+        otherAdjustmentTWD:  feeOtherAmt   ? Number(feeOtherAmt)  : null,
+        otherAdjustmentNote: feeOtherNote  || null,
+        vatPct:              feeVatPct      ? Number(feeVatPct)    : null,
+        finalWireAmountTWD:  fees.finalWire > 0 ? fees.finalWire   : null,
+        // 付款記錄
+        paidAmountTWD: Number(payInput),
+        paidAt:  payDateInput || undefined,
+        note:    payNote      || undefined,
+      }),
     })
     setSaving(false)
     setPayDialog(null)
@@ -216,7 +299,7 @@ export default function FinancePage() {
                       </td>
                       <td className="px-4 py-3">
                         {p.status < 2 && (
-                          <button onClick={() => { setPayDialog(p); setPayInput(p.paidAmountTWD ? String(Number(p.amountTWD)) : String(Number(p.amountTWD))); setPayDateInput(''); setPayNote(p.note ?? '') }}
+                          <button onClick={() => openPayDialog(p)}
                             className="text-xs text-blue-600 hover:underline">記錄付款</button>
                         )}
                       </td>
@@ -269,9 +352,18 @@ export default function FinancePage() {
                         ) : <span className="text-gray-600">{custName}</span>}
                       </td>
                       <td className="px-4 py-3">
-                        <Link href={`/sales/${r.shipment.order.id}`} className="font-mono text-blue-600 hover:underline text-xs">
-                          {r.shipment.order.orderNo}
-                        </Link>
+                        {r.shipment.pis.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {r.shipment.pis.map(sp => (
+                              <Link key={sp.pi.id} href={`/sales/${sp.pi.order.id}`}
+                                className="font-mono text-blue-600 hover:underline text-xs">
+                                {sp.pi.piNo}
+                              </Link>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-xs">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(r.shipment.actualShipDate)}</td>
                       <td className="px-4 py-3 text-xs">
@@ -292,10 +384,22 @@ export default function FinancePage() {
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_REC_COLOR[r.status]}`}>{STATUS_REC[r.status]}</span>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 text-right">
                         {r.status < 2 && (
-                          <button onClick={() => { setRecDialog(r); setRecForeign(String(Number(r.amountForeign))); setRecRate(r.rateAtInvoice); setRecDateInput(''); setRecNote(r.note ?? '') }}
-                            className="text-xs text-blue-600 hover:underline">記錄收款</button>
+                          <div className="flex flex-col items-end gap-1">
+                            <button onClick={() => { setRecDialog(r); setRecForeign(String(Number(r.amountForeign))); setRecRate(r.rateAtInvoice); setRecDateInput(''); setRecNote(r.note ?? '') }}
+                              className="text-xs text-blue-600 hover:underline">記錄收款</button>
+                            {r.status === 0 && !r.rateAtCollection && (
+                              <span className="text-xs text-amber-500" title="收款後請填入銀行押匯匯率以計算匯差">
+                                待填押匯匯率
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {r.status === 2 && !r.rateAtCollection && (
+                          <span className="text-xs text-gray-400" title="已收款但未記錄押匯匯率，無法計算匯差">
+                            未記錄匯率
+                          </span>
                         )}
                       </td>
                     </tr>
@@ -311,38 +415,200 @@ export default function FinancePage() {
       )}
 
       {/* 付款對話框 */}
-      {payDialog && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-96">
-            <h2 className="text-base font-semibold mb-1">記錄付款</h2>
-            <p className="text-sm text-gray-500 mb-4">{payDialog.supplier.name} — {payDialog.receipt.order.poNo}</p>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">付款金額（TWD）</label>
-                <input type="number" value={payInput} onChange={e => setPayInput(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-                <p className="text-xs text-gray-400 mt-1">應付總額：TWD {fmt(payDialog.amountTWD)}</p>
+      {payDialog && (() => {
+        const base = Number(payDialog.amountTWD)
+        const fees = calcFees(base)
+        return (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 overflow-y-auto py-8">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4">
+              {/* 標題 */}
+              <div className="px-6 pt-5 pb-3 border-b border-gray-100">
+                <h2 className="text-base font-semibold">記錄付款 — 台灣出貨明細</h2>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  {payDialog.supplier.shortName ?? payDialog.supplier.name}
+                  <span className="mx-1 text-gray-300">·</span>
+                  <span className="font-mono text-xs text-gray-500">{payDialog.receipt.order.poNo}</span>
+                  <span className="mx-1 text-gray-300">·</span>
+                  入庫 {fmtDate(payDialog.receipt.performedAt)}
+                </p>
               </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">付款日期</label>
-                <input type="date" value={payDateInput} onChange={e => setPayDateInput(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
+
+              <div className="px-6 py-4 space-y-4">
+                {/* 基本金額 */}
+                <div className="bg-blue-50 rounded-lg px-4 py-3 flex justify-between items-center">
+                  <span className="text-sm font-medium text-blue-800">採購金額（TWD）</span>
+                  <span className="font-mono text-base font-bold text-blue-900">{fmt(payDialog.amountTWD)}</span>
+                </div>
+
+                {/* 費用明細區塊（可折疊） */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowFeePanel(!showFeePanel)}
+                    className="flex items-center gap-1.5 text-sm font-medium text-gray-700 hover:text-gray-900"
+                  >
+                    <span className={`transition-transform ${showFeePanel ? 'rotate-90' : ''}`}>▶</span>
+                    費用明細（報關費、拖車費等）
+                    {(feeCustoms || feeTrucking || feeContainer || feeBankPct || feePort || feeWire || feeCommission || feeOtherAmt) && (
+                      <span className="ml-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">已填寫</span>
+                    )}
+                  </button>
+
+                  {showFeePanel && (
+                    <div className="mt-3 border border-gray-200 rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <tbody className="divide-y divide-gray-100">
+                          {[
+                            { label: '報關費', state: feeCustoms,    setter: setFeeCustoms,    unit: 'TWD', placeholder: '0' },
+                            { label: '拖車費', state: feeTrucking,   setter: setFeeTrucking,   unit: 'TWD', placeholder: '0' },
+                            { label: '吊櫃費', state: feeContainer,  setter: setFeeContainer,  unit: 'TWD', placeholder: '0' },
+                            { label: '銀行費', state: feeBankPct,    setter: setFeeBankPct,    unit: '%',   placeholder: '0.7' },
+                            { label: '商港費', state: feePort,       setter: setFeePort,       unit: 'TWD', placeholder: '0' },
+                            { label: '電匯費', state: feeWire,       setter: setFeeWire,       unit: 'TWD', placeholder: '0' },
+                            { label: '佣金',   state: feeCommission, setter: setFeeCommission, unit: 'TWD', placeholder: '0' },
+                          ].map(({ label, state, setter, unit, placeholder }) => (
+                            <tr key={label} className="bg-white hover:bg-gray-50">
+                              <td className="px-3 py-2 text-gray-600 w-24">{label}</td>
+                              <td className="px-3 py-2">
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="number"
+                                    value={state}
+                                    onChange={e => setter(e.target.value)}
+                                    placeholder={placeholder}
+                                    className="w-full border border-gray-200 rounded px-2 py-1 text-right text-sm font-mono focus:outline-none focus:border-blue-400"
+                                  />
+                                  <span className="text-xs text-gray-400 w-8 shrink-0">{unit}</span>
+                                </div>
+                              </td>
+                              <td className="px-3 py-2 text-right font-mono text-gray-500 text-xs w-28">
+                                {unit === '%'
+                                  ? (feeBankPct ? `≈ ${(base * parseFloat(feeBankPct) / 100).toFixed(0)}` : '—')
+                                  : (state ? `− ${fmt(state, 0)}` : '—')
+                                }
+                              </td>
+                            </tr>
+                          ))}
+                          {/* 其他調整 */}
+                          <tr className="bg-white hover:bg-gray-50">
+                            <td className="px-3 py-2 text-gray-600 w-24">其他調整</td>
+                            <td className="px-3 py-2" colSpan={2}>
+                              <div className="flex gap-2">
+                                <input
+                                  type="number"
+                                  value={feeOtherAmt}
+                                  onChange={e => setFeeOtherAmt(e.target.value)}
+                                  placeholder="0"
+                                  className="w-32 border border-gray-200 rounded px-2 py-1 text-right text-sm font-mono focus:outline-none focus:border-blue-400"
+                                />
+                                <span className="text-xs text-gray-400 self-center">TWD</span>
+                                <input
+                                  type="text"
+                                  value={feeOtherNote}
+                                  onChange={e => setFeeOtherNote(e.target.value)}
+                                  placeholder="說明…"
+                                  className="flex-1 border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-400"
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+
+                      {/* 小計 */}
+                      <div className="bg-gray-50 px-3 py-2 border-t border-gray-200 flex justify-between text-xs text-gray-600">
+                        <span>扣款小計</span>
+                        <span className="font-mono text-red-600">− {fees.totalDeduction.toLocaleString('zh-TW', { maximumFractionDigits: 0 })}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 計算結果 */}
+                <div className="bg-gray-50 rounded-lg overflow-hidden border border-gray-200">
+                  <table className="w-full text-sm">
+                    <tbody className="divide-y divide-gray-100">
+                      <tr>
+                        <td className="px-4 py-2 text-gray-600">採購金額</td>
+                        <td className="px-4 py-2 text-right font-mono">{fmt(payDialog.amountTWD)}</td>
+                      </tr>
+                      {fees.totalDeduction > 0 && (
+                        <tr>
+                          <td className="px-4 py-2 text-gray-600">合計扣款</td>
+                          <td className="px-4 py-2 text-right font-mono text-red-600">− {fees.totalDeduction.toLocaleString('zh-TW', { maximumFractionDigits: 0 })}</td>
+                        </tr>
+                      )}
+                      <tr>
+                        <td className="px-4 py-2 text-gray-600">扣款後淨額</td>
+                        <td className="px-4 py-2 text-right font-mono font-medium">{fees.netPayable.toLocaleString('zh-TW', { maximumFractionDigits: 0 })}</td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-2 text-gray-600">
+                          <div className="flex items-center gap-2">
+                            <span>加計營業稅</span>
+                            <input
+                              type="number"
+                              value={feeVatPct}
+                              onChange={e => setFeeVatPct(e.target.value)}
+                              className="w-14 border border-gray-200 rounded px-1.5 py-0.5 text-center text-xs font-mono focus:outline-none focus:border-blue-400"
+                            />
+                            <span className="text-xs text-gray-400">%</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 text-right font-mono text-green-600">
+                          + {fees.vatAmt.toLocaleString('zh-TW', { maximumFractionDigits: 0 })}
+                        </td>
+                      </tr>
+                      <tr className="bg-blue-50">
+                        <td className="px-4 py-2.5 font-semibold text-blue-800">應付匯款金額</td>
+                        <td className="px-4 py-2.5 text-right font-mono font-bold text-blue-900 text-base">
+                          {fees.finalWire.toLocaleString('zh-TW', { maximumFractionDigits: 0 })}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* 付款輸入 */}
+                <div className="border-t border-gray-100 pt-4 space-y-3">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">
+                      實付金額（TWD）
+                      {fees.finalWire > 0 && (
+                        <button type="button" onClick={() => setPayInput(String(Math.round(fees.finalWire)))}
+                          className="ml-2 text-blue-600 underline">帶入計算值</button>
+                      )}
+                    </label>
+                    <input
+                      type="number"
+                      value={payInput}
+                      onChange={e => setPayInput(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">付款日期</label>
+                    <input type="date" value={payDateInput} onChange={e => setPayDateInput(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">備註</label>
+                    <input type="text" value={payNote} onChange={e => setPayNote(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="匯款帳號、備忘…" />
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">備註</label>
-                <input type="text" value={payNote} onChange={e => setPayNote(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="匯款帳號、備忘…" />
+
+              <div className="px-6 pb-5 flex justify-end gap-2">
+                <button onClick={() => setPayDialog(null)} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50">取消</button>
+                <button onClick={submitPay} disabled={saving} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">
+                  {saving ? '儲存中…' : '確認付款'}
+                </button>
               </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-5">
-              <button onClick={() => setPayDialog(null)} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50">取消</button>
-              <button onClick={submitPay} disabled={saving} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">
-                {saving ? '儲存中…' : '確認付款'}
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* 收款對話框 */}
       {recDialog && (
@@ -350,7 +616,10 @@ export default function FinancePage() {
           <div className="bg-white rounded-xl shadow-xl p-6 w-96">
             <h2 className="text-base font-semibold mb-1">記錄收款</h2>
             <p className="text-sm text-gray-500 mb-4">
-              {recDialog.customer?.name ?? recDialog.customerName} — {recDialog.shipment.order.orderNo}
+              {recDialog.customer?.name ?? recDialog.customerName}
+              {recDialog.shipment.pis.length > 0 && (
+                <span className="ml-1 text-gray-500">— {recDialog.shipment.pis.map(sp => sp.pi.piNo).join(' / ')}</span>
+              )}
             </p>
             <div className="space-y-3">
               <div>

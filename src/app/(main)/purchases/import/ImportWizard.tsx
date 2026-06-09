@@ -33,7 +33,7 @@ type SupplierDraft = {
 }
 
 // 步驟 1 完成後儲存的結果（已寫入 DB）
-type SavedProduct = { productId: number; productName: string; sku: string | null; qty: number; unitPrice: number; unit: string; isNew: boolean }
+type SavedProduct = { productId: number; productName: string; sku: string | null; qty: number; unitPrice: number; unit: string; isNew: boolean; originalName: string }
 // 步驟 2 完成後儲存的結果（已寫入 DB）
 type SavedSupplier = { supplierId: number; supplierName: string; isNew: boolean }
 
@@ -72,8 +72,13 @@ export default function ImportWizard({
   const [port,         setPort]         = useState('')
   const [shipVia,      setShipVia]      = useState('')
   const [note,         setNote]         = useState('')
+  // 文件日期（從 AI 解析的 invoiceDate 預填）
+  const [docDate, setDocDate] = useState('')
   // 可讓使用者在 PO 表單調整數量與單價
-  const [poItems, setPoItems] = useState<{ productId: number; productName: string; sku: string | null; qty: string; unitPrice: string; unit: string }[]>([])
+  const [poItems, setPoItems] = useState<{ productId: number; productName: string; sku: string | null; qty: string; unitPrice: string; unit: string; productNameSnapshot: string | null }[]>([])
+  // 供應商候選清單（API 回傳 needConfirm=true 時使用）
+  const [supplierCandidates, setSupplierCandidates] = useState<{ id: number; name: string; shortName: string | null; city: string | null; countryCode: string | null }[]>([])
+  const [showCandidatePicker, setShowCandidatePicker] = useState(false)
 
   const [loading, setLoading] = useState(false)
   const [saving,  setSaving]  = useState(false)
@@ -122,7 +127,7 @@ export default function ImportWizard({
         return {
           name: it.name?.trim() ?? '', specification: it.specification?.trim() ?? '', sku,
           qty: String(it.qty ?? 1), unitPrice: String(it.unitPrice ?? 0), unit: it.unit?.trim() ?? 'PCS',
-          htsCode: (it as unknown as { htsCode?: string }).htsCode?.trim() ?? '',
+          htsCode: it.htsCode?.trim() ?? '',
           conflictId: ex?.id ?? null, conflictName: ex?.name ?? '',
           conflictSpec: ex?.specification ?? '', conflictSku: ex?.sku ?? '',
           hasDiff, action: ex ? 'use-existing' : 'create',
@@ -141,17 +146,18 @@ export default function ImportWizard({
 
       setSupplierDraft({
         name: supName, shortName: '', email: inv.supplierEmail?.trim() ?? '',
-        phone: (inv as unknown as Record<string, string>).supplierPhone?.trim() ?? '',
-        address: (inv as unknown as Record<string, string>).supplierAddress?.trim() ?? '',
-        city: (inv as unknown as Record<string, string>).supplierCity?.trim() ?? '',
-        country: (inv as unknown as Record<string, string>).supplierCountry?.trim() ?? '',
+        phone: inv.supplierPhone?.trim() ?? '',
+        address: inv.supplierAddress?.trim() ?? '',
+        city: inv.supplierCity?.trim() ?? '',
+        country: inv.supplierCountry?.trim() ?? '',
         postalCode: '', taxId: '',
         contactPerson: '', paymentTerms: '', currencyCode: inv.currency ?? 'USD',
         matchedId: matched?.id ?? null, matchedSupplier: matched ?? null,
       })
 
-      if (inv.invoiceNo) setDocRefNo(inv.invoiceNo)
-      if (inv.currency)  setCurrencyCode(inv.currency)
+      if (inv.invoiceNo)   setDocRefNo(inv.invoiceNo)
+      if (inv.currency)    setCurrencyCode(inv.currency)
+      if (inv.invoiceDate) setDocDate(inv.invoiceDate)
 
       setMode('products')
     } catch (err) {
@@ -192,25 +198,27 @@ export default function ImportWizard({
 
       const applied = json.data!
       // ★ 儲存寫入結果（含 DB productId）
-      const saved: SavedProduct[] = applied.map(ap => ({
-        productId:   ap.productId,
-        productName: ap.productName,
-        sku:         ap.sku,
-        qty:         ap.qty,
-        unitPrice:   ap.unitPrice,
-        unit:        ap.unit,
-        isNew:       ap.productCreated,
+      const saved: SavedProduct[] = applied.map((ap, idx) => ({
+        productId:    ap.productId,
+        productName:  ap.productName,
+        sku:          ap.sku,
+        qty:          ap.qty,
+        unitPrice:    ap.unitPrice,
+        unit:         ap.unit,
+        isNew:        ap.productCreated,
+        originalName: productDrafts[idx]?.name.trim() || ap.productName,
       }))
       setSavedProducts(saved)
 
       // 初始化 PO 品項（使用已解析的 productId，名稱優先用使用者在步驟 1 手動調整的版本）
       setPoItems(saved.map((s, idx) => ({
-        productId:   s.productId,
-        productName: productDrafts[idx]?.name.trim() || s.productName,
-        sku:         s.sku,
-        qty:         String(s.qty),
-        unitPrice:   String(s.unitPrice),
-        unit:        s.unit,
+        productId:           s.productId,
+        productName:         productDrafts[idx]?.name.trim() || s.productName,
+        sku:                 s.sku,
+        qty:                 String(s.qty),
+        unitPrice:           String(s.unitPrice),
+        unit:                s.unit,
+        productNameSnapshot: productDrafts[idx]?.name.trim() || s.productName || null,
       })))
 
       setMode('supplier')
@@ -222,14 +230,10 @@ export default function ImportWizard({
   }
 
   // ─── 步驟 2：確認供應商 → 立即寫入 DB ──────────────────────────────────────
-  async function saveSupplier() {
+  async function saveSupplier(opts?: { forceCreate?: boolean; useExistingId?: number }) {
     if (!supplierDraft.name.trim()) { setError('請填入供應商名稱'); return }
     setLoading(true); setError('')
     try {
-      let supplierId: number
-      let supplierName: string
-      let isNew = false
-
       // 永遠呼叫 API，由 API 決定是沿用現有還是新建（避免本地快取的 id 過期）
       const res = await fetch('/api/ai/apply-supplier', {
         method: 'POST',
@@ -247,16 +251,33 @@ export default function ImportWizard({
           contactPerson:     supplierDraft.contactPerson || null,
           paymentTerms:      supplierDraft.paymentTerms || null,
           currencyCode:      supplierDraft.currencyCode || null,
+          forceCreate:       opts?.forceCreate ?? false,
+          useExistingId:     opts?.useExistingId ?? null,
         }),
       })
-      const json = await res.json() as { data?: { supplierId: number; supplierName: string; supplierCreated: boolean }; error?: string }
+      const json = await res.json() as {
+        ok: boolean
+        needConfirm?: boolean
+        candidates?: { id: number; name: string; shortName: string | null; city: string | null; countryCode: string | null }[]
+        data?: { supplierId: number; supplierName: string; supplierCreated: boolean }
+        error?: string
+      }
       if (!res.ok) throw new Error(json.error ?? `寫入失敗 (HTTP ${res.status})`)
-      supplierId   = json.data!.supplierId
-      supplierName = json.data!.supplierName
-      isNew        = json.data!.supplierCreated
+
+      // API 回傳「需要使用者確認」→ 顯示候選清單
+      if (json.needConfirm && json.candidates) {
+        setSupplierCandidates(json.candidates)
+        setShowCandidatePicker(true)
+        return
+      }
 
       // ★ 儲存供應商結果（含 DB supplierId）
-      setSavedSupplier({ supplierId, supplierName, isNew })
+      setSavedSupplier({
+        supplierId:   json.data!.supplierId,
+        supplierName: json.data!.supplierName,
+        isNew:        json.data!.supplierCreated,
+      })
+      setShowCandidatePicker(false)
       setMode('po')
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -279,6 +300,7 @@ export default function ImportWizard({
         body: JSON.stringify({
           supplierId:   savedSupplier.supplierId,
           poNo:         docRefNo || undefined,
+          orderDate:    docDate || null,
           sourceType:   Number(sourceType),
           currencyCode,
           exchangeRate: exchangeRate || '1',
@@ -287,11 +309,12 @@ export default function ImportWizard({
           shipVia,
           note: note || null,
           items: poItems.map(i => ({
-            productId: i.productId,
-            quantity:  Number(i.qty),
-            unitPrice: i.unitPrice,
-            unit:      i.unit,
-            note:      '',
+            productId:           i.productId,
+            quantity:            Number(i.qty),
+            unitPrice:           i.unitPrice,
+            unit:                i.unit,
+            note:                '',
+            productNameSnapshot: i.productNameSnapshot || null,
           })),
         }),
       })
@@ -590,13 +613,48 @@ export default function ImportWizard({
             </Field>
           </div>
 
+          {/* 候選供應商選擇面板（API 回傳 needConfirm 時顯示）*/}
+          {showCandidatePicker && (
+            <div className="mt-4 bg-amber-50 border border-amber-300 rounded-lg p-4">
+              <p className="text-sm font-medium text-amber-800 mb-3">
+                ⚠ 找到名稱相似的現有供應商，請確認是否為同一家？
+              </p>
+              <div className="space-y-2 mb-4">
+                {supplierCandidates.map(c => (
+                  <button key={c.id} type="button"
+                    onClick={() => saveSupplier({ useExistingId: c.id })}
+                    disabled={loading}
+                    className="w-full text-left px-4 py-3 rounded-md border border-amber-200 bg-white hover:bg-blue-50 hover:border-blue-300 text-sm transition-colors">
+                    <span className="font-medium text-gray-800">{c.name}</span>
+                    {c.shortName && <span className="ml-2 text-gray-500 text-xs">({c.shortName})</span>}
+                    {(c.city || c.countryCode) && (
+                      <span className="ml-2 text-gray-400 text-xs">{[c.city, c.countryCode].filter(Boolean).join(', ')}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <button type="button"
+                onClick={() => saveSupplier({ forceCreate: true })}
+                disabled={loading}
+                className="w-full px-4 py-2.5 rounded-md border border-gray-300 bg-white text-sm text-gray-700 hover:bg-orange-50 hover:border-orange-300 transition-colors">
+                ✕ 以上都不是，建立全新供應商「{supplierDraft.name}」
+              </button>
+              <button type="button" onClick={() => setShowCandidatePicker(false)}
+                className="mt-2 text-xs text-gray-400 hover:text-gray-600 underline w-full text-center">
+                取消，重新修改供應商資料
+              </button>
+            </div>
+          )}
+
           <div className="flex justify-between mt-6">
             <button type="button" onClick={() => { setError(''); setMode('products') }}
               className="text-sm text-gray-400 hover:text-gray-600">← 上一步</button>
-            <button type="button" onClick={saveSupplier} disabled={loading}
-              className="bg-green-600 text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50">
-              {loading ? '寫入中…' : supplierDraft.matchedId ? '✓ 確認，使用現有供應商' : '✓ 確認，新增至供應商資料庫'}
-            </button>
+            {!showCandidatePicker && (
+              <button type="button" onClick={() => saveSupplier()} disabled={loading}
+                className="bg-green-600 text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50">
+                {loading ? '寫入中…' : supplierDraft.matchedId ? '✓ 確認，使用現有供應商' : '✓ 確認，新增至供應商資料庫'}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -636,6 +694,9 @@ export default function ImportWizard({
           </Field>
           <Field label="供應商訂單號">
             <input type="text" value={docRefNo} onChange={e => setDocRefNo(e.target.value)} className={inp} placeholder="沿用原始文件號，空白則自動產生" />
+          </Field>
+          <Field label="文件日期（採購訂單日期）">
+            <input type="date" value={docDate} onChange={e => setDocDate(e.target.value)} className={inp} />
           </Field>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">供應商</label>

@@ -40,10 +40,16 @@ export default async function CostPage({
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">成本計算</h1>
-        <a href="/cost/new"
-          className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
-          + 新增試算表
-        </a>
+        <div className="flex gap-2">
+          <a href="/cost/trade-terms"
+            className="border border-gray-300 text-gray-600 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50">
+            交易條件差異試算
+          </a>
+          <a href="/cost/new"
+            className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+            + 新增試算表
+          </a>
+        </div>
       </div>
 
       <form method="GET" className="mb-4 flex gap-2">

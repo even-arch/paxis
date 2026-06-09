@@ -17,7 +17,7 @@ export async function GET(req: NextRequest, {
       id: true, name: true, sku: true, modelNo: true,
       specification: true, unit: true, sellingPrice: true,
       posProductId: true, isAvailableForPos: true, isActive: true,
-      inventoryItems: { select: { quantity: true, reservedQty: true, avgUnitCost: true } },
+      inventoryItems: { select: { quantity: true, reservedQty: true } },
     },
   })
 

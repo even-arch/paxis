@@ -15,7 +15,6 @@ export async function GET(_req: NextRequest, {
   const shipment = await prisma.sLS_Shipment.findUnique({
     where: { id: shipmentId },
     include: {
-      order: { select: { currencyCode: true, exchangeRate: true } },
       items: {
         include: {
           slsItem: {
@@ -73,7 +72,7 @@ export async function GET(_req: NextRequest, {
   return NextResponse.json({
     shipmentNo: shipment.shipmentNo,
     actualShipDate: shipment.actualShipDate,
-    currencyCode: shipment.order.currencyCode,
+    currencyCode: shipment.currencyCode ?? 'USD',
     totalValue,
     breakdown: breakdown.map(b => ({
       supplierId: b.supplierId,

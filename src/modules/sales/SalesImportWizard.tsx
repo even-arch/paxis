@@ -58,13 +58,14 @@ export default function SalesImportWizard({
 
   // 訂單欄位
   const [orderRefNo, setOrderRefNo] = useState('')
+  const [docDate, setDocDate] = useState('')       // 文件日期（AI 解析 orderDate 預填）
   const [currencyCode, setCurrencyCode] = useState('USD')
   const [exchangeRate, setExchangeRate] = useState('')
   const [requestedShipDate, setRequestedShipDate] = useState('')
   const [paymentTerms, setPaymentTerms] = useState('')
   const [note, setNote] = useState('')
   const [orderItems, setOrderItems] = useState<{
-    productId: number; productName: string; sku: string | null; qty: string; unitPrice: string; unit: string
+    productId: number; productName: string; sku: string | null; qty: string; unitPrice: string; unit: string; productNameSnapshot: string | null
   }[]>([])
 
   const [createdOrderId, setCreatedOrderId] = useState<number | null>(null)
@@ -156,8 +157,9 @@ export default function SalesImportWizard({
         matchedId: matched?.id ?? null, matchedCustomer: matched ?? null,
       })
 
-      if (ord.orderNo) setOrderRefNo(ord.orderNo)
-      if (ord.currency) setCurrencyCode(ord.currency)
+      if (ord.orderNo)   setOrderRefNo(ord.orderNo)
+      if (ord.orderDate) setDocDate(ord.orderDate)
+      if (ord.currency)  setCurrencyCode(ord.currency)
       if (ord.requestedShipDate) setRequestedShipDate(ord.requestedShipDate)
       if (ord.estimatedShipDate && !ord.requestedShipDate) setRequestedShipDate(ord.estimatedShipDate)
       if (ord.paymentTerms) setPaymentTerms(ord.paymentTerms)
@@ -205,9 +207,14 @@ export default function SalesImportWizard({
       }))
       setSavedProducts(saved)
 
-      setOrderItems(saved.map(s => ({
-        productId: s.productId, productName: s.productName, sku: s.sku,
-        qty: String(s.qty), unitPrice: String(s.unitPrice), unit: s.unit,
+      setOrderItems(saved.map((s, idx) => ({
+        productId:           s.productId,
+        productName:         s.productName,
+        sku:                 s.sku,
+        qty:                 String(s.qty),
+        unitPrice:           String(s.unitPrice),
+        unit:                s.unit,
+        productNameSnapshot: productDrafts[idx]?.name.trim() || s.productName || null,
       })))
 
       setMode('customer')
@@ -276,16 +283,18 @@ export default function SalesImportWizard({
         body: JSON.stringify({
           customerId: savedCustomer.customerId,
           orderNo: orderRefNo || undefined,
+          orderDate: docDate || null,
           currencyCode,
           exchangeRate: exchangeRate || '1',
           customerRequestedShipDate: requestedShipDate || null,
           note: [paymentTerms ? `付款條件：${paymentTerms}` : '', note].filter(Boolean).join('\n') || null,
           source: 'AI_IMPORT',
           items: orderItems.map(i => ({
-            productId: i.productId,
-            quantity: Number(i.qty),
-            unitPrice: i.unitPrice,
-            unit: i.unit,
+            productId:           i.productId,
+            quantity:            Number(i.qty),
+            unitPrice:           i.unitPrice,
+            unit:                i.unit,
+            productNameSnapshot: i.productNameSnapshot || null,
           })),
         }),
       })
@@ -773,6 +782,9 @@ export default function SalesImportWizard({
           <Field label="客戶訂單號">
             <input type="text" value={orderRefNo} onChange={e => setOrderRefNo(e.target.value)}
               className={inp} placeholder="客戶的 PO 號碼" />
+          </Field>
+          <Field label="文件日期（客戶訂單日期）">
+            <input type="date" value={docDate} onChange={e => setDocDate(e.target.value)} className={inp} />
           </Field>
           <Field label="幣別">
             <select value={currencyCode} onChange={e => setCurrencyCode(e.target.value)} className={inp}>

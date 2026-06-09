@@ -46,8 +46,23 @@ export async function POST(req: NextRequest) {
       if (!pi || (!pi.name && !pi.sku)) continue
 
       const sku = pi.sku?.trim() || null
-      const name = pi.name?.trim() || sku || '未命名商品'
       const specification = pi.specification?.trim() || null
+      const rawName = pi.name?.trim() || null
+      // 偵測 name 是否為型號：無空格、含數字或連字符的英數字串（如 S52RB、BL-M315）
+      // 純字母單字（如 CHAIN、Pedal、Lever）不算型號
+      const looksLikeModelNo = (s: string) =>
+        !s.includes(' ') &&
+        /^[A-Z0-9][A-Z0-9\-\+\.\/]*$/i.test(s) &&
+        (/\d/.test(s) || /[-+.]/.test(s))
+      const nameIsModelNo = rawName && (
+        (sku && rawName.toLowerCase() === sku.toLowerCase()) ||
+        looksLikeModelNo(rawName)
+      )
+      // fallback：AI 填了型號時，用 specification 前段當暫代（僅作保險，正確答案應來自 AI）
+      const nameFromSpec = specification
+        ? specification.replace(/[\d\-\+\.\/,，]+$/, '').slice(0, 30).trim()
+        : null
+      const name = (!rawName || nameIsModelNo) ? (nameFromSpec || rawName || '未命名商品') : rawName
       const unit = pi.unit?.trim() || 'PCS'
       const countryOfOrigin = pi.countryOfOrigin?.trim() || null
       const htsCode = pi.htsCode?.trim() || null

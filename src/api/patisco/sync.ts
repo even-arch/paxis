@@ -107,13 +107,23 @@ export async function syncPatiscoPIs(source: SyncSource, db?: PrismaClient, dbUr
     company?.nameEn,
     company?.shortName,
     company?.nameZh,
-    // Patisco email domain 備援（e.g. pointasia → 能匹配 "Point Asia"）
     emailDomain,
   ].filter(Boolean).map(n => n!.trim().toLowerCase())
 
+  // 讀取已確認的公司別名（SELF / CUSTOMER / SUPPLIER）
+  const allAliases = await prisma.sYS_CompanyAlias.findMany({
+    select: { alias: true, role: true, customerId: true, supplierId: true },
+  })
+  const aliasMap = new Map(allAliases.map(a => [a.alias.trim().toLowerCase(), a]))
+
+  // 判斷是否為我方公司（含已學習的別名）
   const isOurCompany = (name: string): boolean => {
     if (!name) return false
     const low = name.trim().toLowerCase()
+    // 先查別名表
+    const aliasEntry = aliasMap.get(low)
+    if (aliasEntry?.role === 'SELF') return true
+    // 再比對 SYS_Company 名稱變體
     if (ourNameVariants.length === 0) return false
     return ourNameVariants.some(v => v.length >= 4 && (low.includes(v) || v.includes(low)))
   }
@@ -128,8 +138,8 @@ export async function syncPatiscoPIs(source: SyncSource, db?: PrismaClient, dbUr
     select: { id: true, name: true, patiscoSupplierId: true },
   })
 
-  // 系統用戶 ID（Patisco 自動同步，performedBy 使用帳號最早的 SYS_User）
-  const systemUser = await prisma.sYS_User.findFirst({ orderBy: { id: 'asc' } })
+  // 系統用戶 ID（Patisco 自動同步使用 isSystem=true 的帳號）
+  const systemUser = await prisma.sYS_User.findFirst({ where: { isSystem: true } })
   const systemUserId = systemUser?.id ?? 1
 
   // 4. 拉取所有 PI（含 Editing，測試期先全拉；Status 不傳 = 不過濾）
@@ -168,47 +178,50 @@ export async function syncPatiscoPIs(source: SyncSource, db?: PrismaClient, dbUr
 
     try {
       if (isOurCompany(sellerName)) {
-        // ── 主位 = 我方公司（正本，我方發出）────────────────────────────────
-        let customer = matchCustomer(buyerName, customers)
+        // ── 主位 = 我方公司（正本，我方發出）→ 正PI ────────────────────────
+        const customer = matchCustomerWithAlias(buyerName, customers, aliasMap)
 
-        // 找不到客戶 → 自動建立（從 Patisco buyer 名稱，供測試期使用）
-        if (!customer && buyerName) {
-          const newCustomer = await prisma.cUS_Customer.create({
-            data: { name: buyerName, isActive: true },
-          })
-          customer = { id: newCustomer.id }
-          customers.push({ id: newCustomer.id, name: buyerName, patiscoBuyerId: null })
-          console.log(`[patisco-sync] 自動建立客戶：${buyerName} (id=${newCustomer.id})`)
-        }
-
-        if (customer) {
+        if (customer === 'UNKNOWN') {
+          // 找不到 → 停下來等使用者確認，不自動建立
+          await recordSync(sql, 'PI', docId, docNo, source, 'needs_confirm',
+            { unknownCompanies: [{ name: buyerName, roleHint: 'CUSTOMER', docType: '正PI' }] }, null)
+          result.skipped++
+          result.details.push({ patiscoDocNo: docNo, status: 'skipped',
+            msg: `買方「${buyerName}」尚未建檔，請至 Patisco 設定頁確認公司角色後重試` })
+        } else if (!customer) {
+          await recordSync(sql, 'PI', docId, docNo, source, 'skipped', null, `Buyer 名稱為空`)
+          result.skipped++
+          result.details.push({ patiscoDocNo: docNo, status: 'skipped', msg: 'Buyer 名稱為空' })
+        } else {
           // 副位 = 客戶 → 我方 PI 正本
           const r = await processOurPIToCustomer(prisma, creds, pi, customer.id, systemUserId, source)
           const status = r.ok ? (r.partial ? 'partial' : 'ok') : 'error'
           await recordSync(sql, 'PI', docId, docNo, source, status, r.items ?? null, r.error ?? null)
           result.details.push({ patiscoDocNo: docNo, status, items: r.items, msg: r.error })
           r.ok ? result.processed++ : result.errors++
-        } else {
-          await recordSync(sql, 'PI', docId, docNo, source, 'skipped', null, `Buyer 名稱為空`)
-          result.skipped++
-          result.details.push({ patiscoDocNo: docNo, status: 'skipped', msg: 'Buyer 名稱為空' })
         }
       } else {
-        // ── 主位 ≠ 我方公司（副本，我方收到）────────────────────────────────
-        const supplier = matchSupplier(sellerName, suppliers)
-        if (supplier) {
+        // ── 主位 ≠ 我方公司（副本，我方收到）→ 副PI ─────────────────────────
+        const supplier = matchSupplierWithAlias(sellerName, suppliers, aliasMap)
+
+        if (supplier === 'UNKNOWN') {
+          // 找不到 → 停下來等使用者確認
+          await recordSync(sql, 'PI', docId, docNo, source, 'needs_confirm',
+            { unknownCompanies: [{ name: sellerName, roleHint: 'SUPPLIER', docType: '副PI' }] }, null)
+          result.skipped++
+          result.details.push({ patiscoDocNo: docNo, status: 'skipped',
+            msg: `賣方「${sellerName}」尚未建檔，請至 Patisco 設定頁確認公司角色後重試` })
+        } else if (!supplier) {
+          await recordSync(sql, 'PI', docId, docNo, source, 'skipped', null, `Seller 名稱為空`)
+          result.skipped++
+          result.details.push({ patiscoDocNo: docNo, status: 'skipped', msg: 'Seller 名稱為空' })
+        } else {
           // 主位 = 供應商 → 供應商 PI 副本：建 PO_SupplierPI（入倉由人工確認）
           const r = await processSupplierPI(prisma, creds, pi, supplier.id, systemUserId, source)
           const status = r.ok ? 'ok' : 'error'
           await recordSync(sql, 'PI', docId, docNo, source, status, null, r.error ?? null)
           result.details.push({ patiscoDocNo: docNo, status, msg: r.error ?? `供應商 PI 副本已記錄，請至採購頁確認入倉` })
           r.ok ? result.processed++ : result.errors++
-        } else {
-          // 主位不在供應商清單 → 可能是客戶 PO 副本（TODO：之後補）
-          await recordSync(sql, 'PI', docId, docNo, source, 'skipped', null,
-            `Seller "${sellerName}" 不在供應商清單，可能是客戶 PO 副本，待後續實作`)
-          result.skipped++
-          result.details.push({ patiscoDocNo: docNo, status: 'skipped', msg: `Seller: ${sellerName}` })
         }
       }
     } catch (err) {
@@ -782,14 +795,29 @@ export async function syncPatiscoSupplierPOs(source: SyncSource, db?: PrismaClie
         if (!isNaN(dt.getTime())) patiscoCreatedAt = dt
       }
 
-      // ── SUP_Supplier upsert（用 Seller 名稱建立，detail 修復後可補地址等欄位）
+      // ── 供應商比對（別名表優先，找不到則 needs_confirm，不自動建立）──────
       let supplierId: number | null = null
-      if (sellerName.trim()) {
-        supplierId = await upsertSupplierFromPO(prisma, { name: sellerName }, isNaN(tradeTermsCode as number) ? null : tradeTermsCode)
+      if (!sellerName.trim()) {
+        await recordSync(sql, 'PO', docId, docNo, source, 'skipped', null, `Seller 名稱為空，略過`)
+        result.skipped++
+        continue
+      }
+
+      const supplierMatch = matchSupplierWithAlias(sellerName, suppliers, aliasMap)
+      if (supplierMatch === 'UNKNOWN') {
+        // 找不到 → 停下來等使用者確認
+        await recordSync(sql, 'PO', docId, docNo, source, 'needs_confirm',
+          { unknownCompanies: [{ name: sellerName, roleHint: 'SUPPLIER', docType: '正PO' }] }, null)
+        result.skipped++
+        result.details.push({ patiscoDocNo: docNo, status: 'skipped',
+          msg: `賣方「${sellerName}」尚未建檔，請至 Patisco 設定頁確認公司角色後重試` })
+        continue
+      } else if (supplierMatch) {
+        supplierId = supplierMatch.id
       }
 
       if (!supplierId) {
-        await recordSync(sql, 'PO', docId, docNo, source, 'skipped', null, `Seller 名稱為空，略過`)
+        await recordSync(sql, 'PO', docId, docNo, source, 'skipped', null, `無法識別 Seller，略過`)
         result.skipped++
         continue
       }
@@ -910,38 +938,72 @@ async function upsertSupplierFromPO(
   return created.id
 }
 
-// ─── Helper：比對客戶（patiscoBuyerId 優先，名稱 fuzzy 備援）─────────────────
+// ─── Helper：比對客戶（別名表優先 → 精確匹配 → fuzzy 備援）─────────────────
+// 回傳值：{ id } = 找到；null = 名稱為空；'UNKNOWN' = 有名稱但找不到任何匹配
 
-function matchCustomer(
+function matchCustomerWithAlias(
   buyerName: string,
   customers: Array<{ id: number; name: string; patiscoBuyerId: string | null }>,
-): { id: number } | null {
-  if (!buyerName) return null
+  aliasMap: Map<string, { role: string; customerId: number | null; supplierId: number | null }>,
+): { id: number } | null | 'UNKNOWN' {
+  if (!buyerName?.trim()) return null
   const low = buyerName.trim().toLowerCase()
-  // 先找完全匹配
+
+  // 1. 別名表：已知 CUSTOMER
+  const aliasEntry = aliasMap.get(low)
+  if (aliasEntry?.role === 'CUSTOMER' && aliasEntry.customerId) {
+    return { id: aliasEntry.customerId }
+  }
+  // 別名表標記為 OTHER → 明確忽略
+  if (aliasEntry?.role === 'OTHER') return null
+
+  // 2. CUS_Customer 精確比對
   const exact = customers.find(c => c.name.trim().toLowerCase() === low)
   if (exact) return exact
-  // 再找包含匹配
-  return customers.find(c =>
+
+  // 3. CUS_Customer fuzzy 備援（包含比對）
+  const fuzzy = customers.find(c =>
     low.includes(c.name.trim().toLowerCase()) ||
     c.name.trim().toLowerCase().includes(low)
-  ) ?? null
+  )
+  if (fuzzy) return fuzzy
+
+  // 4. 完全找不到 → 需要使用者確認
+  return 'UNKNOWN'
 }
 
-// ─── Helper：比對供應商（patiscoSupplierId 優先，名稱 fuzzy 備援）──────────
+// ─── Helper：比對供應商（別名表優先 → 精確匹配 → fuzzy 備援）──────────────
+// 回傳值：{ id } = 找到；null = 名稱為空；'UNKNOWN' = 有名稱但找不到任何匹配
 
-function matchSupplier(
+function matchSupplierWithAlias(
   sellerName: string,
   suppliers: Array<{ id: number; name: string; patiscoSupplierId: string | null }>,
-): { id: number } | null {
-  if (!sellerName) return null
+  aliasMap: Map<string, { role: string; customerId: number | null; supplierId: number | null }>,
+): { id: number } | null | 'UNKNOWN' {
+  if (!sellerName?.trim()) return null
   const low = sellerName.trim().toLowerCase()
+
+  // 1. 別名表：已知 SUPPLIER
+  const aliasEntry = aliasMap.get(low)
+  if (aliasEntry?.role === 'SUPPLIER' && aliasEntry.supplierId) {
+    return { id: aliasEntry.supplierId }
+  }
+  // 別名表標記為 OTHER → 明確忽略
+  if (aliasEntry?.role === 'OTHER') return null
+
+  // 2. SUP_Supplier 精確比對
   const exact = suppliers.find(s => s.name.trim().toLowerCase() === low)
   if (exact) return exact
-  return suppliers.find(s =>
+
+  // 3. SUP_Supplier fuzzy 備援（包含比對）
+  const fuzzy = suppliers.find(s =>
     low.includes(s.name.trim().toLowerCase()) ||
     s.name.trim().toLowerCase().includes(low)
-  ) ?? null
+  )
+  if (fuzzy) return fuzzy
+
+  // 4. 完全找不到 → 需要使用者確認
+  return 'UNKNOWN'
 }
 
 // ─── Helper：比對商品（SKU 優先，ModelNo 備援）────────────────────────────────

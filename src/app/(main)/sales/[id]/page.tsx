@@ -6,6 +6,7 @@ import SalesPIPanel from './SalesPIPanel'
 import SalesShipmentPanel from './SalesShipmentPanel'
 import SalesChainPanel from './SalesChainPanel'
 import CustomerPoPanel from './CustomerPoPanel'
+import { EditOrderHeaderButton, DeleteSalesItemButton } from './SalesOrderActions'
 
 type Props = { params: { id: string } }
 
@@ -38,21 +39,26 @@ export default async function SalesDetailPage({
         orderBy: { performedAt: 'desc' },
         include: { items: { include: { slsItem: true } } },
       },
-      shipments: {
-        orderBy: { performedAt: 'desc' },
-        include: {
-          performer: { select: { name: true } },
-          items: {
-            include: {
-              slsItem: { include: { product: { select: { name: true, sku: true } } } },
-            },
-          },
-        },
-      },
     },
   })
 
   if (!order) notFound()
+
+  // 出貨記錄：透過出貨品項 → SLS_Item.orderId 反查（SLS_Order 已不直接關聯 SLS_Shipment）
+  const shipments = await prisma.sLS_Shipment.findMany({
+    where: { items: { some: { slsItem: { orderId: order.id } } } },
+    orderBy: { performedAt: 'desc' },
+    include: {
+      performer: { select: { name: true } },
+      // 帶出此出貨關聯的所有 PI 號碼（用於對外核對）
+      pis: { include: { pi: { select: { id: true, piNo: true } } } },
+      items: {
+        include: {
+          slsItem: { include: { product: { select: { name: true, sku: true } } } },
+        },
+      },
+    },
+  })
 
   // 關聯供應商訂單：優先用 salesOrderId FK，fallback 用單號前綴比對
   const linkedPurchaseOrders = await prisma.pO_Order.findMany({
@@ -123,7 +129,18 @@ export default async function SalesDetailPage({
 
       <div className="space-y-4">
         {/* 訂單資訊 */}
-        <div className="bg-white rounded-lg shadow p-6 grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-2 text-sm">
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-medium text-gray-700">訂單資訊</span>
+            <EditOrderHeaderButton
+              orderId={order.id}
+              currencyCode={order.currencyCode}
+              exchangeRate={order.exchangeRate.toString()}
+              note={order.note ?? null}
+              customerRequestedShipDate={order.customerRequestedShipDate?.toISOString() ?? null}
+            />
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-2 text-sm">
           <Row label="客戶" value={customerName} />
           <Row label="幣別" value={order.currencyCode} />
           <Row label="匯率" value={order.exchangeRate.toString()} />
@@ -138,6 +155,7 @@ export default async function SalesDetailPage({
           )}
           <Row label="建立時間" value={formatDate(order.createdAt)} />
           {order.note && <div className="col-span-3"><Row label="備註" value={order.note} /></div>}
+          </div>
         </div>
 
         {/* 交易鏈視圖 */}
@@ -163,6 +181,7 @@ export default async function SalesDetailPage({
                 <th className="text-right px-4 py-2 font-medium text-gray-600">單價</th>
                 <th className="text-right px-4 py-2 font-medium text-gray-600">小計</th>
                 <th className="text-right px-4 py-2 font-medium text-gray-600">已出貨</th>
+                <th className="px-4 py-2" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -184,6 +203,9 @@ export default async function SalesDetailPage({
                       <span className={item.shippedQty >= item.quantity ? 'text-green-600 font-medium' : 'text-gray-500'}>
                         {item.shippedQty.toLocaleString()}
                       </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <DeleteSalesItemButton orderId={order.id} itemId={item.id} />
                     </td>
                   </tr>
                 )
@@ -252,7 +274,7 @@ export default async function SalesDetailPage({
               estimatedShipDate: pi.estimatedShipDate?.toISOString() ?? null,
             }))
           }
-          shipments={order.shipments.map(s => ({
+          shipments={shipments.map(s => ({
             id: s.id,
             shipmentNo: s.shipmentNo,
             actualShipDate: s.actualShipDate.toISOString(),
@@ -266,6 +288,8 @@ export default async function SalesDetailPage({
             source: s.source,
             performedAt: s.performedAt.toISOString(),
             performerName: s.performer?.name ?? null,
+            // 此出貨關聯的所有 PI 號碼（一張出貨可包含同客戶多張 PI）
+            piNos: s.pis.map(sp => sp.pi.piNo),
             items: s.items.map(si => ({
               id: si.id,
               productName: si.slsItem.product.name,

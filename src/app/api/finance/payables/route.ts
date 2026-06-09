@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
         },
       },
     },
+    // 全欄位回傳（費用明細欄位皆在其中）
   })
 
   return NextResponse.json(payables)

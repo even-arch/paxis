@@ -73,19 +73,6 @@ export async function POST(req: NextRequest, {
       where: { productId: poItem.productId },
     })
 
-    const incomingCost = item.unitCost != null ? new Decimal(item.unitCost) : poItem.unitPrice
-    let newAvgCost: Decimal | null = null
-
-    if (incomingCost) {
-      const currentQty = currentStock?.quantity ?? 0
-      const currentAvg = currentStock?.avgUnitCost ?? new Decimal(0)
-      // WAC = (現有庫存×現有平均成本 + 入庫數量×入庫成本) / (現有庫存 + 入庫數量)
-      const totalQty = currentQty + item.quantity
-      newAvgCost = totalQty > 0
-        ? new Decimal(currentQty).mul(currentAvg).add(new Decimal(item.quantity).mul(incomingCost)).div(totalQty)
-        : incomingCost
-    }
-
     // 更新庫存
     const stock = await prisma.iNV_Stock.upsert({
       where: { productId: poItem.productId },
@@ -94,11 +81,9 @@ export async function POST(req: NextRequest, {
         quantity: item.quantity,
         reservedQty: 0,
         safetyStock: 0,
-        avgUnitCost: newAvgCost,
       },
       update: {
         quantity: { increment: item.quantity },
-        ...(newAvgCost !== null ? { avgUnitCost: newAvgCost } : {}),
       },
     })
 
@@ -111,7 +96,6 @@ export async function POST(req: NextRequest, {
         reservedDelta: 0,
         quantityAfter: stock.quantity,
         reservedAfter: stock.reservedQty,
-        avgUnitCostAfter: newAvgCost,
         receiptId: receipt.id,
         source: 'MANUAL',
         performedBy: userId,
@@ -134,7 +118,7 @@ export async function POST(req: NextRequest, {
         grossWeight: poItem.product.grossWeight,
         netWeight: poItem.product.netWeight,
         unit: poItem.product.unit ?? poItem.unit,
-        unitCost: incomingCost,
+        unitCost: item.unitCost != null ? new Decimal(item.unitCost) : poItem.unitPrice,
         currency: item.currency ?? order.currencyCode,
         sourceType: 'PO_RECEIPT',
         poOrderId: orderId,

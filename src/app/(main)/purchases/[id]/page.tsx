@@ -5,6 +5,7 @@ import { formatDate, formatCurrency } from '@/lib/utils'
 import { statusBadge } from '@/modules/purchase/poUtils'
 import PurchaseActions from './PurchaseActions'
 import LinkSalesOrderButton from './LinkSalesOrderButton'
+import DeletePoItemButton from './DeletePoItemButton'
 
 type Props = { params: { id: string } }
 
@@ -181,6 +182,7 @@ export default async function PurchaseDetailPage({
                 <th className="text-right px-4 py-2 font-medium text-gray-600">小計</th>
                 <th className="text-right px-4 py-2 font-medium text-gray-600">已入庫</th>
                 <th className="text-left px-4 py-2 font-medium text-gray-600">進度</th>
+                <th className="px-4 py-2" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -213,6 +215,9 @@ export default async function PurchaseDetailPage({
                         </div>
                         <span className="text-xs text-gray-500">{pct}%</span>
                       </div>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <DeletePoItemButton orderId={order.id} itemId={item.id} />
                     </td>
                   </tr>
                 )

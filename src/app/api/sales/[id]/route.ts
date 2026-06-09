@@ -30,6 +30,30 @@ export async function GET(_req: NextRequest, {
   return NextResponse.json(order)
 }
 
+export async function PATCH(req: NextRequest, {
+  params }: Params) {
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const id = Number(params.id)
+  const body = await req.json() as {
+    currencyCode?: string
+    exchangeRate?: number | string
+    note?: string | null
+    customerRequestedShipDate?: string | null
+  }
+
+  const data: Record<string, unknown> = {}
+  if (body.currencyCode !== undefined) data.currencyCode = body.currencyCode
+  if (body.exchangeRate !== undefined) data.exchangeRate = String(body.exchangeRate)
+  if (body.note !== undefined) data.note = body.note ?? null
+  if (body.customerRequestedShipDate !== undefined)
+    data.customerRequestedShipDate = body.customerRequestedShipDate ? new Date(body.customerRequestedShipDate) : null
+
+  const order = await prisma.sLS_Order.update({ where: { id }, data })
+  return NextResponse.json({ ok: true, order })
+}
+
 export async function DELETE(_req: NextRequest, {
   params }: Params) {
     const session = await getServerSession(authOptions)

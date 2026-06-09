@@ -333,6 +333,7 @@ export default function ShippingPage() {
   const [paxisActualShipDate, setPaxisActualShipDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [paxisPackingListNo, setPaxisPackingListNo] = useState('')
   const [paxisCommercialInvNo, setPaxisCommercialInvNo] = useState('')
+  const [paxisCiExchangeRate, setPaxisCiExchangeRate] = useState('')
 
   // 建提單（確認後才執行）
   const [creatingShipment, setCreatingShipment] = useState(false)
@@ -464,7 +465,9 @@ export default function ShippingPage() {
         currencyCode: string
         recipient: { name: string; address: string; city: string; countryCode: string; postalCode: string; taxId: string } | null
         totalCartons: number | null; totalGrossWeightKg: number | null; totalCbm: number | null
-        items: Array<{ sku: string; name: string; specification: string; quantity: number; cbm: number | null; grossWeightKg: number | null }>
+        items: Array<{ sku: string; name: string; specification: string; quantity: number
+          unitPrice: number | null; unit: string
+          cbm: number | null; grossWeightKg: number | null }>
       }; error?: string }) => {
         if (!json.ok || !json.data) return
         const d = json.data
@@ -484,36 +487,39 @@ export default function ShippingPage() {
           })
         }
 
-        // 預填貨物（每個品項一箱，或用 totalCartons）
-        const cartons = d.totalCartons || 1
-        const weightEach = d.totalGrossWeightKg ? (d.totalGrossWeightKg / cartons).toFixed(2) : ''
-        const cbmEach = d.totalCbm ? (d.totalCbm / cartons).toFixed(4) : ''
-        const cftEach = cbmEach ? (parseFloat(cbmEach) * CBM_TO_CFT).toFixed(3) : ''
+        // 預填貨物：永遠只建 1 箱，所有品項放進去，重量 / 材積是全部加總
+        const totalWeightKg = d.totalGrossWeightKg ?? 0
+        const totalCbm = d.totalCbm ?? 0
+        const totalCft = totalCbm * CBM_TO_CFT
 
-        setPackages(Array.from({ length: cartons }, (_, i): Package => ({
-          grossWeightKg: weightEach,
+        setPackages([{
+          grossWeightKg: totalWeightKg > 0 ? totalWeightKg.toFixed(2) : '',
           netWeightKg: '',
           lengthCm: '',
           widthCm: '',
           heightCm: '',
-          cbmStr: cbmEach,
-          cftStr: cftEach,
-          dimsFromCbm: !!cbmEach,
-          quantity: '1',
+          cbmStr: totalCbm > 0 ? totalCbm.toFixed(4) : '',
+          cftStr: totalCft > 0 ? totalCft.toFixed(3) : '',
+          dimsFromCbm: totalCbm > 0,
+          quantity: String(d.totalCartons || 1),   // 箱數放在 quantity 欄
           packageType: 'package',
-          items: i === 0 ? d.items.map(it => ({
+          items: d.items.map(it => ({
             sku: it.sku || '',
             modelNo: '',
             desc: it.name,
             specification: it.specification || '',
             qty: String(it.quantity),
-            unitPrice: '',
-            unit: 'PC',
+            unitPrice: it.unitPrice != null ? String(it.unitPrice) : '',
+            unit: it.unit || 'PC',
             currencyCode: d.currencyCode || 'USD',
-          })) : [emptyPackageItem()],
-        })))
+          })),
+        }])
 
         if (d.currencyCode) setDeclaredCurrency(d.currencyCode)
+        // 申報總金額 = 品項 qty × unitPrice 加總
+        const totalAmt = d.items.reduce((s, it) =>
+          s + (it.unitPrice ?? 0) * it.quantity, 0)
+        if (totalAmt > 0) setDeclaredValue(totalAmt.toFixed(2))
       })
       .catch(e => console.warn('[shipping] load slsShipment failed', e))
   }, [searchParams])
@@ -829,6 +835,7 @@ export default function ShippingPage() {
           commercialInvNo: paxisCommercialInvNo || null,
           shippingMethod: selectedOption ? `UPS ${selectedOption.serviceName}` : null,
           trackingNo: shipmentResult?.trackingNumber ?? null,
+          ciExchangeRate: paxisCiExchangeRate ? Number(paxisCiExchangeRate) : null,
           source: 'UPS',
           items,
         }),
@@ -997,6 +1004,58 @@ export default function ShippingPage() {
       setQueryError(e instanceof Error ? e.message : '查詢失敗')
     } finally {
       setQueryLoading(false)
+    }
+  }
+
+  // ── UPS 提單歷史 ─────────────────────────────────────────────────────────────
+
+  interface LogRow {
+    id: number
+    trackingNumber: string
+    serviceCode: string
+    serviceName: string | null
+    piNo: string | null
+    chargedAmount: string | null
+    chargedCurrency: string | null
+    pickupConfirmationNo: string | null
+    pickupScheduledDate: string | null
+    destinationSnapshot: { name?: string; city?: string; countryCode?: string }
+    createdAt: string
+  }
+
+  const [logs, setLogs] = useState<LogRow[] | null>(null)
+  const [logsLoading, setLogsLoading] = useState(false)
+  const [downloadingId, setDownloadingId] = useState<number | null>(null)
+
+  async function loadLogs() {
+    setLogsLoading(true)
+    try {
+      const res = await fetch('/api/shipping/logs?limit=20')
+      const data = await res.json()
+      setLogs(data.logs ?? [])
+    } finally {
+      setLogsLoading(false)
+    }
+  }
+
+  async function redownloadLabel(logId: number, trackingNumber: string) {
+    setDownloadingId(logId)
+    try {
+      const res = await fetch(`/api/shipping/logs/${logId}`)
+      const data = await res.json()
+      if (!data.ok || !data.log?.labelBase64) {
+        alert('找不到標籤資料')
+        return
+      }
+      const fmt = (data.log.labelFormat ?? 'GIF').toLowerCase()
+      const mime = fmt === 'pdf' ? 'application/pdf' : `image/${fmt}`
+      const url = `data:${mime};base64,${data.log.labelBase64}`
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `UPS_${trackingNumber}.${fmt}`
+      a.click()
+    } finally {
+      setDownloadingId(null)
     }
   }
 
@@ -1674,6 +1733,14 @@ export default function ShippingPage() {
                 placeholder="選填"
                 className="mt-1 w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" />
             </div>
+            <div>
+              <label className="text-xs text-gray-500">CI 出貨匯率（選填）</label>
+              <input type="number" step="0.0001" min="0" value={paxisCiExchangeRate}
+                onChange={e => setPaxisCiExchangeRate(e.target.value)}
+                placeholder="例：35.5000"
+                className="mt-1 w-full border rounded px-2 py-1.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+              <p className="text-xs text-gray-400 mt-0.5">Commercial Invoice 上的匯率，供後續匯差計算使用</p>
+            </div>
           </div>
           {shipmentResult?.trackingNumber && (
             <p className="text-xs text-green-600 bg-green-50 rounded px-3 py-1.5">
@@ -1704,6 +1771,68 @@ export default function ShippingPage() {
           </a>
         </div>
       )}
+
+      {/* ── Section G: 提單歷史 ── */}
+      <div className="bg-white rounded-lg border p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium text-gray-700">過去的提單</h2>
+          <button type="button" onClick={loadLogs} disabled={logsLoading}
+            className="text-xs text-blue-600 hover:underline disabled:opacity-50">
+            {logsLoading ? '載入中…' : logs === null ? '載入歷史記錄' : '重新整理'}
+          </button>
+        </div>
+
+        {logs === null && !logsLoading && (
+          <p className="text-xs text-gray-400">點擊「載入歷史記錄」查看過去建立的 UPS 提單</p>
+        )}
+
+        {logs !== null && logs.length === 0 && (
+          <p className="text-xs text-gray-400">尚無提單記錄</p>
+        )}
+
+        {logs !== null && logs.length > 0 && (
+          <div className="divide-y">
+            {logs.map(log => {
+              const dest = log.destinationSnapshot
+              const destLabel = [dest?.name, dest?.city, dest?.countryCode].filter(Boolean).join(', ')
+              const dateStr = new Date(log.createdAt).toLocaleDateString('zh-TW', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+              })
+              return (
+                <div key={log.id} className="py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-sm font-medium text-gray-800">
+                        {log.trackingNumber}
+                      </span>
+                      {log.piNo && (
+                        <span className="text-xs text-gray-400 font-mono">PI: {log.piNo}</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {dateStr}
+                      {log.serviceName && <span className="ml-2">{log.serviceName}</span>}
+                      {destLabel && <span className="ml-2">→ {destLabel}</span>}
+                      {log.chargedAmount && (
+                        <span className="ml-2 text-gray-400">
+                          {log.chargedCurrency} {parseFloat(log.chargedAmount).toFixed(2)}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => redownloadLabel(log.id, log.trackingNumber)}
+                    disabled={downloadingId === log.id}
+                    className="shrink-0 text-xs px-2.5 py-1.5 border border-blue-300 text-blue-600 rounded hover:bg-blue-50 disabled:opacity-50">
+                    {downloadingId === log.id ? '下載中…' : '⬇ 標籤'}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Contact picker modal */}
       {picker && (

@@ -16,6 +16,7 @@ const SOURCE_LABELS: Record<string, string> = {
   PATISCO:   'Patisco',
   MANUAL:    '手動',
   AI_IMPORT: 'AI 匯入',
+  MARKETPLACE: '電商平台',
 }
 
 type Props = { searchParams: { search?: string; page?: string; customerId?: string } }
