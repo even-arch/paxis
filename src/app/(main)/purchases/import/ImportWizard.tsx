@@ -364,7 +364,7 @@ export default function ImportWizard({
       if (!res.ok) throw new Error(json.error ?? `建立失敗 (HTTP ${res.status})`)
       // 多檔佇列：如果還有下一個檔案，繼續處理；否則跳轉到詳情頁
       const nextIdx = queueIndex + 1
-      setDoneList(prev => [...prev, { poNo: poNo, id: json.id! }])
+      setDoneList(prev => [...prev, { poNo: docRefNo || `#${json.id}`, id: json.id! }])
       if (nextIdx < fileQueue.length) {
         setQueueIndex(nextIdx)
         resetWizardState()
