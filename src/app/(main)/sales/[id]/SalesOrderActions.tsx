@@ -3,6 +3,64 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+// ─── 刪除整張訂單（草稿用）──────────────────────────────────────────────────
+
+export function DeleteSalesOrderButton({ orderId }: { orderId: number }) {
+  const router = useRouter()
+  const [confirm, setConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  async function handleDelete() {
+    setDeleting(true)
+    const res = await fetch(`/api/sales/${orderId}`, { method: 'DELETE' })
+    setDeleting(false)
+    if (res.ok) { router.push('/sales'); router.refresh() }
+    else { const err = await res.json() as { error?: string }; alert(err.error ?? '刪除失敗') }
+  }
+
+  if (confirm) {
+    return (
+      <span className="inline-flex items-center gap-2">
+        <button onClick={handleDelete} disabled={deleting}
+          className="px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50">
+          {deleting ? '刪除中…' : '確認刪除'}
+        </button>
+        <button onClick={() => setConfirm(false)} className="text-sm text-gray-500 hover:text-gray-700">取消</button>
+      </span>
+    )
+  }
+
+  return (
+    <button onClick={() => setConfirm(true)}
+      className="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50">
+      刪除草稿
+    </button>
+  )
+}
+
+// ─── 送出訂單（草稿→確認）──────────────────────────────────────────────────
+
+export function SubmitSalesOrderButton({ orderId }: { orderId: number }) {
+  const router = useRouter()
+  const [submitting, setSubmitting] = useState(false)
+
+  async function handleSubmit() {
+    if (!confirm('確定送出訂單？送出後將進入確認狀態，可繼續開立 PI 及出貨。')) return
+    setSubmitting(true)
+    const res = await fetch(`/api/sales/${orderId}/submit`, { method: 'POST' })
+    setSubmitting(false)
+    if (res.ok) router.refresh()
+    else { const err = await res.json() as { error?: string }; alert(err.error ?? '送出失敗') }
+  }
+
+  return (
+    <button onClick={handleSubmit} disabled={submitting}
+      className="px-4 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 font-medium">
+      {submitting ? '送出中…' : '送出客戶訂單'}
+    </button>
+  )
+}
+
 // ─── 訂單表頭編輯 ────────────────────────────────────────────────────────────
 
 type EditHeaderProps = {

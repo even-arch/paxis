@@ -6,7 +6,8 @@ import SalesPIPanel from './SalesPIPanel'
 import SalesShipmentPanel from './SalesShipmentPanel'
 import SalesChainPanel from './SalesChainPanel'
 import CustomerPoPanel from './CustomerPoPanel'
-import { EditOrderHeaderButton, DeleteSalesItemButton } from './SalesOrderActions'
+import { EditOrderHeaderButton, DeleteSalesItemButton, DeleteSalesOrderButton, SubmitSalesOrderButton } from './SalesOrderActions'
+import { EditItemButton, AddItemPanel } from '@/components/ItemTableActions'
 
 type Props = { params: { id: string } }
 
@@ -85,7 +86,17 @@ export default async function SalesDetailPage({
   })
 
   const badge = STATUS_LABELS[order.status] ?? STATUS_LABELS[0]
+  const isDraft = order.status === 0
   const customerName = order.customer?.name ?? order.patiscoBuyerName ?? '（未關聯客戶）'
+
+  // 草稿狀態才需要產品清單（for 新增品項）
+  const products = isDraft
+    ? await prisma.pRD_Product.findMany({
+        where: { isActive: true },
+        select: { id: true, name: true, sku: true, unit: true },
+        orderBy: { name: 'asc' },
+      })
+    : []
   const totalAmount = order.items.reduce((s, i) => s + parseFloat(i.unitPrice.toString()) * i.quantity, 0)
 
   // 組裝 SalesChainPanel 所需資料
@@ -125,7 +136,19 @@ export default async function SalesDetailPage({
           </div>
           <p className="text-sm text-gray-500 mt-0.5">{customerName}</p>
         </div>
+        {isDraft && (
+          <div className="flex items-center gap-2">
+            <DeleteSalesOrderButton orderId={order.id} />
+            <SubmitSalesOrderButton orderId={order.id} />
+          </div>
+        )}
       </div>
+
+      {isDraft && (
+        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
+          草稿狀態，請確認內容無誤後點「送出客戶訂單」，即可開始開立 PI 及安排出貨。
+        </div>
+      )}
 
       <div className="space-y-4">
         {/* 訂單資訊 */}
@@ -181,12 +204,13 @@ export default async function SalesDetailPage({
                 <th className="text-right px-4 py-2 font-medium text-gray-600">單價</th>
                 <th className="text-right px-4 py-2 font-medium text-gray-600">小計</th>
                 <th className="text-right px-4 py-2 font-medium text-gray-600">已出貨</th>
-                <th className="px-4 py-2" />
+                <th className="px-4 py-2 text-right font-medium text-gray-600 text-xs">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {order.items.map(item => {
                 const lineTotal = parseFloat(item.unitPrice.toString()) * item.quantity
+                const canEdit = item.shippedQty === 0
                 return (
                   <tr key={item.id}>
                     <td className="px-4 py-3">
@@ -205,7 +229,19 @@ export default async function SalesDetailPage({
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <DeleteSalesItemButton orderId={order.id} itemId={item.id} />
+                      {canEdit ? (
+                        <span className="inline-flex items-center gap-2">
+                          <EditItemButton
+                            apiUrl={`/api/sales/${order.id}/items?itemId=${item.id}`}
+                            initQty={item.quantity}
+                            initPrice={item.unitPrice.toString()}
+                            initUnit={item.unit ?? item.product.unit ?? 'PCS'}
+                          />
+                          <DeleteSalesItemButton orderId={order.id} itemId={item.id} />
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-300">已出貨</span>
+                      )}
                     </td>
                   </tr>
                 )
@@ -217,10 +253,21 @@ export default async function SalesDetailPage({
                 <td className="px-4 py-3 text-right font-bold text-gray-900">
                   {formatCurrency(totalAmount, order.currencyCode)}
                 </td>
-                <td />
+                <td /><td />
               </tr>
             </tfoot>
           </table>
+          {/* 草稿狀態：可新增品項 */}
+          {isDraft && (
+            <div className="px-4 pb-4">
+              <AddItemPanel
+                apiUrl={`/api/sales/${order.id}/items`}
+                products={products}
+                currency={order.currencyCode}
+                orderId={order.id}
+              />
+            </div>
+          )}
         </div>
 
         {/* 客戶 PO 關聯面板 */}

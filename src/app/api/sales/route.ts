@@ -87,7 +87,8 @@ export async function POST(req: NextRequest) {
       customerId: body.customerId ?? null,
       patiscoBuyerName: body.patiscoBuyerName ?? null,
       orderDate: body.orderDate ? new Date(body.orderDate) : null,
-      status: 1, // 直接設為「已確認」（AI 匯入或手動建立都是確認狀態）
+      // Patisco/AI_IMPORT 直接確認；手動建立為草稿（status=0），需使用者按「送出」
+      status: (body.source === 'PATISCO' || body.source === 'AI_IMPORT') ? 1 : 0,
       currencyCode: body.currencyCode,
       exchangeRate: body.exchangeRate || '1',
       customerRequestedShipDate: body.customerRequestedShipDate
