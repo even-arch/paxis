@@ -710,6 +710,16 @@ export async function syncPatiscoSupplierPOs(source: SyncSource, db?: PrismaClie
   const systemUser = await prisma.sYS_User.findFirst({ orderBy: { id: 'asc' } })
   const systemUserId = systemUser?.id ?? 1
 
+  // 讀取供應商清單與公司別名（用於比對 Seller）
+  const suppliers = await prisma.sUP_Supplier.findMany({
+    where: { isActive: true },
+    select: { id: true, name: true, patiscoSupplierId: true },
+  })
+  const allAliasesPO = await prisma.sYS_CompanyAlias.findMany({
+    select: { alias: true, role: true, customerId: true, supplierId: true },
+  })
+  const aliasMap = new Map(allAliasesPO.map(a => [a.alias.trim().toLowerCase(), a]))
+
   // listOrderCopies 拉供應商 PO 副本（我方為 Buyer）
   // 不管狀態（0=Editing, 1=Confirmed...）一律全拉，每個 status 分頁抓到底
   // status: 0=Editing, 1=Confirmed, 2=Archived, 4=Cancelled（無 3，依官方文件）
