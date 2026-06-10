@@ -208,32 +208,38 @@ export default function CompanyAliasPanel() {
 
               {confirmRole === 'CUSTOMER' && (
                 <div>
-                  <label className="text-xs text-gray-500 block mb-1">關聯至客戶主檔</label>
+                  <label className="text-xs text-gray-500 block mb-1">
+                    關聯至客戶主檔
+                    <span className="text-gray-400 font-normal ml-1">（選填，可稍後再關聯）</span>
+                  </label>
                   <select value={confirmCustId} onChange={e => setConfirmCustId(e.target.value)}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
-                    <option value="">— 選擇客戶 —</option>
+                    <option value="">— 暫不關聯，角色確認後即可匯入 —</option>
                     {customers.map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
                   <p className="text-xs text-gray-400 mt-1">
-                    若客戶尚未建檔，請先至「客戶管理」新增，再回來確認。
+                    不選擇也可以確認，訂單將以公司名稱顯示，日後可至此頁補充關聯。
                   </p>
                 </div>
               )}
 
               {confirmRole === 'SUPPLIER' && (
                 <div>
-                  <label className="text-xs text-gray-500 block mb-1">關聯至供應商主檔</label>
+                  <label className="text-xs text-gray-500 block mb-1">
+                    關聯至供應商主檔
+                    <span className="text-gray-400 font-normal ml-1">（選填，可稍後再關聯）</span>
+                  </label>
                   <select value={confirmSuppId} onChange={e => setConfirmSuppId(e.target.value)}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
-                    <option value="">— 選擇供應商 —</option>
+                    <option value="">— 暫不關聯，角色確認後即可繼續 —</option>
                     {suppliers.map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
                   </select>
                   <p className="text-xs text-gray-400 mt-1">
-                    若供應商尚未建檔，請先至「供應商管理」新增，再回來確認。
+                    供應商類文件需要關聯主檔才能建立採購單，建議盡快至此頁補充。
                   </p>
                 </div>
               )}
@@ -246,9 +252,7 @@ export default function CompanyAliasPanel() {
               </button>
               <button
                 onClick={submitConfirm}
-                disabled={saving ||
-                  (confirmRole === 'CUSTOMER' && !confirmCustId) ||
-                  (confirmRole === 'SUPPLIER' && !confirmSuppId)}
+                disabled={saving}
                 className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">
                 {saving ? '儲存中…' : '確認並重試匯入'}
               </button>
