@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { patiscoLogin, getBuyers, getSellers } from '@/api/patisco/client'
 
 // GET /api/patisco/company-aliases
 // 回傳：
@@ -72,33 +73,87 @@ export async function POST(req: NextRequest) {
   const aliasKey = body.alias.trim().toLowerCase()
   const displayName = body.alias.trim()
 
-  // 若角色為 CUSTOMER/SUPPLIER 且未提供 master ID，自動建立主檔記錄
+  // 若角色為 CUSTOMER/SUPPLIER 且未提供 master ID，自動建立主檔並從 Patisco 補充完整資料
   let resolvedCustomerId = body.customerId ?? null
   let resolvedSupplierId = body.supplierId ?? null
 
+  const creds = await patiscoLogin(prisma)
+
   if (body.role === 'CUSTOMER' && !resolvedCustomerId) {
+    // 嘗試從 Patisco 取得完整買家資料
+    let patiscoData: { name: string; address?: string | null; city?: string | null; countryCode?: string | null; postalCode?: string | null; phoneNo?: string | null; fax?: string | null; email?: string | null; contactPerson?: string | null; taxId?: string | null; note?: string | null; patiscoBuyerId?: string } = { name: displayName }
+    if (creds) {
+      const res = await getBuyers(creds, { filter: { Name: displayName }, first: 1 })
+      const buyer = res.ok ? res.data?.items?.[0] : undefined
+      if (buyer) {
+        patiscoData = {
+          name:          buyer.Name || displayName,
+          address:       buyer.Address       ?? null,
+          city:          buyer.City          ?? null,
+          countryCode:   buyer.CountryCode   ?? null,
+          postalCode:    buyer.PostalCode    ?? null,
+          phoneNo:       buyer.PhoneNo       ?? null,
+          fax:           buyer.FAX           ?? null,
+          email:         buyer.EMail         ?? null,
+          contactPerson: buyer.ContactPerson ?? null,
+          taxId:         buyer.TaxID         ?? null,
+          note:          buyer.Note          ?? null,
+          patiscoBuyerId: buyer.ID,
+        }
+      }
+    }
     const existing = await prisma.cUS_Customer.findFirst({
-      where: { name: { equals: displayName, mode: 'insensitive' } },
+      where: { OR: [
+        { name: { equals: displayName, mode: 'insensitive' } },
+        ...(patiscoData.patiscoBuyerId ? [{ patiscoBuyerId: patiscoData.patiscoBuyerId }] : []),
+      ]},
       select: { id: true },
     })
     if (existing) {
+      await prisma.cUS_Customer.update({ where: { id: existing.id }, data: patiscoData })
       resolvedCustomerId = existing.id
     } else {
-      const created = await prisma.cUS_Customer.create({ data: { name: displayName } })
-      resolvedCustomerId = created.id
+      const rec = await prisma.cUS_Customer.create({ data: patiscoData })
+      resolvedCustomerId = rec.id
     }
   }
 
   if (body.role === 'SUPPLIER' && !resolvedSupplierId) {
+    // 嘗試從 Patisco 取得完整賣家資料
+    let patiscoData: { name: string; address?: string | null; city?: string | null; countryCode?: string | null; postalCode?: string | null; phoneNo?: string | null; fax?: string | null; email?: string | null; contactPerson?: string | null; taxId?: string | null; note?: string | null; patiscoSupplierId?: string } = { name: displayName }
+    if (creds) {
+      const res = await getSellers(creds, { filter: { Name: displayName }, first: 1, offset: 0 })
+      const seller = res.ok ? res.data?.items?.[0] : undefined
+      if (seller) {
+        patiscoData = {
+          name:          seller.Name || displayName,
+          address:       seller.Address       ?? null,
+          city:          seller.City          ?? null,
+          countryCode:   seller.CountryCode   ?? null,
+          postalCode:    seller.PostalCode    ?? null,
+          phoneNo:       seller.PhoneNo       ?? null,
+          fax:           seller.FAX           ?? null,
+          email:         seller.EMail         ?? null,
+          contactPerson: seller.ContactPerson ?? null,
+          taxId:         seller.TaxID         ?? null,
+          note:          seller.Note          ?? null,
+          patiscoSupplierId: seller.ID,
+        }
+      }
+    }
     const existing = await prisma.sUP_Supplier.findFirst({
-      where: { name: { equals: displayName, mode: 'insensitive' } },
+      where: { OR: [
+        { name: { equals: displayName, mode: 'insensitive' } },
+        ...(patiscoData.patiscoSupplierId ? [{ patiscoSupplierId: patiscoData.patiscoSupplierId }] : []),
+      ]},
       select: { id: true },
     })
     if (existing) {
+      await prisma.sUP_Supplier.update({ where: { id: existing.id }, data: patiscoData })
       resolvedSupplierId = existing.id
     } else {
-      const created = await prisma.sUP_Supplier.create({ data: { name: displayName } })
-      resolvedSupplierId = created.id
+      const rec = await prisma.sUP_Supplier.create({ data: patiscoData })
+      resolvedSupplierId = rec.id
     }
   }
 
