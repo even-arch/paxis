@@ -69,12 +69,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'alias 和 role 為必填' }, { status: 400 })
   }
 
-  if (body.role === 'CUSTOMER' && !body.customerId) {
-    return NextResponse.json({ error: 'CUSTOMER 角色必須指定 customerId' }, { status: 400 })
-  }
-  if (body.role === 'SUPPLIER' && !body.supplierId) {
-    return NextResponse.json({ error: 'SUPPLIER 角色必須指定 supplierId' }, { status: 400 })
-  }
+  // customerId / supplierId 為選填：角色確認後即可匯入，主檔關聯可稍後補充
 
   const aliasKey = body.alias.trim().toLowerCase()
 

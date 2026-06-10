@@ -85,6 +85,8 @@ export default function CompanyAliasPanel() {
         supplierId: confirmRole === 'SUPPLIER' && confirmSuppId ? Number(confirmSuppId) : undefined,
       }),
     })
+    // 角色確認後立即重新同步，讓待匯文件馬上處理
+    await fetch('/api/patisco/sync', { method: 'POST' })
     setSaving(false)
     setConfirmItem(null)
     load()
