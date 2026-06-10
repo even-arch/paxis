@@ -69,9 +69,38 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'alias 和 role 為必填' }, { status: 400 })
   }
 
-  // customerId / supplierId 為選填：角色確認後即可匯入，主檔關聯可稍後補充
-
   const aliasKey = body.alias.trim().toLowerCase()
+  const displayName = body.alias.trim()
+
+  // 若角色為 CUSTOMER/SUPPLIER 且未提供 master ID，自動建立主檔記錄
+  let resolvedCustomerId = body.customerId ?? null
+  let resolvedSupplierId = body.supplierId ?? null
+
+  if (body.role === 'CUSTOMER' && !resolvedCustomerId) {
+    const existing = await prisma.cUS_Customer.findFirst({
+      where: { name: { equals: displayName, mode: 'insensitive' } },
+      select: { id: true },
+    })
+    if (existing) {
+      resolvedCustomerId = existing.id
+    } else {
+      const created = await prisma.cUS_Customer.create({ data: { name: displayName } })
+      resolvedCustomerId = created.id
+    }
+  }
+
+  if (body.role === 'SUPPLIER' && !resolvedSupplierId) {
+    const existing = await prisma.sUP_Supplier.findFirst({
+      where: { name: { equals: displayName, mode: 'insensitive' } },
+      select: { id: true },
+    })
+    if (existing) {
+      resolvedSupplierId = existing.id
+    } else {
+      const created = await prisma.sUP_Supplier.create({ data: { name: displayName } })
+      resolvedSupplierId = created.id
+    }
+  }
 
   // upsert alias（同一個 alias 可以更新角色）
   const created = await prisma.sYS_CompanyAlias.upsert({
@@ -79,13 +108,13 @@ export async function POST(req: NextRequest) {
     create: {
       alias:      aliasKey,
       role:       body.role,
-      customerId: body.customerId ?? null,
-      supplierId: body.supplierId ?? null,
+      customerId: resolvedCustomerId,
+      supplierId: resolvedSupplierId,
     },
     update: {
       role:       body.role,
-      customerId: body.customerId ?? null,
-      supplierId: body.supplierId ?? null,
+      customerId: resolvedCustomerId,
+      supplierId: resolvedSupplierId,
     },
     include: {
       customer: { select: { id: true, name: true } },
