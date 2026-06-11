@@ -877,8 +877,8 @@ model SLS_ShipmentItem {
   id            Int    @id @default(autoincrement())
   shipmentId    Int
   shipment      SLS_Shipment @relation(fields: [shipmentId], references: [id])
-  slsItemId     Int
-  slsItem       SLS_Item     @relation(fields: [slsItemId], references: [id])
+  slsItemId     Int?
+  slsItem       SLS_Item?    @relation(fields: [slsItemId], references: [id])
 
   quantity      Int
 

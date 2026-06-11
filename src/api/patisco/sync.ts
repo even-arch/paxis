@@ -1371,8 +1371,6 @@ export async function syncPatiscoDeliveryOrders(
               })
             : null
 
-          if (!slsItem) continue
-
           const qty = parseInt(String((packing as { quantity?: string }).quantity ?? '0'), 10) || 0
           if (qty === 0) continue
 
@@ -1387,19 +1385,25 @@ export async function syncPatiscoDeliveryOrders(
           const grossWt  = plItem?.totalGrossWeight ?? plItem?.grossWeight ?? null
           const netWt    = plItem?.totalNetWeight   ?? plItem?.netWeight   ?? null
           const totalCbm = plItem?.totalDimension   ?? null
-          const cartons  = plItem?.unitPerCarton
-            ? Math.ceil(qty / parseInt(String(plItem.unitPerCarton), 10))
+          // 直接用 quantityOfCartons（Patisco 已算好），fallback 才自己除
+          const cartonsRaw = plItem?.quantityOfCartons
+            ? parseInt(String(plItem.quantityOfCartons), 10)
             : null
+          const unitsPerCarton = plItem?.unitPerCarton
+            ? parseInt(String(plItem.unitPerCarton), 10)
+            : null
+          const cartons = cartonsRaw
+            ?? (unitsPerCarton && unitsPerCarton > 0 ? Math.floor(qty / unitsPerCarton) : null)
 
           await prisma.sLS_ShipmentItem.create({
             data: {
-              shipmentId:   shipment.id,
-              slsItemId:    slsItem.id,
-              quantity:     qty,
-              cartons:      cartons,
-              grossWeightKg: grossWt ? new Decimal(grossWt) : null,
-              netWeightKg:   netWt   ? new Decimal(netWt)   : null,
-              cbm:           totalCbm ? new Decimal(totalCbm) : null,
+              shipmentId:    shipment.id,
+              slsItemId:     slsItem?.id ?? null,
+              quantity:      qty,
+              cartons,
+              grossWeightKg: grossWt   ? new Decimal(grossWt)   : null,
+              netWeightKg:   netWt     ? new Decimal(netWt)     : null,
+              cbm:           totalCbm  ? new Decimal(totalCbm)  : null,
             },
           })
 
