@@ -140,7 +140,10 @@ export default async function PurchaseDetailPage({
           <Row label="運送方式" value={order.shipVia} />
           <Row label="實際到貨" value={order.arrivedDate ? formatDate(order.arrivedDate) : undefined} />
           <Row label="建立者" value={order.creator.name} />
-          <Row label="建立日期" value={formatDate(order.createdAt)} />
+          {order.orderDate && (
+            <Row label="建立日期" value={formatDate(order.orderDate)} />
+          )}
+          <Row label="匯入日期" value={formatDate(order.createdAt)} />
           {order.note && <div className="col-span-3"><Row label="備註" value={order.note} /></div>}
         </div>
 

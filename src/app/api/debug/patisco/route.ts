@@ -121,6 +121,53 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: res.ok, error: !res.ok ? res.error : undefined, data: res.ok ? res.data : undefined })
     }
 
+    // 補填所有缺 patiscoCreatedAt 的 SLS_Order（從 Patisco listProformaInvoices 拿 createdDate）
+    if (action === 'backfillCreatedAt') {
+      const missing = await prisma.sLS_Order.findMany({
+        where: { patiscoCreatedAt: null, source: 'PATISCO', patiscoDocId: { not: null } },
+        select: { id: true, orderNo: true, patiscoDocId: true },
+      })
+      if (missing.length === 0) return NextResponse.json({ ok: true, message: '無需補填', updated: 0 })
+
+      // 從 Patisco 拉所有 PI 建立一個 docId → createdDate 的 map
+      const piMap = new Map<string, string>()
+      let page = 1
+      while (true) {
+        const res = await listProformaInvoices(creds, page)
+        if (!res.ok || !res.data?.items?.length) break
+        for (const pi of res.data.items) {
+          if (pi.id && pi.createdDate) piMap.set(pi.id, pi.createdDate)
+        }
+        if (res.data.items.length < 20) break
+        page++
+      }
+
+      function parseCreatedDate(cd: string): Date | null {
+        if (!cd || cd.length < 8) return null
+        const y  = parseInt(cd.substring(0,4), 10)
+        const mo = parseInt(cd.substring(4,6), 10) - 1
+        const d  = parseInt(cd.substring(6,8), 10)
+        const h  = cd.length >= 10 ? parseInt(cd.substring(8,10), 10) : 0
+        const mi = cd.length >= 12 ? parseInt(cd.substring(10,12), 10) : 0
+        const s  = cd.length >= 14 ? parseInt(cd.substring(12,14), 10) : 0
+        const dt = new Date(Date.UTC(y, mo, d, h, mi, s))
+        return isNaN(dt.getTime()) ? null : dt
+      }
+
+      let updated = 0
+      const results = []
+      for (const order of missing) {
+        const cd = piMap.get(order.patiscoDocId!)
+        if (!cd) { results.push({ orderNo: order.orderNo, status: 'not found in Patisco' }); continue }
+        const dt = parseCreatedDate(cd)
+        if (!dt) { results.push({ orderNo: order.orderNo, status: 'invalid date: ' + cd }); continue }
+        await prisma.sLS_Order.update({ where: { id: order.id }, data: { patiscoCreatedAt: dt } })
+        updated++
+        results.push({ orderNo: order.orderNo, status: 'ok', date: dt.toISOString() })
+      }
+      return NextResponse.json({ ok: true, missing: missing.length, updated, results })
+    }
+
     return NextResponse.json({ error: 'unknown action' })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })

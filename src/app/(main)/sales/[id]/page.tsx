@@ -173,7 +173,10 @@ export default async function SalesDetailPage({
           {order.patiscoDocNo && (
             <Row label="Patisco 文件號" value={order.patiscoDocNo} />
           )}
-          <Row label="建立時間" value={formatDate(order.createdAt)} />
+          {order.patiscoCreatedAt && (
+            <Row label="建立日期" value={formatDate(order.patiscoCreatedAt)} />
+          )}
+          <Row label="匯入日期" value={formatDate(order.createdAt)} />
           {order.note && <div className="col-span-3"><Row label="備註" value={order.note} /></div>}
           </div>
         </div>
