@@ -20,7 +20,7 @@ const SOURCE_LABELS: Record<string, string> = {
   MARKETPLACE: '電商平台',
 }
 
-const VALID_SORTS = ['orderNo', 'currencyCode', 'totalAmount', 'status', 'source', 'customerRequestedShipDate', 'patiscoCreatedAt'] as const
+const VALID_SORTS = ['orderNo', 'currencyCode', 'totalAmount', 'status', 'source', 'patiscoCreatedAt'] as const
 type SortField = typeof VALID_SORTS[number]
 
 type Props = { searchParams: { search?: string; page?: string; customerId?: string; sort?: string; dir?: string } }
@@ -53,6 +53,12 @@ export default async function SalesPage({ searchParams }: Props) {
       include: {
         customer: { select: { name: true, shortName: true } },
         _count: { select: { items: true } },
+        pis: {
+          where: { status: 0 },
+          select: { etd: true },
+          orderBy: { id: 'desc' },
+          take: 1,
+        },
       },
     }),
   ])
@@ -111,7 +117,7 @@ export default async function SalesPage({ searchParams }: Props) {
               {sh('金額', 'totalAmount', 'right')}
               {sh('狀態', 'status')}
               {sh('來源', 'source')}
-              {sh('希望出貨日', 'customerRequestedShipDate')}
+              <th className="text-left px-4 py-3 font-medium text-gray-600">ETD</th>
               {sh('建立日期', 'patiscoCreatedAt')}
             </tr>
           </thead>
@@ -141,7 +147,7 @@ export default async function SalesPage({ searchParams }: Props) {
                   </td>
                   <td className="px-4 py-3 text-gray-400 text-xs">{SOURCE_LABELS[o.source] ?? o.source}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs">
-                    {o.customerRequestedShipDate ? formatDate(o.customerRequestedShipDate) : '-'}
+                    {o.pis[0]?.etd ? formatDate(o.pis[0].etd) : '-'}
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{o.patiscoCreatedAt ? formatDate(o.patiscoCreatedAt) : '-'}</td>
                 </tr>

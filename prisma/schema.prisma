@@ -761,6 +761,8 @@ model SLS_PI {
 
   // PI 上標註的預計出貨日（較貼近實際，用於追蹤提醒）
   estimatedShipDate DateTime?
+  // Patisco expiredDate（PI 到期日，即 ETD）
+  etd               DateTime?
 
   // 交易條件（Patisco TradingTerm code：13=FOB, 14=FOR…）& PI 層級加收
   tradeTermsCode Int?    // Patisco payment 欄位值

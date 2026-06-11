@@ -295,6 +295,17 @@ async function processOurPIToCustomer(
   const tradeTermsCode = orderDetail?.payment != null ? parseInt(String(orderDetail.payment), 10) : null
   const extraCharges: PatiscoExtraCharge[] = orderDetail?.extraCharges ?? []
 
+  // 解析 expiredDate（ETD，格式：YYYYMMDD 或 YYYYMMDDHHmmss）
+  let piEtd: Date | null = null
+  const ed = (orderDetail as Record<string, unknown> | null)?.expiredDate as string | undefined ?? ''
+  if (ed && ed.length >= 8) {
+    const y = parseInt(ed.substring(0,4), 10)
+    const mo = parseInt(ed.substring(4,6), 10) - 1
+    const d = parseInt(ed.substring(6,8), 10)
+    const dt = new Date(Date.UTC(y, mo, d))
+    if (!isNaN(dt.getTime())) piEtd = dt
+  }
+
   // 若有 orderDetail.buyer，順便更新 CUS_Customer 的聯絡資料
   if (customerId && orderDetail?.buyer) {
     const b = orderDetail.buyer
@@ -450,6 +461,7 @@ async function processOurPIToCustomer(
       patiscoDocNo:   pi.no,
       tradeTermsCode: isNaN(tradeTermsCode as number) ? null : tradeTermsCode,
       extraCharges:   extraCharges.length > 0 ? extraCharges : undefined,
+      etd:            piEtd ?? undefined,
     },
   })
 
