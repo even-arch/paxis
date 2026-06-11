@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
 
     // 銷售側（由子到父）
     await prisma.sLS_ShipmentItem.deleteMany()
+    await prisma.sLS_ShipmentPI.deleteMany()   // 必須在 SLS_PI 之前（piId FK）
     await prisma.sLS_Shipment.deleteMany()
     await prisma.sLS_PIItem.deleteMany()
     await prisma.sLS_PI.deleteMany()
