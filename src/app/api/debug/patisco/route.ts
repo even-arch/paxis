@@ -131,10 +131,10 @@ export async function GET(req: NextRequest) {
       if (missing.length === 0) return NextResponse.json({ ok: true, message: '無需補填', reset: 0 })
 
       const docIds = missing.map(o => o.patiscoDocId!)
-      const result = await sql`
+      await sql`
         UPDATE "SYS_PatiscoSync"
         SET status = 'pending'
-        WHERE "docId" = ANY(${docIds}::text[]) AND type = 'PI'
+        WHERE "patiscoDocId" = ANY(${docIds}::text[]) AND "docType" = 'PI'
       `
       return NextResponse.json({
         ok: true,
