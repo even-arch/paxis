@@ -68,6 +68,8 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
   const [testing, setTesting] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [syncElapsed, setSyncElapsed] = useState(0)
+  const [enriching, setEnriching] = useState(false)
+  const [enrichProgress, setEnrichProgress] = useState<{ done: number; total: number; skipped: number } | null>(null)
   const [catalogSyncing, setCatalogSyncing] = useState(false)
   const [msg, setMsg] = useState<{ type: 'ok' | 'error'; text: string } | null>(null)
   const [testResult, setTestResult] = useState<{
@@ -167,6 +169,33 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
     }
   }
 
+  async function handleEnrich() {
+    setEnriching(true); setEnrichProgress(null); setMsg(null)
+    // 先查總數
+    const preview = await fetch('/api/admin/re-enrich').then(r => r.json())
+    const total = (preview.needName ?? 0) + (preview.needHts ?? 0)
+    if (total === 0) {
+      setMsg({ type: 'ok', text: '所有商品已有名稱和 HS Code，不需要豐富化' })
+      setEnriching(false)
+      return
+    }
+    let done = 0; let skipped = 0; let offset = 0
+    const batchSize = 5
+    while (true) {
+      const res = await fetch(`/api/admin/re-enrich?batch=${batchSize}&offset=${offset}`, { method: 'POST' })
+      const data = await res.json()
+      if (!data.ok) break
+      done += data.changed ?? 0
+      skipped += (data.processed ?? 0) - (data.changed ?? 0)
+      offset += batchSize
+      setEnrichProgress({ done, total, skipped })
+      if (!data.hasMore) break
+    }
+    setEnriching(false)
+    setMsg({ type: 'ok', text: `AI 豐富化完成：${done} 筆商品已更新名稱/HS Code` })
+    router.refresh()
+  }
+
   async function handleManualSync() {
     setSyncing(true); setSyncResult(null); setMsg(null); setSyncElapsed(0)
     const startTime = Date.now()
@@ -248,6 +277,18 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
               className="text-sm px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50">
               {catalogSyncing ? '型錄同步中...' : '📦 型錄同步'}
             </button>
+            <button onClick={handleEnrich} disabled={enriching || syncing}
+              className="text-sm px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 flex items-center gap-1.5">
+              {enriching ? (
+                <>
+                  <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                  {enrichProgress ? `AI 豐富化 ${enrichProgress.done}/${enrichProgress.total}` : 'AI 豐富化...'}
+                </>
+              ) : '✨ AI 豐富化'}
+            </button>
           </div>
         )}
       </div>
@@ -296,6 +337,7 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
       {syncResult && (
         <div className="px-6 py-3 border-b bg-blue-50 text-sm text-blue-800">
           <p className="font-medium mb-1">✓ 同步完成{syncResult.durationMs ? `（${(syncResult.durationMs / 1000).toFixed(1)}s）` : ''}</p>
+          <p className="text-xs text-blue-600 mt-1">💡 同步完成後，點「✨ AI 豐富化」讓系統自動補齊商品名稱與 HS Code。</p>
           <div className="grid grid-cols-3 gap-3 text-xs mt-2">
             {syncResult.buyers && (
               <div className="bg-white rounded px-3 py-2 border border-blue-100">

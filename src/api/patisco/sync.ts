@@ -44,7 +44,6 @@ import {
   type PatiscoExtraCharge,
   type PatiscoOrderCopyProduct,
 } from './client'
-import { enrichProduct } from './product-enrich'
 
 export type SyncSource = 'webhook' | 'cron' | 'manual'
 
@@ -444,15 +443,6 @@ async function processOurPIToCustomer(
     const qty = parseInt(String(item.Quantity), 10) || 0
     if (qty <= 0) continue
 
-    // AI 豐富化（補名稱、HS Code、更新供應商報價）— fire-and-forget，不阻擋主流程
-    enrichProduct(prisma, product.id, {
-      sku:          item.SKU,
-      modelNo:      item.ModelNo?.trim(),
-      specification: item.Specification,
-      unitPrice:    parseFloat(String(item.Price ?? '0')) || undefined,
-      systemUserId,
-    }).catch(e => console.warn('[patisco-sync] enrichProduct 失敗', e))
-
     // 找或建 SLS_Item
     let slsItem = await prisma.sLS_Item.findFirst({
       where: { orderId: order.id, productId: product.id },
@@ -629,16 +619,6 @@ async function processSupplierPI(
               if (!created) return null
               product = created
             }
-            // AI 豐富化 — fire-and-forget
-            enrichProduct(prisma, product.id, {
-              sku:           p.SKU,
-              modelNo:       p.ModelNo?.trim(),
-              specification: p.Specification,
-              unitPrice:     parseFloat(String(p.Price ?? '0')) || undefined,
-              supplierId,
-              systemUserId,
-            }).catch(e => console.warn('[patisco-sync] enrichProduct 失敗', e))
-
             return {
               productId: product.id,
               unitPrice: new Decimal(parseFloat(String(p.Price ?? '0')) || 0),
@@ -907,14 +887,6 @@ export async function syncPatiscoSupplierPOs(source: SyncSource, db?: PrismaClie
                   if (!product) return null
                   console.log(`[patisco-po-sync] 自動建立商品 SKU=${p.sku} id=${product.id}`)
                 }
-                enrichProduct(prisma, product.id, {
-                  sku:           p.sku,
-                  modelNo:       p.modelNo?.trim(),
-                  specification: p.specification,
-                  unitPrice:     parseFloat(String(p.price ?? '0')) || undefined,
-                  supplierId,
-                  systemUserId,
-                }).catch(e => console.warn('[patisco-po-sync] enrichProduct 失敗', e))
                 return {
                   productId: product.id,
                   unitPrice: new Decimal(parseFloat(String(p.price ?? '0')) || 0),
