@@ -380,6 +380,20 @@ async function processOurPIToCustomer(
     currency = resolvePatiscoCurrency(rawCurrency, 'TWD')
   }
 
+  // ── 解析 PI 原始建立日期（格式：YYYYMMDDHHmmss）────────────────────────────
+  let piPatiscoCreatedAt: Date | null = null
+  const piCd = pi.createdDate ?? ''
+  if (piCd && piCd.length >= 8) {
+    const y  = parseInt(piCd.substring(0,4), 10)
+    const mo = parseInt(piCd.substring(4,6), 10) - 1
+    const d  = parseInt(piCd.substring(6,8), 10)
+    const h  = piCd.length >= 10 ? parseInt(piCd.substring(8,10), 10) : 0
+    const mi = piCd.length >= 12 ? parseInt(piCd.substring(10,12), 10) : 0
+    const s  = piCd.length >= 14 ? parseInt(piCd.substring(12,14), 10) : 0
+    const dt = new Date(Date.UTC(y, mo, d, h, mi, s))
+    if (!isNaN(dt.getTime())) piPatiscoCreatedAt = dt
+  }
+
   // ── 找或建 SLS_Order ──────────────────────────────────────────────────────
   let order = await prisma.sLS_Order.findFirst({
     where: { OR: [{ patiscoDocId: piId }, { orderNo: pi.no }] },
@@ -406,9 +420,17 @@ async function processOurPIToCustomer(
         patiscoBuyerName: buyerName || pi.buyer || null,
         patiscoDocId:     piId,
         patiscoDocNo:     pi.no,
+        patiscoCreatedAt: piPatiscoCreatedAt,
         createdBy:        systemUserId,
       },
     })
+  } else if (!order.patiscoCreatedAt && piPatiscoCreatedAt) {
+    // 補填舊資料缺漏的原始建立日期
+    await prisma.sLS_Order.update({
+      where: { id: order.id },
+      data: { patiscoCreatedAt: piPatiscoCreatedAt },
+    })
+    order = { ...order, patiscoCreatedAt: piPatiscoCreatedAt }
   }
 
   // ── 找或建 SLS_PI（去重：patiscoDocId 或 piNo 任一存在即跳過）────────────
