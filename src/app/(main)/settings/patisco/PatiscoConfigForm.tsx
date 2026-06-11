@@ -26,7 +26,8 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
   const router = useRouter()
   // 預設：有 apiKey 就用 token 模式，否則 password 模式
   const [mode, setMode] = useState<Mode>(
-    initialConfig?.apiKey ? 'token' : 'password'
+    // 已有 token 模式設定時保留 token，否則預設帳密（較簡單）
+    (initialConfig?.jwtSet && !initialConfig?.passwordSet) ? 'token' : 'password'
   )
   const [mcpUrl, setMcpUrl] = useState(initialConfig?.mcpUrl ?? 'https://mcp.patisco.com')
 
@@ -66,6 +67,7 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [syncElapsed, setSyncElapsed] = useState(0)
   const [catalogSyncing, setCatalogSyncing] = useState(false)
   const [msg, setMsg] = useState<{ type: 'ok' | 'error'; text: string } | null>(null)
   const [testResult, setTestResult] = useState<{
@@ -166,7 +168,9 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
   }
 
   async function handleManualSync() {
-    setSyncing(true); setSyncResult(null); setMsg(null)
+    setSyncing(true); setSyncResult(null); setMsg(null); setSyncElapsed(0)
+    const startTime = Date.now()
+    const timer = setInterval(() => setSyncElapsed(Math.floor((Date.now() - startTime) / 1000)), 500)
     try {
       const res = await fetch('/api/patisco/sync', {
         method: 'POST',
@@ -174,6 +178,7 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
         body: JSON.stringify({ type: 'all' }),
       })
       const data = await res.json()
+      clearInterval(timer)
       setSyncing(false)
       if (data.ok) {
         setSyncResult({
@@ -187,6 +192,7 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
       }
       router.refresh()
     } catch {
+      clearInterval(timer)
       setSyncing(false)
       setMsg({ type: 'error', text: '同步請求失敗，請檢查網路' })
     }
@@ -227,8 +233,16 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
               {testing ? '測試中...' : '測試連線'}
             </button>
             <button onClick={handleManualSync} disabled={syncing}
-              className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
-              {syncing ? '同步中...' : '手動同步'}
+              className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5">
+              {syncing ? (
+                <>
+                  <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                  同步中 {syncElapsed > 0 ? `${syncElapsed}s` : ''}
+                </>
+              ) : '手動同步'}
             </button>
             <button onClick={handleCatalogSync} disabled={catalogSyncing}
               className="text-sm px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50">
@@ -237,6 +251,23 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
           </div>
         )}
       </div>
+
+      {/* 同步進度橫幅 */}
+      {syncing && (
+        <div className="px-6 py-2.5 bg-blue-600 text-white text-sm flex items-center gap-3 overflow-hidden">
+          <svg className="animate-spin h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+          <div className="flex-1 overflow-hidden">
+            <span className="font-medium">正在從 Patisco 同步資料</span>
+            <span className="ml-2 opacity-75 text-xs">
+              已等待 {syncElapsed}s，請勿關閉此頁面…
+            </span>
+          </div>
+          <div className="shrink-0 text-xs opacity-60 tabular-nums">{syncElapsed}s</div>
+        </div>
+      )}
 
       {/* JWT 到期警示 */}
       {jwtExpired && (
@@ -355,25 +386,29 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
 
         {/* 模式切換 */}
         <div>
-          <label className={lbl}>登入方式</label>
+          <label className={lbl}>Patisco 登入方式</label>
           <div className="flex gap-0 border border-gray-300 rounded-md overflow-hidden w-fit">
-            <button type="button" onClick={() => setMode('token')}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${mode === 'token' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
-              🔑 直接貼 JWT + API Key
-            </button>
             <button type="button" onClick={() => setMode('password')}
-              className={`px-4 py-2 text-sm font-medium transition-colors border-l ${mode === 'password' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
-              👤 帳號 + 密碼（自動刷新）
+              className={`px-4 py-2 text-sm font-medium transition-colors ${mode === 'password' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+              👤 帳號 + 密碼（推薦）
+            </button>
+            <button type="button" onClick={() => setMode('token')}
+              className={`px-4 py-2 text-sm font-medium transition-colors border-l ${mode === 'token' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+              🔑 手動貼 JWT + API Key
             </button>
           </div>
+          {mode === 'password' && (
+            <p className="text-xs text-green-700 mt-1.5">
+              ✓ 不需要開啟 Patisco 網站，直接在這裡輸入帳密即可，系統會自動登入並定期刷新。
+            </p>
+          )}
         </div>
 
         {/* Token 模式 */}
         {mode === 'token' && (
           <div className="space-y-4 p-4 bg-blue-50 rounded-md border border-blue-100">
             <p className="text-xs text-blue-600">
-              使用 Patisco MCP 憑證取得工具登入後，把 JWT Token 和 API Key 貼到這裡。
-              JWT 有時效性，過期後需要重新取得。
+              需要先登入 <a href="https://mcp.patisco.com/login.html" target="_blank" rel="noopener noreferrer" className="underline">mcp.patisco.com/login.html</a> 取得 JWT Token 和 API Key，再貼到這裡。JWT 有時效性，過期後需要重新取得。建議改用「帳號 + 密碼」模式。
             </p>
             <div>
               <label className={lbl}>
@@ -402,10 +437,9 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
 
         {/* 帳密模式 */}
         {mode === 'password' && (
-          <div className="space-y-4 p-4 bg-gray-50 rounded-md border border-gray-200">
-            <p className="text-xs text-gray-500">
-              系統每次同步時自動用帳密登入取得新 JWT，適合長期穩定運行。
-              帳號格式為 Email（例如：even@pointasia.com.tw）
+          <div className="space-y-4 p-4 bg-green-50 rounded-md border border-green-200">
+            <p className="text-xs text-green-700">
+              輸入你在 Patisco 的登入帳密。儲存後系統會自動幫你登入、取得憑證，並在每次同步時自動刷新，無需手動操作。
             </p>
             <div className="grid grid-cols-2 gap-4">
               <div>
