@@ -20,7 +20,7 @@ const SOURCE_LABELS: Record<string, string> = {
   MARKETPLACE: '電商平台',
 }
 
-const VALID_SORTS = ['orderNo', 'currencyCode', 'totalAmount', 'status', 'source', 'customerRequestedShipDate', 'createdAt'] as const
+const VALID_SORTS = ['orderNo', 'currencyCode', 'totalAmount', 'status', 'source', 'customerRequestedShipDate', 'patiscoCreatedAt'] as const
 type SortField = typeof VALID_SORTS[number]
 
 type Props = { searchParams: { search?: string; page?: string; customerId?: string; sort?: string; dir?: string } }
@@ -29,7 +29,7 @@ export default async function SalesPage({ searchParams }: Props) {
   const search = searchParams.search ?? ''
   const customerId = searchParams.customerId ? Number(searchParams.customerId) : undefined
   const page = Math.max(1, Number(searchParams.page ?? 1))
-  const sort: SortField = VALID_SORTS.includes(searchParams.sort as SortField) ? searchParams.sort as SortField : 'createdAt'
+  const sort: SortField = VALID_SORTS.includes(searchParams.sort as SortField) ? searchParams.sort as SortField : 'patiscoCreatedAt'
   const dir = searchParams.dir === 'asc' ? 'asc' : 'desc'
   const limit = 20
 
@@ -112,7 +112,7 @@ export default async function SalesPage({ searchParams }: Props) {
               {sh('狀態', 'status')}
               {sh('來源', 'source')}
               {sh('希望出貨日', 'customerRequestedShipDate')}
-              {sh('建立日期', 'createdAt')}
+              {sh('建立日期', 'patiscoCreatedAt')}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -143,7 +143,7 @@ export default async function SalesPage({ searchParams }: Props) {
                   <td className="px-4 py-3 text-gray-500 text-xs">
                     {o.customerRequestedShipDate ? formatDate(o.customerRequestedShipDate) : '-'}
                   </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(o.createdAt)}</td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">{o.patiscoCreatedAt ? formatDate(o.patiscoCreatedAt) : '-'}</td>
                 </tr>
               )
             })}

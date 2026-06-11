@@ -5,7 +5,7 @@ import { formatDate } from '@/lib/utils'
 import { statusBadge } from '@/modules/purchase/poUtils'
 import SortableHeader from '@/components/SortableHeader'
 
-const VALID_SORTS = ['poNo', 'patiscoOrderNo', 'status', 'expectedDate', 'createdAt'] as const
+const VALID_SORTS = ['poNo', 'patiscoOrderNo', 'status', 'expectedDate', 'orderDate'] as const
 type SortField = typeof VALID_SORTS[number]
 
 type Props = { searchParams: { search?: string; status?: string; page?: string; sort?: string; dir?: string } }
@@ -14,7 +14,7 @@ export default async function PurchasesPage({ searchParams }: Props) {
   const search = searchParams.search ?? ''
   const statusFilter = searchParams.status ?? ''
   const page = Math.max(1, Number(searchParams.page ?? 1))
-  const sort: SortField = VALID_SORTS.includes(searchParams.sort as SortField) ? searchParams.sort as SortField : 'createdAt'
+  const sort: SortField = VALID_SORTS.includes(searchParams.sort as SortField) ? searchParams.sort as SortField : 'orderDate'
   const dir = searchParams.dir === 'asc' ? 'asc' : 'desc'
   const limit = 20
 
@@ -107,7 +107,7 @@ export default async function PurchasesPage({ searchParams }: Props) {
               {sh('狀態', 'status')}
               {sh('預計到貨', 'expectedDate')}
               <th className="text-right px-4 py-3 font-medium text-gray-600">項目</th>
-              {sh('建立日期', 'createdAt')}
+              {sh('建立日期', 'orderDate')}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -138,7 +138,7 @@ export default async function PurchasesPage({ searchParams }: Props) {
                   </td>
                   <td className="px-4 py-3 text-gray-500">{o.expectedDate ? formatDate(o.expectedDate) : '-'}</td>
                   <td className="px-4 py-3 text-right text-gray-500">{o._count.items}</td>
-                  <td className="px-4 py-3 text-gray-400">{formatDate(o.createdAt)}</td>
+                  <td className="px-4 py-3 text-gray-400">{o.orderDate ? formatDate(o.orderDate) : '-'}</td>
                 </tr>
               )
             })}
