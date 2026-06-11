@@ -139,7 +139,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         ok: true,
         missing: missing.length,
-        reset: result.count ?? docIds.length,
+        reset: docIds.length,
         message: '請再跑一次 Patisco 同步，日期將自動補填',
         orders: missing.map(o => o.orderNo),
       })
