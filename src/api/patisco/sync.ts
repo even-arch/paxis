@@ -1264,22 +1264,40 @@ export async function syncPatiscoDeliveryOrders(
 
     try {
       // 2. 取兩種文件詳情（CI 優先取價格，PL 取材積重量）
+      // Patisco API：有些 DO 需要用 copyId 取 detail，先試 id，失敗再試 copyId
+      const copyId = String(doHeader.copyId ?? '')
+      const lookupId = docId
+
       const [ciRes, plRes] = await Promise.all([
-        getDeliveryOrderDetail(creds, docId, 'commercialInvoice'),
-        getDeliveryOrderDetail(creds, docId, 'packingList'),
+        getDeliveryOrderDetail(creds, lookupId, 'commercialInvoice'),
+        getDeliveryOrderDetail(creds, lookupId, 'packingList'),
       ])
 
-      const ci = ciRes.ok ? (ciRes.data?.detail ?? ciRes.data?.item ?? null) : null
-      const pl = plRes.ok ? (plRes.data?.detail ?? plRes.data?.item ?? null) : null
+      let ci = ciRes.ok ? (ciRes.data?.detail ?? ciRes.data?.item ?? null) : null
+      let pl = plRes.ok ? (plRes.data?.detail ?? plRes.data?.item ?? null) : null
       const ciDataKeys = ciRes.ok ? Object.keys(ciRes.data ?? {}).join(',') : 'N/A'
       const plDataKeys = plRes.ok ? Object.keys(plRes.data ?? {}).join(',') : 'N/A'
-      const ciSample = ciRes.ok ? JSON.stringify(ciRes.data).slice(0, 200) : ''
-      console.log(`[patisco-do-sync] DO ${docNo} ciOk=${ciRes.ok} plOk=${plRes.ok} ciDataKeys=${ciDataKeys} plDataKeys=${plDataKeys}`)
+      const ciSample = ciRes.ok ? JSON.stringify(ciRes.data).slice(0, 300) : ''
+      console.log(`[patisco-do-sync] DO ${docNo} id=${lookupId} copyId=${copyId} ciOk=${ciRes.ok} plOk=${plRes.ok} ciDataKeys=${ciDataKeys} plDataKeys=${plDataKeys}`)
       console.log(`[patisco-do-sync] DO ${docNo} ciSample=${ciSample}`)
+
+      // 若 id 拿不到資料且有 copyId，改用 copyId 重試
+      if (!ci && !pl && copyId && copyId !== lookupId) {
+        console.log(`[patisco-do-sync] DO ${docNo} id 無資料，改用 copyId=${copyId} 重試`)
+        const [ciRes2, plRes2] = await Promise.all([
+          getDeliveryOrderDetail(creds, copyId, 'commercialInvoice'),
+          getDeliveryOrderDetail(creds, copyId, 'packingList'),
+        ])
+        ci = ciRes2.ok ? (ciRes2.data?.detail ?? ciRes2.data?.item ?? null) : null
+        pl = plRes2.ok ? (plRes2.data?.detail ?? plRes2.data?.item ?? null) : null
+        console.log(`[patisco-do-sync] DO ${docNo} copyId retry: ciOk=${ciRes2.ok} plOk=${plRes2.ok} ciKeys=${ciRes2.ok ? Object.keys(ciRes2.data ?? {}).join(',') : 'N/A'}`)
+        console.log(`[patisco-do-sync] DO ${docNo} copyId ciSample=${ciRes2.ok ? JSON.stringify(ciRes2.data).slice(0, 300) : ''}`)
+      }
+
       const detail = ci ?? pl
 
       if (!detail) {
-        await recordSync(sql, 'DO', docId, docNo, source, 'error', null, 'getDeliveryOrderDetail 兩種文件都失敗')
+        await recordSync(sql, 'DO', docId, docNo, source, 'error', null, 'getDeliveryOrderDetail 兩種文件都失敗（id 和 copyId 均無資料）')
         result.errors++
         continue
       }

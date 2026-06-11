@@ -42,6 +42,7 @@ const b2bGroups: NavGroup[] = [
   {
     section: '物流',
     items: [
+      { label: '出貨單', href: '/shipments', icon: '📦' },
       { label: 'UPS 出貨', href: '/shipping', icon: '🚚' },
     ],
   },

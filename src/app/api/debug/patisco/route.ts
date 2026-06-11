@@ -110,7 +110,11 @@ export async function GET(req: NextRequest) {
     if (action === 'listDOs') {
       const res = await listDeliveryOrders(creds, 1)
       if (!res.ok) return NextResponse.json({ error: res.error })
-      const items = (res.data?.items ?? []).slice(0, 5).map(d => ({ id: d.id, no: d.no, buyer: d.buyer }))
+      // 回傳完整欄位，讓我們看到 copyId
+      const items = (res.data?.items ?? []).slice(0, 5).map(d => ({
+        id: d.id, no: d.no, buyer: d.buyer, copyId: d.copyId,
+        createdDate: d.createdDate, expiredDate: d.expiredDate,
+      }))
       return NextResponse.json({ ok: true, total: res.data?.items?.length, items })
     }
 
@@ -119,6 +123,28 @@ export async function GET(req: NextRequest) {
       const docType = (searchParams.get('docType') ?? 'commercialInvoice') as 'commercialInvoice' | 'packingList'
       const res = await getDeliveryOrderDetail(creds, doId, docType)
       return NextResponse.json({ ok: res.ok, error: !res.ok ? res.error : undefined, data: res.ok ? res.data : undefined })
+    }
+
+    // 同時用 id 和 copyId 測試，找出哪個能拿到資料
+    if (action === 'probeDO') {
+      const doId = searchParams.get('doId') ?? ''
+      const copyId = searchParams.get('copyId') ?? ''
+      const [r1, r2, r3, r4] = await Promise.all([
+        getDeliveryOrderDetail(creds, doId, 'commercialInvoice'),
+        getDeliveryOrderDetail(creds, doId, 'packingList'),
+        copyId ? getDeliveryOrderDetail(creds, copyId, 'commercialInvoice') : Promise.resolve({ ok: false, error: 'no copyId' }),
+        copyId ? getDeliveryOrderDetail(creds, copyId, 'packingList') : Promise.resolve({ ok: false, error: 'no copyId' }),
+      ])
+      return NextResponse.json({
+        withId: {
+          ci: { ok: r1.ok, keys: r1.ok ? Object.keys(r1.data ?? {}) : null, error: !r1.ok ? (r1 as {error?:string}).error : undefined, sample: r1.ok ? JSON.stringify(r1.data).slice(0, 300) : null },
+          pl: { ok: r2.ok, keys: r2.ok ? Object.keys(r2.data ?? {}) : null, error: !r2.ok ? (r2 as {error?:string}).error : undefined },
+        },
+        withCopyId: copyId ? {
+          ci: { ok: r3.ok, keys: r3.ok ? Object.keys((r3 as {data?: unknown}).data ?? {}) : null, error: !r3.ok ? (r3 as {error?:string}).error : undefined, sample: r3.ok ? JSON.stringify((r3 as {data?: unknown}).data).slice(0, 300) : null },
+          pl: { ok: r4.ok, keys: r4.ok ? Object.keys((r4 as {data?: unknown}).data ?? {}) : null, error: !r4.ok ? (r4 as {error?:string}).error : undefined },
+        } : 'skipped (no copyId)',
+      })
     }
 
     // 將缺 patiscoCreatedAt 的 SLS_Order 對應的 SYS_PatiscoSync 重設為 pending，讓下次 sync 重新處理
