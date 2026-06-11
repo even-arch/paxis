@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { syncPatiscoPIs, syncPatiscoBuyers, syncPatiscoDeliveryOrders } from '@/api/patisco/sync'
+import { syncPatiscoPIs, syncPatiscoBuyers, syncPatiscoSupplierPOs, syncPatiscoDeliveryOrders } from '@/api/patisco/sync'
 
 /**
  * POST /api/patisco/sync
@@ -33,6 +33,9 @@ export async function POST(req: NextRequest) {
     }
     if (type === 'pi' || type === 'all') {
       result.pi = await syncPatiscoPIs('manual', prisma)
+    }
+    if (type === 'po' || type === 'all') {
+      result.po = await syncPatiscoSupplierPOs('manual', prisma)
     }
     if (type === 'deliveries' || type === 'all') {
       result.deliveries = await syncPatiscoDeliveryOrders('manual', prisma)
