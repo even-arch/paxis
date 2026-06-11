@@ -142,7 +142,7 @@ export async function GET(req: NextRequest) {
         page++
       }
 
-      function parseCreatedDate(cd: string): Date | null {
+      const parseCreatedDate = (cd: string): Date | null => {
         if (!cd || cd.length < 8) return null
         const y  = parseInt(cd.substring(0,4), 10)
         const mo = parseInt(cd.substring(4,6), 10) - 1
