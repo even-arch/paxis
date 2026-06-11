@@ -40,6 +40,7 @@ async function rawMcpCall(creds: { jwt: string; apiKey: string; _mcpUrl?: string
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'Accept': 'application/json, text/event-stream',
       'Authorization': `Bearer ${creds.jwt}`,
       'X-API-Key': creds.apiKey,
     },
