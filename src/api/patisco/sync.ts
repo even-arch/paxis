@@ -25,21 +25,21 @@ import { Decimal } from '@prisma/client/runtime/library'
 import type { PrismaClient } from '@prisma/client'
 import {
   patiscoLogin,
-  getPIs,
+  listProformaInvoices,
+  listProformaInvoiceCopies,
+  listDeliveryOrders,
+  getDeliveryOrderDetail,
   getOrderProducts,
   getOrderDetail,
-  getBuyers,
-  getSellers,
-  listOrderCopies,
+  extractOrderDetail,
   getOrderCopyDetail,
   getOrderCopyProducts,
   resolvePatiscoCurrency,
+  PATISCO_CURRENCY,
   type PatiscoCredentials,
   type PatiscoPI,
   type PatiscoPIProduct,
   type PatiscoOrderDetailItem,
-  type PatiscoBuyer,
-  type PatiscoSeller,
   type PatiscoOrderWithProducts,
   type PatiscoExtraCharge,
   type PatiscoOrderCopyProduct,
@@ -142,18 +142,22 @@ export async function syncPatiscoPIs(source: SyncSource, db?: PrismaClient, dbUr
   const systemUser = await prisma.sYS_User.findFirst({ where: { isSystem: true } })
   const systemUserId = systemUser?.id ?? 1
 
-  // 4. 拉取所有 PI（含 Editing，測試期先全拉；Status 不傳 = 不過濾）
-  const piRes = await getPIs(creds, {
-    first: 50,
-    orderBy: 'CreatedDate_DESC',
-  })
-
-  if (!piRes.ok) {
-    console.error('[patisco-sync] getPIs 失敗', piRes.error)
-    return result
+  // 4. 拉取所有 PI（listProformaInvoices，autoExpanded 自動展開 < 100 筆）
+  const allPIs: PatiscoPI[] = []
+  let page = 1
+  while (true) {
+    const piRes = await listProformaInvoices(creds, page)
+    if (!piRes.ok) {
+      console.error(`[patisco-sync] listProformaInvoices page=${page} 失敗`, piRes.error)
+      break
+    }
+    const data = piRes.data
+    const items = data?.items ?? []
+    allPIs.push(...items)
+    if (!data?.hasNextPage || data?.autoExpanded) break
+    page++
   }
-
-  const pis: PatiscoPI[] = piRes.data?.items ?? []
+  const pis: PatiscoPI[] = allPIs
   result.total = pis.length
 
   // 5. 逐張處理
@@ -179,16 +183,20 @@ export async function syncPatiscoPIs(source: SyncSource, db?: PrismaClient, dbUr
     try {
       if (isOurCompany(sellerName)) {
         // ── 主位 = 我方公司（正本，我方發出）→ 正PI ────────────────────────
-        const customer = matchCustomerWithAlias(buyerName, customers, aliasMap)
+        let customer = matchCustomerWithAlias(buyerName, customers, aliasMap)
 
         if (customer === 'UNKNOWN') {
-          // 找不到 → 停下來等使用者確認，不自動建立
-          await recordSync(sql, 'PI', docId, docNo, source, 'needs_confirm',
-            { unknownCompanies: [{ name: buyerName, roleHint: 'CUSTOMER', docType: '正PI' }] }, null)
-          result.skipped++
-          result.details.push({ patiscoDocNo: docNo, status: 'skipped',
-            msg: `買方「${buyerName}」尚未建檔，請至 Patisco 設定頁確認公司角色後重試` })
-        } else if (!customer) {
+          // 文件已確定 buyer = 客戶，直接建立主檔（找不到才建）
+          const found = await prisma.cUS_Customer.findFirst({
+            where: { name: { equals: buyerName, mode: 'insensitive' } },
+            select: { id: true, name: true, patiscoBuyerId: true },
+          })
+          const rec = found ?? await prisma.cUS_Customer.create({ data: { name: buyerName }, select: { id: true, name: true, patiscoBuyerId: true } })
+          customers.push(rec)
+          customer = { id: rec.id }
+        }
+
+        if (!customer) {
           await recordSync(sql, 'PI', docId, docNo, source, 'skipped', null, `Buyer 名稱為空`)
           result.skipped++
           result.details.push({ patiscoDocNo: docNo, status: 'skipped', msg: 'Buyer 名稱為空' })
@@ -202,26 +210,23 @@ export async function syncPatiscoPIs(source: SyncSource, db?: PrismaClient, dbUr
         }
       } else {
         // ── 主位 ≠ 我方公司（副本，我方收到）→ 副PI ─────────────────────────
-        const supplier = matchSupplierWithAlias(sellerName, suppliers, aliasMap)
+        let supplier = matchSupplierWithAlias(sellerName, suppliers, aliasMap)
 
-        if (supplier === 'UNKNOWN') {
-          // 找不到 → 停下來等使用者確認
-          await recordSync(sql, 'PI', docId, docNo, source, 'needs_confirm',
-            { unknownCompanies: [{ name: sellerName, roleHint: 'SUPPLIER', docType: '副PI' }] }, null)
-          result.skipped++
-          result.details.push({ patiscoDocNo: docNo, status: 'skipped',
-            msg: `賣方「${sellerName}」尚未建檔，請至 Patisco 設定頁確認公司角色後重試` })
-        } else if (!supplier) {
+        if (supplier === 'UNKNOWN' || (supplier && supplier.id === null)) {
+          // 文件已確定 seller = 供應商，直接建立主檔
+          const found = await prisma.sUP_Supplier.findFirst({
+            where: { name: { equals: sellerName, mode: 'insensitive' } },
+            select: { id: true, name: true, patiscoSupplierId: true },
+          })
+          const rec = found ?? await prisma.sUP_Supplier.create({ data: { name: sellerName }, select: { id: true, name: true, patiscoSupplierId: true } })
+          suppliers.push(rec)
+          supplier = { id: rec.id }
+        }
+
+        if (!supplier) {
           await recordSync(sql, 'PI', docId, docNo, source, 'skipped', null, `Seller 名稱為空`)
           result.skipped++
           result.details.push({ patiscoDocNo: docNo, status: 'skipped', msg: 'Seller 名稱為空' })
-        } else if (supplier.id === null) {
-          // 角色已確認為供應商，但尚未關聯供應商主檔（PO_Order.supplierId 不可為 null）
-          await recordSync(sql, 'PI', docId, docNo, source, 'skipped', null,
-            `供應商「${sellerName}」角色已確認，請先至供應商主檔建立記錄並關聯後重試`)
-          result.skipped++
-          result.details.push({ patiscoDocNo: docNo, status: 'skipped',
-            msg: `供應商「${sellerName}」角色已確認，請至設定頁關聯供應商主檔後重試` })
         } else {
           // 主位 = 供應商 → 供應商 PI 副本：建 PO_SupplierPI（入倉由人工確認）
           const r = await processSupplierPI(prisma, creds, pi, supplier.id, systemUserId, source)
@@ -265,22 +270,62 @@ async function processOurPIToCustomer(
 
   // 拉取 PI 完整 header（含 extraCharges、payment/Incoterm）
   const detailRes = await getOrderDetail(creds, pi.id)
-  const orderDetail = detailRes.ok ? (detailRes.data?.order ?? null) : null
+  const orderDetail = detailRes.ok ? extractOrderDetail(detailRes.data) : null
   const tradeTermsCode = orderDetail?.payment != null ? parseInt(String(orderDetail.payment), 10) : null
   const extraCharges: PatiscoExtraCharge[] = orderDetail?.extraCharges ?? []
 
-  // 拉取 PI 商品明細
+  // 若有 orderDetail.buyer，順便更新 CUS_Customer 的聯絡資料
+  if (customerId && orderDetail?.buyer) {
+    const b = orderDetail.buyer
+    if (b.name || b.address || b.city || b.email || b.phoneNo) {
+      await prisma.cUS_Customer.update({
+        where: { id: customerId },
+        data: {
+          ...(b.address      ? { address: b.address }           : {}),
+          ...(b.city         ? { city: b.city }                 : {}),
+          ...(b.countryCode  ? { countryCode: b.countryCode }   : {}),
+          ...(b.postalCode   ? { postalCode: b.postalCode }      : {}),
+          ...(b.phoneNo      ? { phoneNo: b.phoneNo }            : {}),
+          ...(b.email        ? { email: b.email }                : {}),
+          ...(b.fax          ? { fax: b.fax }                    : {}),
+          ...(b.taxId        ? { taxId: b.taxId }                : {}),
+        },
+      }).catch(() => {})  // 非必要，失敗不影響主流程
+    }
+  }
+
+  // 拉取 PI 商品明細（新版：orderId 參數，回傳 items[]；舊版 fallback：orders[]）
   const prodRes = await getOrderProducts(creds, pi.id)
   if (!prodRes.ok) return { ok: false, error: `getOrderProducts 失敗: ${prodRes.error}` }
 
-  const orders: PatiscoOrderWithProducts[] = prodRes.data?.orders ?? []
-  const products: PatiscoPIProduct[] = orders[0]?.Products ?? pi.Products ?? []
-  const rawCurrencyCode = orders[0]?.CurrencyCode ?? pi.priceText?.split(' ')[1]
+  // 相容新版 items[] 和舊版 orders[].Products[]
+  const newItems = prodRes.data?.items
+  const oldOrders: PatiscoOrderWithProducts[] = prodRes.data?.orders ?? []
+  const products: PatiscoPIProduct[] = newItems?.length
+    ? newItems.map(i => ({
+        ID: '',
+        SKU: i.sku ?? undefined,
+        ModelNo: i.modelNo ?? undefined,
+        Specification: i.specification ?? undefined,
+        Note: i.note ?? null,
+        Quantity: i.quantity ?? '0',
+        Price: i.price ?? undefined,
+        CurrencyCode: i.currencyCode ?? undefined,
+        Unit: i.unit ?? undefined,
+        NetWeight: i.netWeight ?? null,
+        GrossWeight: i.grossWeight ?? null,
+        UnitPerCarton: i.unitPerCarton ?? null,
+        Length: i.length ?? null,
+        Width: i.width ?? null,
+        Height: i.height ?? null,
+      } satisfies PatiscoPIProduct))
+    : (oldOrders[0]?.Products ?? pi.Products ?? [])
+  const rawCurrencyCode = oldOrders[0]?.CurrencyCode ?? pi.priceText?.split(' ')[1]
   const currency = resolvePatiscoCurrency(rawCurrencyCode, 'TWD')
 
   // ── 找或建 SLS_Order ──────────────────────────────────────────────────────
   let order = await prisma.sLS_Order.findFirst({
-    where: { OR: [{ patiscoDocId: piId }, { orderNo: `P-${pi.no}` }] },
+    where: { OR: [{ patiscoDocId: piId }, { orderNo: pi.no }] },
   })
 
   if (!order) {
@@ -293,7 +338,7 @@ async function processOurPIToCustomer(
 
     order = await prisma.sLS_Order.create({
       data: {
-        orderNo:          `P-${pi.no}`,   // 前綴 P- 避免和手動訂單衝突
+        orderNo:          pi.no,
         customerId:       customerId ?? undefined,
         status:           1,               // 1 = 確認中
         currencyCode:     currency,
@@ -453,7 +498,7 @@ async function processSupplierPI(
 
   // 拉 PI header（extraCharges、tradeTermsCode）
   const detailRes = await getOrderDetail(creds, pi.id)
-  const orderDetail = detailRes.ok ? (detailRes.data?.order ?? null) : null
+  const orderDetail = detailRes.ok ? extractOrderDetail(detailRes.data) : null
   const tradeTermsCode = orderDetail?.payment != null ? parseInt(String(orderDetail.payment), 10) : null
   const extraCharges: PatiscoExtraCharge[] = orderDetail?.extraCharges ?? []
 
@@ -465,13 +510,32 @@ async function processSupplierPI(
   if (!poOrder) {
     // 拉明細，嘗試建草稿 PO_Order
     const prodRes = await getOrderProducts(creds, pi.id)
-    const orders = prodRes.ok ? (prodRes.data?.orders ?? []) : []
-    const products: PatiscoPIProduct[] = orders[0]?.Products ?? pi.Products ?? []
-    const rawCurrency = orders[0]?.CurrencyCode ?? pi.priceText?.split(' ')[1]
+    const newItems = prodRes.ok ? (prodRes.data?.items ?? []) : []
+    const oldOrders = prodRes.ok ? (prodRes.data?.orders ?? []) : []
+    const products: PatiscoPIProduct[] = newItems.length
+      ? newItems.map(i => ({
+          ID: '',
+          SKU: i.sku ?? undefined,
+          ModelNo: i.modelNo ?? undefined,
+          Specification: i.specification ?? undefined,
+          Note: i.note ?? null,
+          Quantity: i.quantity ?? '0',
+          Price: i.price ?? undefined,
+          CurrencyCode: i.currencyCode ?? undefined,
+          Unit: i.unit ?? undefined,
+          NetWeight: i.netWeight ?? null,
+          GrossWeight: i.grossWeight ?? null,
+          UnitPerCarton: i.unitPerCarton ?? null,
+          Length: i.length ?? null,
+          Width: i.width ?? null,
+          Height: i.height ?? null,
+        } satisfies PatiscoPIProduct))
+      : (oldOrders[0]?.Products ?? pi.Products ?? [])
+    const rawCurrency = oldOrders[0]?.CurrencyCode ?? pi.priceText?.split(' ')[1]
 
     poOrder = await prisma.pO_Order.create({
       data: {
-        poNo:            `SP-${pi.no}`,  // SP- = Supplier PI 草稿
+        poNo:            pi.no,
         supplierId,
         status:          0,              // 0 = 草稿（等人工確認後升為正式）
         currencyCode:    resolvePatiscoCurrency(rawCurrency, 'TWD'),
@@ -556,84 +620,10 @@ export type SellerSyncResult = {
   errors: number
 }
 
-export async function syncPatiscoSellers(source: SyncSource, db?: PrismaClient, sharedCreds?: PatiscoCredentials & { _mcpUrl: string }): Promise<SellerSyncResult> {
-  const prisma = db ?? defaultPrisma
-  const result: SellerSyncResult = { total: 0, created: 0, updated: 0, skipped: 0, errors: 0 }
-
-  const creds = sharedCreds ?? await patiscoLogin(prisma)
-  if (!creds) {
-    console.warn('[patisco-sellers] 未設定 PATISCO 帳密，跳過供應商同步')
-    return result
-  }
-
-  // 分頁拉取全部賣家（每頁 50，直到沒有更多）
-  let offset = 0
-  const pageSize = 50
-  let hasMore = true
-
-  while (hasMore) {
-    const res = await getSellers(creds, { first: pageSize, offset })
-    if (!res.ok) {
-      console.error('[patisco-sellers] getSellers 失敗', res.error)
-      break
-    }
-
-    const items: PatiscoSeller[] = res.data?.items ?? []
-    const totalCount = parseInt(String(res.data?.totalCount ?? '0'), 10) || 0
-    result.total = totalCount
-
-    if (items.length === 0) break
-
-    for (const seller of items) {
-      const patiscoSellerId = seller.ID
-      if (!patiscoSellerId || !seller.Name?.trim()) { result.skipped++; continue }
-
-      try {
-        const data = {
-          name:          seller.Name.trim(),
-          address:       seller.Address       ?? null,
-          city:          seller.City          ?? null,
-          countryCode:   seller.CountryCode   ?? null,
-          postalCode:    seller.PostalCode    ?? null,
-          phoneNo:       seller.PhoneNo       ?? null,
-          fax:           seller.FAX           ?? null,
-          email:         seller.EMail         ?? null,
-          taxId:         seller.TaxID         ?? null,
-          contactPerson: seller.ContactPerson ?? null,
-          note:          seller.Note          ?? null,
-          patiscoSupplierId: patiscoSellerId,
-        }
-
-        // 先用 patiscoSupplierId 找（最精確），再用 taxId，再用名稱精確比對
-        let existing = await prisma.sUP_Supplier.findFirst({ where: { patiscoSupplierId: patiscoSellerId } })
-        if (!existing && seller.TaxID) {
-          existing = await prisma.sUP_Supplier.findFirst({ where: { taxId: seller.TaxID } })
-        }
-        if (!existing) {
-          existing = await prisma.sUP_Supplier.findFirst({
-            where: { name: { equals: seller.Name.trim(), mode: 'insensitive' } },
-          })
-        }
-
-        if (existing) {
-          await prisma.sUP_Supplier.update({ where: { id: existing.id }, data })
-          result.updated++
-        } else {
-          await prisma.sUP_Supplier.create({ data })
-          result.created++
-        }
-      } catch (err) {
-        console.error(`[patisco-sellers] 供應商同步失敗 ID=${seller.ID}`, err)
-        result.errors++
-      }
-    }
-
-    offset += items.length
-    hasMore = offset < totalCount && items.length === pageSize
-  }
-
-  console.log(`[patisco-sellers] 供應商同步完成 total=${result.total} created=${result.created} updated=${result.updated} errors=${result.errors}`)
-  return result
+export async function syncPatiscoSellers(_source: SyncSource, _db?: PrismaClient, _sharedCreds?: PatiscoCredentials & { _mcpUrl: string }): Promise<SellerSyncResult> {
+  // getSellers API 已在新版 Patisco MCP 中移除，供應商資料改從訂單明細同步
+  console.warn('[patisco-sellers] getSellers API 已移除，跳過獨立供應商同步')
+  return { total: 0, created: 0, updated: 0, skipped: 0, errors: 0 }
 }
 
 // ─── Patisco 客戶同步（getBuyers → CUS_Customer upsert）─────────────────────
@@ -648,50 +638,8 @@ export async function syncPatiscoBuyers(source: SyncSource, db?: PrismaClient, s
     return result
   }
 
-  const buyersRes = await getBuyers(creds, { first: 200, orderBy: 'CreatedDate_DESC' })
-  if (!buyersRes.ok) {
-    console.error('[patisco-sync] getBuyers 失敗', buyersRes.error)
-    return result
-  }
-
-  const buyers: PatiscoBuyer[] = buyersRes.data?.items ?? []
-  result.total = buyers.length
-
-  for (const buyer of buyers) {
-    const patiscoBuyerId = buyer.ID
-    if (!patiscoBuyerId) { result.skipped++; continue }
-
-    try {
-      const existing = await prisma.cUS_Customer.findFirst({ where: { patiscoBuyerId } })
-      const data = {
-        name:          buyer.Name,
-        address:       buyer.Address       ?? null,
-        city:          buyer.City          ?? null,
-        countryCode:   buyer.CountryCode   ?? null,
-        postalCode:    buyer.PostalCode    ?? null,
-        phoneNo:       buyer.PhoneNo       ?? null,
-        fax:           buyer.FAX           ?? null,
-        email:         buyer.EMail         ?? null,
-        contactPerson: buyer.ContactPerson ?? null,
-        taxId:         buyer.TaxID         ?? null,
-        note:          buyer.Note          ?? null,
-        patiscoBuyerId,
-      }
-
-      if (existing) {
-        await prisma.cUS_Customer.update({ where: { id: existing.id }, data })
-        result.updated++
-      } else {
-        await prisma.cUS_Customer.create({ data })
-        result.created++
-      }
-    } catch (err) {
-      console.error(`[patisco-sync] 客戶同步失敗 ID=${buyer.ID}`, err)
-      result.errors++
-    }
-  }
-
-  console.log(`[patisco-sync] 客戶同步完成 created=${result.created} updated=${result.updated} errors=${result.errors}`)
+  // getBuyers API 已在新版 Patisco MCP 中移除，客戶資料改從訂單明細同步
+  console.warn('[patisco-sync] getBuyers API 已移除，跳過獨立客戶同步')
   return result
 }
 
@@ -728,45 +676,28 @@ export async function syncPatiscoSupplierPOs(source: SyncSource, db?: PrismaClie
   })
   const aliasMap = new Map(allAliasesPO.map(a => [a.alias.trim().toLowerCase(), a]))
 
-  // listOrderCopies 拉供應商 PO 副本（我方為 Buyer）
-  // 不管狀態（0=Editing, 1=Confirmed...）一律全拉，每個 status 分頁抓到底
-  // status: 0=Editing, 1=Confirmed, 2=Archived, 4=Cancelled（無 3，依官方文件）
-  const STATUS_VALUES = ['0', '1', '2', '4']
-  const PAGE_SIZE = 50  // offset = 取回筆數
+  // listProformaInvoiceCopies 拉供應商 PI 副本（我方為 Buyer）
   const allCopies: import('./client').PatiscoOrderCopy[] = []
-  const debugByStatus: Record<string, unknown> = {}
-
-  for (const s of STATUS_VALUES) {
-    let startIdx = 0
-    let statusTotal = 0
-    let fetched = 0
-
-    while (true) {
-      const r = await listOrderCopies(creds, { status: s, first: startIdx, offset: PAGE_SIZE })
-      if (!r.ok) {
-        debugByStatus[`status_${s}`] = { error: (r as any).error }
-        break
-      }
-      const items = r.data?.items ?? []
-      statusTotal = parseInt(String((r.data as any)?.totalCount ?? '0'), 10) || items.length
-      allCopies.push(...items)
-      fetched += items.length
-      if (items.length < PAGE_SIZE || fetched >= statusTotal) break
-      startIdx += items.length
+  let piCopyPage = 1
+  while (true) {
+    const r = await listProformaInvoiceCopies(creds, piCopyPage)
+    if (!r.ok) {
+      console.error(`[patisco-po-sync] listProformaInvoiceCopies 失敗: ${(r as any).error}`)
+      break
     }
-    if (!debugByStatus[`status_${s}`]) {
-      debugByStatus[`status_${s}`] = { fetched, totalCount: statusTotal }
-    }
+    const items = r.data?.items ?? []
+    allCopies.push(...items)
+    if (!r.data?.hasNextPage || r.data?.autoExpanded) break
+    piCopyPage++
   }
 
-  ;(result as any)._debug = { byStatus: debugByStatus, totalCollected: allCopies.length }
+  ;(result as any)._debug = { totalCollected: allCopies.length }
 
   const copies = allCopies
   result.total = copies.length
-  console.log(`[patisco-po-sync] listOrderCopies 全狀態拉到 ${copies.length} 筆 PO`)
+  console.log(`[patisco-po-sync] listProformaInvoiceCopies 拉到 ${copies.length} 筆 PO`)
 
   for (const copy of copies) {
-    // listOrderCopies 回傳大寫欄位（ID, No, Seller...）
     const docId: string = (copy.ID ?? copy.id ?? '').toString()
     const docNo: string = (copy.No ?? copy.no ?? '').toString()
 
@@ -790,9 +721,7 @@ export async function syncPatiscoSupplierPOs(source: SyncSource, db?: PrismaClie
     }
 
     try {
-      // ── 直接從 listOrderCopies header 取資料 ──────────────────────────────
-      // 注意：getOrderCopyDetail / getOrderCopyProducts 目前對買方角色回傳 Forbidden / GraphQL 錯誤
-      // 已回報 Patisco，待修復後再補 detail sync。Header 已足夠建立 PO 記錄。
+      // ── 從 listProformaInvoiceCopies header 取資料（PI 副本 = 供應商給我方的文件）──
       const sellerName = copy.Seller ?? copy.seller ?? ''
       const rawCurrency = copy.CurrencyCode ?? copy.priceText?.split(' ')[1]
       const currencyCode = resolvePatiscoCurrency(rawCurrency, 'TWD')
@@ -813,31 +742,24 @@ export async function syncPatiscoSupplierPOs(source: SyncSource, db?: PrismaClie
         if (!isNaN(dt.getTime())) patiscoCreatedAt = dt
       }
 
-      // ── 供應商比對（別名表優先，找不到則 needs_confirm，不自動建立）──────
-      let supplierId: number | null = null
+      // ── 供應商比對（別名表優先，找不到則自動建立）──────────────────────────
       if (!sellerName.trim()) {
         await recordSync(sql, 'PO', docId, docNo, source, 'skipped', null, `Seller 名稱為空，略過`)
         result.skipped++
         continue
       }
 
+      let supplierId: number | null = null
       const supplierMatch = matchSupplierWithAlias(sellerName, suppliers, aliasMap)
-      if (supplierMatch === 'UNKNOWN') {
-        // 找不到 → 停下來等使用者確認
-        await recordSync(sql, 'PO', docId, docNo, source, 'needs_confirm',
-          { unknownCompanies: [{ name: sellerName, roleHint: 'SUPPLIER', docType: '正PO' }] }, null)
-        result.skipped++
-        result.details.push({ patiscoDocNo: docNo, status: 'skipped',
-          msg: `賣方「${sellerName}」尚未建檔，請至 Patisco 設定頁確認公司角色後重試` })
-        continue
-      } else if (supplierMatch && supplierMatch.id === null) {
-        // 角色已確認為供應商，但尚未關聯主檔（PO_Order.supplierId 不可為 null）
-        await recordSync(sql, 'PO', docId, docNo, source, 'skipped', null,
-          `供應商「${sellerName}」角色已確認，請先至供應商主檔建立記錄並關聯後重試`)
-        result.skipped++
-        result.details.push({ patiscoDocNo: docNo, status: 'skipped',
-          msg: `供應商「${sellerName}」角色已確認，請至設定頁關聯供應商主檔後重試` })
-        continue
+      if (supplierMatch === 'UNKNOWN' || (supplierMatch && supplierMatch.id === null)) {
+        // 文件已確定 seller = 供應商，直接建立主檔
+        const found = await prisma.sUP_Supplier.findFirst({
+          where: { name: { equals: sellerName, mode: 'insensitive' } },
+          select: { id: true, name: true, patiscoSupplierId: true },
+        })
+        const rec = found ?? await prisma.sUP_Supplier.create({ data: { name: sellerName }, select: { id: true, name: true, patiscoSupplierId: true } })
+        suppliers.push(rec)
+        supplierId = rec.id
       } else if (supplierMatch) {
         supplierId = supplierMatch.id
       }
@@ -850,14 +772,41 @@ export async function syncPatiscoSupplierPOs(source: SyncSource, db?: PrismaClie
 
       // ── PO_Order 找或建 ────────────────────────────────────────────────────
       let poOrder = await prisma.pO_Order.findFirst({
-        where: { OR: [{ patiscoOrderId: docId }, { poNo: `PA-${docNo}` }] },
+        where: { OR: [{ patiscoOrderId: docId }, { poNo: docNo }] },
         select: { id: true },
       })
 
       if (!poOrder) {
+        // getOrderDetail 現在已修復，可取得完整品項
+        const detailRes = await getOrderDetail(creds, docId)
+        const orderDetail = detailRes.ok ? extractOrderDetail(detailRes.data) : null
+        const detailProducts: PatiscoOrderDetailItem[] = detailRes.ok
+          ? (detailRes.data?.products?.items ?? [])
+          : []
+        const tradeTermsFromDetail = orderDetail?.payment != null
+          ? parseInt(String(orderDetail.payment), 10)
+          : tradeTermsCode
+
+        // 若 getOrderDetail 回傳 seller 完整資料，更新供應商主檔
+        if (orderDetail?.seller?.name) {
+          await prisma.sUP_Supplier.update({
+            where: { id: supplierId },
+            data: {
+              ...(orderDetail.seller.address   ? { address: orderDetail.seller.address }       : {}),
+              ...(orderDetail.seller.city      ? { city: orderDetail.seller.city }             : {}),
+              ...(orderDetail.seller.countryCode ? { countryCode: orderDetail.seller.countryCode } : {}),
+              ...(orderDetail.seller.postalCode ? { postalCode: orderDetail.seller.postalCode }  : {}),
+              ...(orderDetail.seller.phoneNo   ? { phoneNo: orderDetail.seller.phoneNo }       : {}),
+              ...(orderDetail.seller.email     ? { email: orderDetail.seller.email }           : {}),
+              ...(orderDetail.seller.fax       ? { fax: orderDetail.seller.fax }               : {}),
+              ...(orderDetail.seller.taxId     ? { taxId: orderDetail.seller.taxId }           : {}),
+            },
+          }).catch(() => {})
+        }
+
         poOrder = await prisma.pO_Order.create({
           data: {
-            poNo:           `PA-${docNo}`,   // PA- = Patisco 採購副本
+            poNo:           docNo,
             supplierId,
             status:         0,               // 草稿，等人工確認入倉
             currencyCode,
@@ -866,7 +815,51 @@ export async function syncPatiscoSupplierPOs(source: SyncSource, db?: PrismaClie
             patiscoOrderNo: docNo,
             patiscoOrderId: docId,
             createdBy:      systemUserId,
-            // items 暫無（getOrderCopyProducts Forbidden，待 Patisco 修復）
+            ...(tradeTermsFromDetail != null && !isNaN(tradeTermsFromDetail)
+              ? { tradeTermsCode: tradeTermsFromDetail }
+              : {}),
+            items: detailProducts.length > 0 ? {
+              create: (await Promise.all(detailProducts.map(async p => {
+                if (!p.sku && !p.modelNo) return null
+                let product = await prisma.pRD_Product.findFirst({
+                  where: p.sku
+                    ? { sku: p.sku, isActive: true }
+                    : { modelNo: p.modelNo!, isActive: true },
+                  select: { id: true, sku: true },
+                })
+                if (!product) {
+                  product = await prisma.pRD_Product.create({
+                    data: {
+                      name:          p.modelNo?.trim() || p.sku || '未命名商品',
+                      sku:           p.sku || null,
+                      modelNo:       p.modelNo?.trim() || null,
+                      specification: p.specification || null,
+                      unit:          p.unit || null,
+                    },
+                    select: { id: true, sku: true },
+                  }).catch(() => null)
+                  if (!product) return null
+                  console.log(`[patisco-po-sync] 自動建立商品 SKU=${p.sku} id=${product.id}`)
+                }
+                enrichProduct(prisma, product.id, {
+                  sku:           p.sku,
+                  modelNo:       p.modelNo?.trim(),
+                  specification: p.specification,
+                  unitPrice:     parseFloat(String(p.price ?? '0')) || undefined,
+                  supplierId,
+                  systemUserId,
+                }).catch(e => console.warn('[patisco-po-sync] enrichProduct 失敗', e))
+                return {
+                  productId: product.id,
+                  unitPrice: new Decimal(parseFloat(String(p.price ?? '0')) || 0),
+                  quantity:  parseInt(String(p.quantity ?? '0'), 10) || 0,
+                  unit:      p.unit ?? null,
+                  note:      p.note ?? null,
+                }
+              }))).filter(Boolean) as Array<{
+                productId: number; unitPrice: Decimal; quantity: number; unit: string | null; note: string | null
+              }>,
+            } : undefined,
           },
           select: { id: true },
         })
@@ -883,7 +876,7 @@ export async function syncPatiscoSupplierPOs(source: SyncSource, db?: PrismaClie
             performedBy:    null,
             patiscoDocId:   docId,
             patiscoDocNo:   docNo,
-            tradeTermsCode: isNaN(tradeTermsCode as number) ? null : tradeTermsCode,
+            tradeTermsCode: tradeTermsCode != null && !isNaN(tradeTermsCode) ? tradeTermsCode : null,
             ...(patiscoCreatedAt ? { patiscoCreatedAt } : {}),
           },
         })
@@ -1084,4 +1077,325 @@ async function recordSync(
   } catch (err) {
     console.warn('[patisco-sync] recordSync 寫入失敗', err)
   }
+}
+
+// ─── Patisco 出貨單同步（listDeliveryOrders → SLS_Shipment）──────────────────
+//
+// 流程：
+//   1. listDeliveryOrders → 取全部出貨單清單
+//   2. 每筆 getDeliveryOrderDetail(packingList) 取尺寸/重量
+//      getDeliveryOrderDetail(commercialInvoice) 取單價/金額/匯率
+//   3. Upsert SLS_Shipment（以 patiscoDocId 為唯一鍵）
+//   4. 從 buyer.buyerId 更新 CUS_Customer.patiscoBuyerId
+//   5. 建立 SLS_ShipmentItem（以 SKU 比對 PRD_Product → SLS_Item）
+//   6. 建立 SLS_ShipmentPI 關聯（packings[].sourceOrderID → SLS_PI.patiscoDocId）
+//   7. 寫 INV_Movement（quantity--, reservedQty--）
+
+export async function syncPatiscoDeliveryOrders(
+  source: SyncSource,
+  db?: PrismaClient,
+  dbUrl?: string,
+  sharedCreds?: PatiscoCredentials & { _mcpUrl: string },
+): Promise<SyncResult> {
+  const prisma = db ?? defaultPrisma
+  const resolvedDbUrl = dbUrl ?? process.env.DATABASE_URL!
+  const sql = neon(resolvedDbUrl)
+  const result: SyncResult = { total: 0, skipped: 0, processed: 0, errors: 0, details: [] }
+
+  const creds = sharedCreds ?? await patiscoLogin(prisma)
+  if (!creds) {
+    console.warn('[patisco-do-sync] 未設定 PATISCO 帳密，跳過出貨單同步')
+    return result
+  }
+
+  const systemUser = await prisma.sYS_User.findFirst({ where: { isSystem: true }, select: { id: true } })
+  const systemUserId = systemUser?.id ?? 1
+
+  // 1. 拉全部出貨單（通常不多，autoExpanded 一頁拿完）
+  const allDOs: import('./client').PatiscoShipment[] = []
+  let doPage = 1
+  while (true) {
+    const r = await listDeliveryOrders(creds, doPage)
+    if (!r.ok) {
+      console.error(`[patisco-do-sync] listDeliveryOrders 失敗: ${(r as { error?: string }).error}`)
+      break
+    }
+    const items = r.data?.items ?? []
+    allDOs.push(...items)
+    if (!r.data?.hasNextPage || r.data?.autoExpanded) break
+    doPage++
+  }
+
+  result.total = allDOs.length
+  console.log(`[patisco-do-sync] listDeliveryOrders 拉到 ${allDOs.length} 筆`)
+
+  for (const doHeader of allDOs) {
+    const docId = doHeader.id
+    const docNo = doHeader.no
+
+    // 去重
+    const existing = await prisma.sYS_PatiscoSync.findFirst({
+      where: { docType: 'DO', patiscoDocId: docId },
+      select: { id: true, status: true },
+    })
+    if (existing?.status === 'ok') { result.skipped++; continue }
+    if (existing) await prisma.sYS_PatiscoSync.deleteMany({ where: { id: existing.id } })
+
+    try {
+      // 2. 取兩種文件詳情（CI 優先取價格，PL 取材積重量）
+      const [ciRes, plRes] = await Promise.all([
+        getDeliveryOrderDetail(creds, docId, 'commercialInvoice'),
+        getDeliveryOrderDetail(creds, docId, 'packingList'),
+      ])
+
+      const ci = ciRes.ok ? (ciRes.data?.detail ?? ciRes.data?.item ?? null) : null
+      const pl = plRes.ok ? (plRes.data?.detail ?? plRes.data?.item ?? null) : null
+      const detail = ci ?? pl
+
+      if (!detail) {
+        await recordSync(sql, 'DO', docId, docNo, source, 'error', null, 'getDeliveryOrderDetail 兩種文件都失敗')
+        result.errors++
+        continue
+      }
+
+      // 3. 解析欄位
+      const currencyCode = (() => {
+        const code = detail.currencyCode
+        if (!code) return 'USD'
+        const n = parseInt(String(code), 10)
+        return PATISCO_CURRENCY[n] ?? 'USD'
+      })()
+
+      const shipDate = (() => {
+        const sd = detail.shipDate ?? detail.createdDate ?? ''
+        if (sd && sd.length >= 8) {
+          return new Date(
+            parseInt(sd.substring(0,4), 10),
+            parseInt(sd.substring(4,6), 10) - 1,
+            parseInt(sd.substring(6,8), 10),
+          )
+        }
+        return new Date()
+      })()
+
+      const ciExchangeRate = (() => {
+        const er = ci?.exchangeRate?.value
+        return er ? new Decimal(er) : null
+      })()
+
+      // 4. 找客戶：優先用 buyerId（穩定唯一識別碼）
+      const buyerObj = detail.buyer
+      const patiscoBuyerId = buyerObj?.buyerId ?? null
+      const buyerName = buyerObj?.name ?? doHeader.buyer ?? ''
+
+      let customerId: number | null = null
+      if (patiscoBuyerId) {
+        const byId = await prisma.cUS_Customer.findFirst({
+          where: { patiscoBuyerId },
+          select: { id: true },
+        })
+        if (byId) {
+          customerId = byId.id
+        } else {
+          // 先嘗試名稱比對，找到了就補 buyerId
+          const byName = await prisma.cUS_Customer.findFirst({
+            where: { name: { equals: buyerName, mode: 'insensitive' } },
+            select: { id: true },
+          })
+          if (byName) {
+            await prisma.cUS_Customer.update({
+              where: { id: byName.id },
+              data: {
+                patiscoBuyerId,
+                ...(buyerObj?.address  ? { address: buyerObj.address }  : {}),
+                ...(buyerObj?.city     ? { city: buyerObj.city }         : {}),
+                ...(buyerObj?.countryCode ? { countryCode: buyerObj.countryCode } : {}),
+                ...(buyerObj?.postalCode  ? { postalCode: buyerObj.postalCode }   : {}),
+                ...(buyerObj?.phoneNo  ? { phoneNo: buyerObj.phoneNo }   : {}),
+                ...(buyerObj?.email    ? { email: buyerObj.email }       : {}),
+                ...(buyerObj?.fax      ? { fax: buyerObj.fax }           : {}),
+                ...(buyerObj?.taxId    ? { taxId: buyerObj.taxId }       : {}),
+              },
+            }).catch(() => {})
+            customerId = byName.id
+          }
+        }
+      }
+      if (!customerId && buyerName) {
+        const byName = await prisma.cUS_Customer.findFirst({
+          where: { name: { equals: buyerName, mode: 'insensitive' } },
+          select: { id: true },
+        })
+        customerId = byName?.id ?? null
+      }
+
+      // 5. Upsert SLS_Shipment
+      const existingShipment = await prisma.sLS_Shipment.findFirst({
+        where: { patiscoDocId: docId },
+        select: { id: true },
+      })
+
+      const shipmentData = {
+        shipmentNo:     docNo,
+        customerId,
+        currencyCode,
+        actualShipDate: shipDate,
+        portOfLoading:  (detail as { port?: string }).port ?? null,
+        patiscoDocId:   docId,
+        patiscoDocNo:   docNo,
+        ...(ciExchangeRate ? { ciExchangeRate } : {}),
+        source:         'PATISCO',
+        performedBy:    systemUserId,
+      }
+
+      const shipment = existingShipment
+        ? await prisma.sLS_Shipment.update({
+            where: { id: existingShipment.id },
+            data: shipmentData,
+            select: { id: true },
+          })
+        : await prisma.sLS_Shipment.create({
+            data: shipmentData,
+            select: { id: true },
+          })
+
+      // 6. 建立 SLS_ShipmentPI 關聯（PL 和 CI 都有 packings[].sourceOrderID）
+      // sourceOrderID = Patisco PI 的 id，對應 SLS_PI.patiscoDocId
+      const packingItems = (pl ?? ci)?.packings ?? []
+
+      // 收集關聯的 PI sourceOrderIDs（去重）
+      const seenSrcIds = new Set<string>()
+      for (const p of packingItems) {
+        const sid = (p as { sourceOrderID?: string }).sourceOrderID
+        if (sid) seenSrcIds.add(sid)
+      }
+      const sourceOrderIds = Array.from(seenSrcIds)
+
+      for (const srcId of sourceOrderIds) {
+        const pi = await prisma.sLS_PI.findFirst({
+          where: { patiscoDocId: srcId },
+          select: { id: true },
+        })
+        if (!pi) continue
+        await prisma.sLS_ShipmentPI.upsert({
+          where: { shipmentId_piId: { shipmentId: shipment.id, piId: pi.id } },
+          create: { shipmentId: shipment.id, piId: pi.id },
+          update: {},
+        })
+      }
+
+      // 7. 建立 SLS_ShipmentItem + INV_Movement（跳過已存在的）
+      const alreadyHasItems = await prisma.sLS_ShipmentItem.count({
+        where: { shipmentId: shipment.id },
+      })
+
+      if (alreadyHasItems === 0 && packingItems.length > 0) {
+        for (const packing of packingItems) {
+          const sku = packing.sku?.trim()
+          if (!sku) continue
+
+          const product = await prisma.pRD_Product.findFirst({
+            where: { sku, isActive: true },
+            select: { id: true },
+          })
+          if (!product) continue
+
+          // 找對應的 SLS_Item（從 sourceOrderID 關聯的 SLS_Order）
+          const packingSrcOrderId = (packing as { sourceOrderID?: string }).sourceOrderID
+          const sourcePI = packingSrcOrderId
+            ? await prisma.sLS_PI.findFirst({
+                where: { patiscoDocId: packingSrcOrderId },
+                select: { orderId: true },
+              })
+            : null
+
+          const slsItem = sourcePI
+            ? await prisma.sLS_Item.findFirst({
+                where: { orderId: sourcePI.orderId, productId: product.id },
+                select: { id: true },
+              })
+            : null
+
+          if (!slsItem) continue
+
+          const qty = parseInt(String((packing as { quantity?: string }).quantity ?? '0'), 10) || 0
+          if (qty === 0) continue
+
+          // PL 版的 packing 有重量/材積欄位
+          type PLPacking = import('./client').PatiscoShipmentPackingPL
+          const plItem = pl?.packings?.find(p => {
+            const pp = p as PLPacking
+            return pp.sourceProductID === (packing as PLPacking).sourceProductID
+              && pp.sourceOrderID === (packing as PLPacking).sourceOrderID
+          }) as PLPacking | undefined
+
+          const grossWt  = plItem?.totalGrossWeight ?? plItem?.grossWeight ?? null
+          const netWt    = plItem?.totalNetWeight   ?? plItem?.netWeight   ?? null
+          const totalCbm = plItem?.totalDimension   ?? null
+          const cartons  = plItem?.unitPerCarton
+            ? Math.ceil(qty / parseInt(String(plItem.unitPerCarton), 10))
+            : null
+
+          await prisma.sLS_ShipmentItem.create({
+            data: {
+              shipmentId:   shipment.id,
+              slsItemId:    slsItem.id,
+              quantity:     qty,
+              cartons:      cartons,
+              grossWeightKg: grossWt ? new Decimal(grossWt) : null,
+              netWeightKg:   netWt   ? new Decimal(netWt)   : null,
+              cbm:           totalCbm ? new Decimal(totalCbm) : null,
+            },
+          })
+
+          // INV_Movement: 出貨 → quantity--, reservedQty--
+          const stock = await prisma.iNV_Stock.findUnique({
+            where: { productId: product.id },
+            select: { quantity: true, reservedQty: true },
+          })
+          if (stock) {
+            const qtyAfter      = stock.quantity    - qty
+            const reservedAfter = Math.max(0, stock.reservedQty - qty)
+            await prisma.iNV_Stock.update({
+              where: { productId: product.id },
+              data: { quantity: qtyAfter, reservedQty: reservedAfter },
+            })
+            await prisma.iNV_Movement.create({
+              data: {
+                productId:      product.id,
+                type:           4,  // 4 = 出貨確認
+                qtyDelta:       -qty,
+                reservedDelta:  -Math.min(qty, stock.reservedQty),
+                quantityAfter:  qtyAfter,
+                reservedAfter,
+                slsShipmentId:  shipment.id,
+                performedBy:    systemUserId,
+                source:         'PATISCO',
+                note:           `Patisco DO ${docNo}`,
+              },
+            })
+          }
+        }
+      }
+
+      await recordSync(sql, 'DO', docId, docNo, source, 'ok',
+        { customerId, itemCount: packingItems.length }, null)
+      result.processed++
+      result.details.push({
+        patiscoDocNo: docNo,
+        status: 'ok',
+        msg: `客戶: ${buyerName}，${packingItems.length} 項商品`,
+      })
+
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error(`[patisco-do-sync] 處理 DO ${docNo} 失敗`, err)
+      await recordSync(sql, 'DO', docId, docNo, source, 'error', null, msg)
+      result.errors++
+      result.details.push({ patiscoDocNo: docNo, status: 'error', msg })
+    }
+  }
+
+  console.log(`[patisco-do-sync] 完成 processed=${result.processed} skipped=${result.skipped} errors=${result.errors}`)
+  return result
 }

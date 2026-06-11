@@ -1,18 +1,79 @@
 /**
  * Patisco MCP Gateway Client
  * 協定：JSON-RPC 2.0 over HTTP POST
- * 端點：https://mcp.patisco.com:9443
+ * 端點：https://mcp.patisco.com
  *
- * 注意：MCP Gateway 是 pull-only，沒有 webhook push。
- * PAXIS 透過兩條路同步：
- *   1. Cron 輪詢（主要）：每 5 分鐘拉一次 getPIs
- *   2. Webhook（備用）：Patisco 未來支援時自動啟用
+ * 新版 API（2026-06）工具清單：
+ *   listProformaInvoices / listProformaInvoiceCopies
+ *   listPurchaseOrders   / listPurchaseOrderCopies
+ *   listDeliveryOrders
+ *   getOrderDetail / getOrderProducts（orderId 參數，回傳 { detail, products, ... }）
+ *   getDeliveryOrderDetail（需 documentType: "packingList"|"commercialInvoice"）
+ *   getOrderCopyDetail / getOrderCopyProducts
+ *   health
+ *
+ * 已移除的舊工具（已保留 stub 供舊呼叫端 graceful degrade）：
+ *   getPIs → listProformaInvoices
+ *   getShipments / getShipmentDetail → listDeliveryOrders / getDeliveryOrderDetail
+ *   listOrderCopies → listProformaInvoiceCopies / listPurchaseOrderCopies
+ *   getBuyers / getSellers → 已不存在，公司資料改從 order detail 中提取
  */
 
 import type { PrismaClient } from '@prisma/client'
 
 // 預設值（DB 設定優先，環境變數備援）
-const DEFAULT_MCP_URL = process.env.PATISCO_MCP_URL ?? 'https://mcp.patisco.com'
+// 路徑須包含 /mcp（MCP 協定端點）
+const DEFAULT_MCP_URL = process.env.PATISCO_MCP_URL ?? 'https://mcp.patisco.com/mcp'
+
+// ─── MCP Session 管理 ─────────────────────────────────────────────────────────
+// MCP 協定要求先 POST initialize，從回應 Header 取得 mcp-session-id，
+// 後續所有 tools/call 都需帶此 Header。這裡用 in-process Map 快取，
+// 避免同一 sync run 重複 initialize。
+
+const _sessions = new Map<string, string>() // key: mcpUrl → sessionId
+
+async function ensureMcpSession(mcpUrl: string, jwt: string, apiKey: string): Promise<string | null> {
+  const existing = _sessions.get(mcpUrl)
+  if (existing) return existing
+
+  try {
+    const res = await fetch(mcpUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream',
+        'Authorization': `Bearer ${jwt}`,
+        'X-API-Key': apiKey,
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 0,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2024-11-05',
+          capabilities: {},
+          clientInfo: { name: 'paxis', version: '1.0' },
+        },
+      }),
+      signal: AbortSignal.timeout(15_000),
+    })
+    const sessionId = res.headers.get('mcp-session-id')
+    if (sessionId) {
+      _sessions.set(mcpUrl, sessionId)
+      return sessionId
+    }
+    // Session-less server — 繼續不帶 session ID
+    return null
+  } catch (err) {
+    console.warn('[patisco] MCP initialize 失敗', err)
+    return null
+  }
+}
+
+/** 清除 session 快取（換帳號 / JWT 過期時呼叫） */
+export function clearMcpSessions() {
+  _sessions.clear()
+}
 
 // ─── 型別定義 ─────────────────────────────────────────────────────────────────
 
@@ -110,41 +171,128 @@ export type PatiscoOrderWithProducts = {
   Products: PatiscoPIProduct[]
 }
 
+/** listDeliveryOrders 清單項目（實際回傳格式） */
 export type PatiscoShipment = {
-  id: string                    // DeliveryOrder ID
-  no: string                    // 出貨單號
-  status: string                // 出貨狀態
-  buyer: { id: string; name: string }
-  createdDate: string
-  shipDate: string              // 實際出貨日
-  etd?: string                  // 預計出貨日
-  itemsCount?: number
-  shipmentsCount?: number
-  totalNetWeight?: string
-  totalGrossWeight?: string
-  sourceOrders: Array<{ id: string; no: string }>  // 關聯訂單（可多個）
-}
-
-export type PatiscoShipmentPacking = {
-  sku: string
-  modelNo?: string
-  quantity: string              // 注意是 string
-  totalNetWeight: string
-  totalGrossWeight: string
-}
-
-export type PatiscoShipmentDetail = {
   id: string
   no: string
-  status: string
-  buyer: { id: string; name: string }
-  shipDate: string
-  sourceOrders: Array<{ id: string; no: string }>
-  packings: PatiscoShipmentPacking[]
-  totals: {
-    totalNetWeight: string
-    totalGrossWeight: string
-    quantityOfCartons: string
+  buyer?: string           // 買家名稱（字串，非物件）
+  expiredDate?: string | null
+  createdDate?: string
+  completedDate?: string | null
+  copyId?: string
+  tradingCode?: string
+  port?: string
+}
+
+/** getDeliveryOrderDetail 的 packings 項目（packingList 版） */
+export type PatiscoShipmentPackingPL = {
+  id?: string
+  type?: string
+  sourceOrderID?: string
+  sourceProductID?: string
+  sourceOrderNo?: string
+  sku?: string
+  modelNo?: string
+  specification?: string
+  sizeUnit?: string
+  length?: string; height?: string; width?: string
+  totalDimension?: string; itemTotalDimension?: string
+  imperialTotalDimension?: string; itemImperialTotalDimension?: string
+  weightUnit?: string
+  netWeight?: string; totalNetWeight?: string
+  grossWeight?: string; totalGrossWeight?: string
+  unitPerCarton?: string
+  unit?: string
+  quantity?: string; totalQuantity?: string; sourceQuantity?: string
+  quantityOfCartons?: string
+  isSameCase?: string
+  dimension?: string | null
+  caseNumbers?: Array<{ id?: string; caseNo1?: string; caseNo2?: string; identificationCode?: string | null }>
+}
+
+/** getDeliveryOrderDetail 的 packings 項目（commercialInvoice 版） */
+export type PatiscoShipmentPackingCI = {
+  id?: string
+  no?: string
+  sourceOrderID?: string
+  sourceProductID?: string
+  sourceOrderNo?: string
+  sku?: string
+  modelNo?: string
+  specification?: string
+  currencyCode?: string
+  price?: string
+  quantity?: string
+  unit?: string
+  amount?: string
+}
+
+/** getDeliveryOrderDetail 回傳（共用，欄位依 documentType 有差異） */
+export type PatiscoShipmentDetail = {
+  id: string
+  isCopy?: string
+  no: string
+  status?: string
+  createdBy?: string
+  createdDate?: string
+  expiredDate?: string | null
+  shippedBy?: string
+  shipDate?: string
+  shipNo?: string | null
+  from?: string
+  to?: string
+  shipment?: string      // 純文字格式的收貨人資訊
+  note?: string | null
+  marks?: string | null
+  termAndCondition?: string | null
+  currencyCode?: string
+  tradingCode?: string
+  port?: string
+  buyer?: {
+    name?: string
+    address?: string
+    city?: string
+    countryCode?: string
+    postalCode?: string
+    phoneNo?: string
+    email?: string
+    fax?: string
+    taxId?: string
+    buyerId?: string     // Patisco 唯一客戶識別碼
+  }
+  shippingInfo?: {
+    shipVia?: string | null
+    address?: string
+    city?: string
+    countryCode?: string
+    postalCode?: string
+    phoneNo?: string
+    receiver?: string
+  }
+  orders?: Array<{
+    id?: string; no?: string; expiredDate?: string | null
+    totalDimension?: string; imperialTotalDimension?: string
+    totalQuantity?: string; totalGrossWeight?: string; totalNetWeight?: string
+    amount?: string; caseNumber?: string; seq?: string | null
+  }>
+  packings?: (PatiscoShipmentPackingPL | PatiscoShipmentPackingCI)[]
+  extraCharges?: Array<{
+    id?: string; sourceOrderNo?: string; name?: string
+    type?: string; amount?: string; charge?: string; isBeSeen?: string
+  }>
+  exchangeRate?: { roundingType?: string | null; accurateTo?: string | null; value?: string | null; oriCurrency?: string | null; toCurrency?: string | null }
+  copyExchangeRate?: { roundingType?: string | null; accurateTo?: string | null; value?: string | null }
+  total?: {
+    amount?: string | null
+    totalPriceOfProducts?: string | null
+    additionalCharges?: string | null
+    currencyCode?: string
+    quantityOfCartons?: string | null
+    content?: Array<{ unit?: string; quantity?: string }>
+    totalNetWeight?: string | null
+    totalGrossWeight?: string | null
+    totalDimension?: string | null
+    imperialTotalDimension?: string | null
   }
 }
 
@@ -286,16 +434,19 @@ async function mcpCall<T>(
   tool: string,
   args: Record<string, unknown> = {},
 ): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
-  const base = creds._mcpUrl ?? DEFAULT_MCP_URL
+  const base = (creds._mcpUrl ?? DEFAULT_MCP_URL).replace(/\/$/, '')
+  const sessionId = await ensureMcpSession(base, creds.jwt, creds.apiKey)
   try {
-    const res = await fetch(`${base}/`, {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json, text/event-stream',
+      'Authorization': `Bearer ${creds.jwt}`,
+      'X-API-Key': creds.apiKey,
+    }
+    if (sessionId) headers['mcp-session-id'] = sessionId
+    const res = await fetch(base, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${creds.jwt}`,
-        'X-API-Key': creds.apiKey,
-        'Accept': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         jsonrpc: '2.0',
         id: _reqId++,
@@ -309,27 +460,44 @@ async function mcpCall<T>(
       return { ok: false, error: `HTTP ${res.status}` }
     }
 
-    const json = await res.json()
+    // 伺服器回傳 SSE 格式（event: message\ndata: {...}）或純 JSON
+    // 統一用 text() 讀取，再提取 data: 行
+    const raw = await res.text()
+    let json: Record<string, unknown>
+    try {
+      // SSE 格式：取最後一個 data: 行（避免 ping 等 heartbeat 行干擾）
+      const dataLine = raw.split('\n').filter(l => l.startsWith('data:')).pop()
+      const jsonStr = dataLine ? dataLine.replace(/^data:\s*/, '') : raw
+      json = JSON.parse(jsonStr)
+    } catch {
+      return { ok: false, error: `無法解析回應：${raw.slice(0, 200)}` }
+    }
 
     if (json.error) {
-      return { ok: false, error: json.error.message ?? JSON.stringify(json.error) }
+      const err = json.error as Record<string, unknown>
+      // session 過期或無效 → 清除快取讓下次重新 initialize
+      if (typeof err.message === 'string' && /session/i.test(err.message)) {
+        _sessions.delete(base)
+      }
+      return { ok: false, error: (err.message as string) ?? JSON.stringify(err) }
     }
 
     // MCP 回傳格式，依優先順序：
     // 1. result.structuredContent（新版 MCP structured output）
     // 2. result.content[0].text（標準 MCP text content，JSON string）
     // 3. result 本身（直接回傳物件，部分自架 MCP Server）
+    const result = json.result as Record<string, unknown> | undefined
     let data: unknown
-    if (json.result?.structuredContent !== undefined) {
-      data = json.result.structuredContent
-    } else if (Array.isArray(json.result?.content) && json.result.content[0]?.text) {
+    if (result?.structuredContent !== undefined) {
+      data = result.structuredContent
+    } else if (Array.isArray(result?.content) && (result.content as unknown[])[0] && typeof ((result.content as unknown[])[0] as Record<string, unknown>).text === 'string') {
       try {
-        data = JSON.parse(json.result.content[0].text)
+        data = JSON.parse(((result.content as unknown[])[0] as Record<string, unknown>).text as string)
       } catch {
-        data = json.result.content[0].text
+        data = ((result.content as unknown[])[0] as Record<string, unknown>).text
       }
     } else {
-      data = json.result
+      data = result
     }
     return { ok: true, data: data as T }
   } catch (err) {
@@ -462,16 +630,35 @@ function parseOrderProductsText(text: string): PatiscoOrderWithProducts[] {
   return orders
 }
 
-/** 查詢 PI 的商品明細（回傳 orders[].Products[]） */
+export type GetOrderProductsResult = {
+  // 新版：paginated items（PatiscoOrderDetailItem[]）
+  items?: PatiscoOrderDetailItem[]
+  page?: number
+  pageSize?: number
+  totalCount?: number
+  totalPages?: number
+  hasNextPage?: boolean
+  autoExpanded?: boolean
+  // 舊版 fallback
+  orders?: PatiscoOrderWithProducts[]
+}
+
+/** 查詢 PI/PO 的商品明細
+ * 新版參數：{ orderId, page? }
+ * 回傳：paginated items（PatiscoOrderDetailItem[]）或舊版 orders[]
+ */
 export async function getOrderProducts(
   creds: PatiscoCredentials,
-  piId: string,
+  orderId: string,
+  page = 1,
 ) {
-  const res = await mcpCall<{ orders: PatiscoOrderWithProducts[] }>(creds, 'getOrderProducts', {
-    filter: { ID: piId },
-  })
+  const res = await mcpCall<GetOrderProductsResult>(creds, 'getOrderProducts', { orderId, page })
   if (!res.ok) return res
+  // 新版回傳 items[]
+  if (Array.isArray(res.data?.items)) return res
+  // 舊版 fallback：orders[]
   if (Array.isArray(res.data?.orders)) return res
+  // 純文字 fallback（舊版）
   if (typeof res.data === 'string') {
     const orders = parseOrderProductsText(res.data as unknown as string)
     return { ok: true as const, data: { orders } }
@@ -575,10 +762,23 @@ export type PatiscoOrderDetailItem = {
 }
 
 export type GetOrderDetailResult = {
-  order?: PatiscoOrderDetail
+  // 新版 API 回傳 detail（同時保留 order 做 backward compat）
+  detail?: PatiscoOrderDetail
+  order?: PatiscoOrderDetail   // 舊版欄位，仍可能出現
+  products?: {
+    items: PatiscoOrderDetailItem[]
+    page: number
+    pageSize: number
+    totalCount: number
+    totalPages: number
+    hasNextPage: boolean
+    autoExpanded: boolean
+  }
+  priceAdjustments?: PatiscoExtraCharge[]
+  price?: { amount?: string; totalPriceOfProducts?: string } | null
 }
 
-/** 取得 PI 完整 header 資料（含 extraCharges、payment/Incoterm、total） */
+/** 取得 PI/PO 完整 header 資料（含 extraCharges、payment/Incoterm、total） */
 export async function getOrderDetail(
   creds: PatiscoCredentials,
   orderId: string,
@@ -586,7 +786,61 @@ export async function getOrderDetail(
   return mcpCall<GetOrderDetailResult>(creds, 'getOrderDetail', { orderId })
 }
 
-// ─── Buyer 型別 ────────────────────────────────────────────────────────────────
+/** 從 getOrderDetail 回傳中取出 order header（相容新舊格式） */
+export function extractOrderDetail(data: GetOrderDetailResult | undefined): PatiscoOrderDetail | null {
+  if (!data) return null
+  return data.detail ?? data.order ?? null
+}
+
+// ─── 新版 List 工具 ──────────────────────────────────────────────────────────
+
+export type PatiscoListResult<T> = {
+  items: T[]
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+  hasNextPage: boolean
+  autoExpanded: boolean
+}
+
+/** 列出我方發出的 PI 正本（listProformaInvoices） */
+export async function listProformaInvoices(creds: PatiscoCredentials, page = 1) {
+  return mcpCall<PatiscoListResult<PatiscoPI>>(creds, 'listProformaInvoices', { page })
+}
+
+/** 列出我方收到的 PI 副本（供應商發給我方）（listProformaInvoiceCopies） */
+export async function listProformaInvoiceCopies(creds: PatiscoCredentials, page = 1) {
+  return mcpCall<PatiscoListResult<PatiscoOrderCopy>>(creds, 'listProformaInvoiceCopies', { page })
+}
+
+/** 列出我方發出的 PO 正本（listPurchaseOrders） */
+export async function listPurchaseOrders(creds: PatiscoCredentials, page = 1) {
+  return mcpCall<PatiscoListResult<PatiscoOrderCopy>>(creds, 'listPurchaseOrders', { page })
+}
+
+/** 列出我方收到的 PO 副本（客戶發給我方）（listPurchaseOrderCopies） */
+export async function listPurchaseOrderCopies(creds: PatiscoCredentials, page = 1) {
+  return mcpCall<PatiscoListResult<PatiscoOrderCopy>>(creds, 'listPurchaseOrderCopies', { page })
+}
+
+/** 列出進行中的出貨單（listDeliveryOrders，Status=0） */
+export async function listDeliveryOrders(creds: PatiscoCredentials, page = 1) {
+  return mcpCall<PatiscoListResult<PatiscoShipment>>(creds, 'listDeliveryOrders', { page })
+}
+
+/** 取得出貨文件明細（需指定文件類型） */
+export async function getDeliveryOrderDetail(
+  creds: PatiscoCredentials,
+  shipmentId: string,
+  documentType: 'packingList' | 'commercialInvoice',
+) {
+  return mcpCall<{ detail?: PatiscoShipmentDetail; item?: PatiscoShipmentDetail }>(
+    creds, 'getDeliveryOrderDetail', { shipmentId, documentType }
+  )
+}
+
+// ─── Buyer 型別（已不存在獨立 getBuyers API，保留型別供相容）──────────────
 
 export type PatiscoBuyer = {
   ID: string
@@ -644,49 +898,41 @@ function parseBuyersText(text: string): PatiscoBuyer[] {
   return buyers
 }
 
-/** 取得所有 buyers（客戶）清單 */
+/** @deprecated getBuyers 已在新版 MCP API 移除。公司資料改從 order detail 提取。 */
 export async function getBuyers(
-  creds: PatiscoCredentials,
-  args: GetBuyersArgs = {},
-) {
-  const res = await mcpCall<GetBuyersResult>(creds, 'getBuyers', args as Record<string, unknown>)
-  if (!res.ok) return res
-  if (Array.isArray(res.data?.items)) return res
-  if (typeof res.data === 'string') {
-    const items = parseBuyersText(res.data as unknown as string)
-    return { ok: true as const, data: { items, totalCount: items.length } }
-  }
-  return res
+  _creds: PatiscoCredentials,
+  _args: GetBuyersArgs = {},
+): Promise<{ ok: false; error: string }> {
+  console.warn('[patisco] getBuyers 已移除，請改用 listProformaInvoices 並從 order detail 提取 buyer 資料')
+  return { ok: false, error: 'getBuyers: tool removed in new MCP API' }
 }
 
-/** 查詢特定 buyer 的出貨單列表 */
+/** @deprecated getShipments 已移除，請改用 listDeliveryOrders */
 export async function getShipments(
-  creds: PatiscoCredentials,
-  args: GetShipmentsArgs,
-) {
-  return mcpCall<GetShipmentsResult>(creds, 'getShipments', args as Record<string, unknown>)
+  _creds: PatiscoCredentials,
+  _args: GetShipmentsArgs,
+): Promise<{ ok: false; error: string }> {
+  console.warn('[patisco] getShipments 已移除，請改用 listDeliveryOrders')
+  return { ok: false, error: 'getShipments: tool removed in new MCP API' }
 }
 
-/** 查詢出貨單明細（裝箱清單） */
+/** @deprecated getShipmentDetail 已移除，請改用 getDeliveryOrderDetail */
 export async function getShipmentDetail(
-  creds: PatiscoCredentials,
-  deliveryOrderId: string | number,
-) {
-  return mcpCall<GetShipmentDetailResult>(creds, 'getShipmentDetail', {
-    filter: { DeliveryOrderID: String(deliveryOrderId) },
-  })
+  _creds: PatiscoCredentials,
+  _deliveryOrderId: string | number,
+): Promise<{ ok: false; error: string }> {
+  console.warn('[patisco] getShipmentDetail 已移除，請改用 getDeliveryOrderDetail')
+  return { ok: false, error: 'getShipmentDetail: tool removed in new MCP API' }
 }
 
-/** 在 Patisco 建立空白 PI 草稿（PAXIS 反向推送用） */
+/** @deprecated addBlankPIOrder 已移除（新版 API 為唯讀）*/
 export async function addBlankPIOrder(
-  creds: PatiscoCredentials,
-  buyerId: string | number,
-  products: Array<{ ProductID: string | number; Quantity: number }> = [],
-) {
-  return mcpCall<{ OrderID: string }>(creds, 'addBlankPIOrder', {
-    BuyerID: String(buyerId),
-    Products: products,
-  })
+  _creds: PatiscoCredentials,
+  _buyerId: string | number,
+  _products: Array<{ ProductID: string | number; Quantity: number }> = [],
+): Promise<{ ok: false; error: string }> {
+  console.warn('[patisco] addBlankPIOrder 已移除，新版 MCP API 為唯讀')
+  return { ok: false, error: 'addBlankPIOrder: tool removed in new MCP API (read-only)' }
 }
 
 /** 查詢所有工具清單（debug 用） */
@@ -1000,20 +1246,17 @@ type GetSellersResult = {
   items: PatiscoSeller[]
 }
 
-/** 查詢 Patisco 賣家名錄（= 我方的供應商） */
+/** @deprecated getSellers 已在新版 MCP API 移除。公司資料改從 order detail 提取。 */
 export async function getSellers(
-  creds: PatiscoCredentials,
-  args: GetSellersArgs,
-) {
-  return mcpCall<GetSellersResult>(creds, 'getSellers', args as Record<string, unknown>)
+  _creds: PatiscoCredentials,
+  _args: GetSellersArgs,
+): Promise<{ ok: false; error: string }> {
+  console.warn('[patisco] getSellers 已移除，請改用 listProformaInvoiceCopies 並從 order detail 提取 seller 資料')
+  return { ok: false, error: 'getSellers: tool removed in new MCP API' }
 }
 
-// ─── 供應商 PO 副本（Order Copies）────────────────────────────────────────────
-// Patisco 架構：
-//   正本（getPIs）= 我方是 Seller，發給客戶的 PI
-//   副本（listOrderCopies）= 供應商發給我方的 PO，我方是 Buyer
+// ─── Order Copy 型別 ──────────────────────────────────────────────────────────
 
-// listOrderCopies 回傳大寫欄位名（與 getPIs 小寫不同）
 export type PatiscoOrderCopy = {
   // 大寫（listOrderCopies 實際回傳格式）
   ID?: string
@@ -1088,34 +1331,13 @@ export type PatiscoOrderCopyProduct = {
   height?: string | null
 }
 
-/** 列出 PO 副本清單（供應商發給我方的 PO）
- *
- * 分頁語意（同 getPIs）：
- *   first  = 起始索引（0-based）
- *   offset = 取回筆數（預設 20）
- *
- * status 必填，影本狀態碼：
- *   0=Editing, 1=Confirmed（文件尚未有官方定義，以實測為準）
- */
+/** @deprecated listOrderCopies 已移除。改用 listProformaInvoiceCopies 或 listPurchaseOrderCopies。 */
 export async function listOrderCopies(
-  creds: PatiscoCredentials,
-  args: {
-    status: string     // 必填
-    first?: number     // 起始索引，預設 0
-    offset?: number    // 取回筆數，預設 20
-    orderBy?: string
-  },
-) {
-  return mcpCall<{ items: PatiscoOrderCopy[]; totalCount?: string | number; pageCount?: number }>(
-    creds,
-    'listOrderCopies',
-    {
-      status: args.status,
-      first:  args.first  ?? 0,
-      offset: args.offset ?? 20,
-      ...(args.orderBy ? { orderBy: args.orderBy } : {}),
-    },
-  )
+  _creds: PatiscoCredentials,
+  _args: { status: string; first?: number; offset?: number; orderBy?: string },
+): Promise<{ ok: false; error: string }> {
+  console.warn('[patisco] listOrderCopies 已移除，請改用 listProformaInvoiceCopies / listPurchaseOrderCopies')
+  return { ok: false, error: 'listOrderCopies: tool removed in new MCP API' }
 }
 
 /** 取得 PO 副本完整 header（含 seller 資料） */
@@ -1126,21 +1348,16 @@ export async function getOrderCopyDetail(
   return mcpCall<{ data?: PatiscoOrderCopyDetail | null; item?: PatiscoOrderCopyDetail }>(creds, 'getOrderCopyDetail', { copyId })
 }
 
-/** 取得 PO 副本的商品明細
- *
- * 分頁語意（同 getPIs）：
- *   first  = 起始索引（0-based）
- *   offset = 取回筆數（預設 50）
- */
+/** 取得副本的商品明細（新版參數：copyId + page） */
 export async function getOrderCopyProducts(
   creds: PatiscoCredentials,
   copyId: string,
-  args: { first?: number; offset?: number } = {},
+  page = 1,
 ) {
-  return mcpCall<{ items: PatiscoOrderCopyProduct[]; totalCount?: string | number }>(
+  return mcpCall<PatiscoListResult<PatiscoOrderCopyProduct> & { items: PatiscoOrderCopyProduct[]; totalCount?: string | number }>(
     creds,
     'getOrderCopyProducts',
-    { copyId, first: args.first ?? 0, offset: args.offset ?? 50 },
+    { copyId, page },
   )
 }
 
