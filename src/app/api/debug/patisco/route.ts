@@ -145,6 +145,30 @@ export async function GET(req: NextRequest) {
       })
     }
 
+    // 將缺 etd 的 SLS_PI 對應的 SYS_PatiscoSync 重設為 pending，讓下次 sync 補填 ETD
+    if (action === 'backfillEtd') {
+      const sql = neon(process.env.DATABASE_URL!)
+      const missing = await prisma.sLS_PI.findMany({
+        where: { etd: null, source: 'PATISCO', patiscoDocId: { not: null } },
+        select: { id: true, piNo: true, patiscoDocId: true },
+      })
+      if (missing.length === 0) return NextResponse.json({ ok: true, message: '無需補填', reset: 0 })
+
+      const docIds = missing.map(p => p.patiscoDocId!)
+      await sql`
+        UPDATE "SYS_PatiscoSync"
+        SET status = 'pending'
+        WHERE "patiscoDocId" = ANY(${docIds}::text[]) AND "docType" = 'PI'
+      `
+      return NextResponse.json({
+        ok: true,
+        missing: missing.length,
+        reset: docIds.length,
+        message: '請再跑一次 Patisco 同步，ETD 將自動補填',
+        pis: missing.map(p => p.piNo),
+      })
+    }
+
     return NextResponse.json({ error: 'unknown action' })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })

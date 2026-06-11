@@ -191,7 +191,7 @@ export async function syncPatiscoPIs(source: SyncSource, db?: PrismaClient, dbUr
     const sellerName = pi.seller ?? ''
     const buyerName  = pi.buyer  ?? ''
 
-    // 去重：成功 / 部分成功 → 跳過；失敗 → 刪舊紀錄重試（全從記憶體查）
+    // 去重：成功 / 部分成功 → 跳過；失敗或 pending（補填用）→ 重試
     const existing = syncMap.get(docId) ?? null
     if (existing?.status === 'ok' || existing?.status === 'partial') {
       result.skipped++
@@ -449,7 +449,11 @@ async function processOurPIToCustomer(
     where: { OR: [{ patiscoDocId: piId }, { piNo: pi.no }] },
   })
   if (existingPI) {
-    return { ok: true, items: [] }  // 已處理過
+    // 補填缺漏欄位
+    if (!existingPI.etd && piEtd) {
+      await prisma.sLS_PI.update({ where: { id: existingPI.id }, data: { etd: piEtd } })
+    }
+    return { ok: true, items: [] }
   }
 
   const slsPi = await prisma.sLS_PI.create({
