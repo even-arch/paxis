@@ -169,6 +169,12 @@ export async function syncPatiscoPIs(source: SyncSource, db?: PrismaClient, dbUr
   const pis: PatiscoPI[] = allPIs
   result.total = pis.length
 
+  // 5a. 一次撈完所有 PI 的 sync 紀錄（避免迴圈內每筆都打 DB）
+  const existingSyncRows = await execSQL(sql,
+    `SELECT "patiscoDocId", id, status FROM "SYS_PatiscoSync" WHERE "docType" = 'PI'`
+  ) as { patiscoDocId: string; id: number; status: string }[]
+  const syncMap = new Map(existingSyncRows.map(r => [r.patiscoDocId, r]))
+
   // 5. 逐張處理
   for (const pi of pis) {
     const docId = pi.no
@@ -176,11 +182,8 @@ export async function syncPatiscoPIs(source: SyncSource, db?: PrismaClient, dbUr
     const sellerName = pi.seller ?? ''
     const buyerName  = pi.buyer  ?? ''
 
-    // 去重：成功 / 部分成功 → 跳過；失敗 → 刪舊紀錄重試
-    const syncRows = await execSQL(sql,
-      `SELECT id, status FROM "SYS_PatiscoSync" WHERE "docType" = 'PI' AND "patiscoDocId" = '${esc(docId)}' LIMIT 1`
-    )
-    const existing = (syncRows[0] as { id: number; status: string } | undefined) ?? null
+    // 去重：成功 / 部分成功 → 跳過；失敗 → 刪舊紀錄重試（全從記憶體查）
+    const existing = syncMap.get(docId) ?? null
     if (existing?.status === 'ok' || existing?.status === 'partial') {
       result.skipped++
       continue
@@ -742,6 +745,12 @@ export async function syncPatiscoSupplierPOs(source: SyncSource, db?: PrismaClie
   result.total = copies.length
   console.log(`[patisco-po-sync] listProformaInvoiceCopies 拉到 ${copies.length} 筆 PO`)
 
+  // 一次撈完所有 PO sync 紀錄
+  const poSyncRows = await execSQL(sql,
+    `SELECT "patiscoDocId", id, status FROM "SYS_PatiscoSync" WHERE "docType" = 'PO'`
+  ) as { patiscoDocId: string; id: number; status: string }[]
+  const poSyncMap = new Map(poSyncRows.map(r => [r.patiscoDocId, r]))
+
   for (const copy of copies) {
     const docId: string = (copy.ID ?? copy.id ?? '').toString()
     const docNo: string = (copy.No ?? copy.no ?? '').toString()
@@ -752,11 +761,8 @@ export async function syncPatiscoSupplierPOs(source: SyncSource, db?: PrismaClie
       continue
     }
 
-    // 去重
-    const syncRows = await execSQL(sql,
-      `SELECT id, status FROM "SYS_PatiscoSync" WHERE "docType" = 'PO' AND "patiscoDocId" = '${esc(docId)}' LIMIT 1`
-    )
-    const existing = (syncRows[0] as { id: number; status: string } | undefined) ?? null
+    // 去重（記憶體查找）
+    const existing = poSyncMap.get(docId) ?? null
     if (existing?.status === 'ok' || existing?.status === 'partial') {
       result.skipped++
       continue

@@ -70,7 +70,6 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
   const [syncElapsed, setSyncElapsed] = useState(0)
   const [enriching, setEnriching] = useState(false)
   const [enrichProgress, setEnrichProgress] = useState<{ done: number; total: number; skipped: number } | null>(null)
-  const [catalogSyncing, setCatalogSyncing] = useState(false)
   const [msg, setMsg] = useState<{ type: 'ok' | 'error'; text: string } | null>(null)
   const [testResult, setTestResult] = useState<{
     ok: boolean; tools?: string[]; msg?: string; error?: string
@@ -80,9 +79,6 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
     pi?: { processed: number; skipped: number; errors: number; details?: Array<{patiscoDocNo:string; status:string; msg?:string}> }
     shipments?: { processed: number; skipped: number; errors: number }
     durationMs?: number
-  } | null>(null)
-  const [catalogResult, setCatalogResult] = useState<{
-    products: number; created: number; updated: number; skipped: number; errors: number; durationMs?: number
   } | null>(null)
 
   const isConfigured = !!initialConfig
@@ -143,30 +139,6 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
     setTesting(false)
     setTestResult(data)
     router.refresh()
-  }
-
-  async function handleCatalogSync() {
-    setCatalogSyncing(true); setCatalogResult(null); setMsg(null)
-    try {
-      const res = await fetch('/api/patisco/catalog-sync', { method: 'POST' })
-      const data = await res.json()
-      setCatalogSyncing(false)
-      if (data.ok) {
-        setCatalogResult({
-          products: data.products,
-          created: data.created,
-          updated: data.updated,
-          skipped: data.skipped,
-          errors: data.errors,
-          durationMs: data.durationMs,
-        })
-      } else {
-        setMsg({ type: 'error', text: `型錄同步失敗：${data.error ?? '未知錯誤'}` })
-      }
-    } catch {
-      setCatalogSyncing(false)
-      setMsg({ type: 'error', text: '型錄同步請求失敗，請檢查網路' })
-    }
   }
 
   async function handleEnrich() {
@@ -273,10 +245,6 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
                 </>
               ) : '手動同步'}
             </button>
-            <button onClick={handleCatalogSync} disabled={catalogSyncing}
-              className="text-sm px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50">
-              {catalogSyncing ? '型錄同步中...' : '📦 型錄同步'}
-            </button>
             <button onClick={handleEnrich} disabled={enriching || syncing}
               className="text-sm px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 flex items-center gap-1.5">
               {enriching ? (
@@ -320,16 +288,10 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
       {/* 測試結果 */}
       {testResult && (
         <div className={`px-6 py-3 border-b text-sm ${testResult.ok ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-700'}`}>
-          {testResult.ok ? (
-            <div>
-              <p className="font-medium">✓ {testResult.msg}</p>
-              {testResult.tools && testResult.tools.length > 0 && (
-                <p className="text-xs mt-1 text-green-600 font-mono">
-                  {testResult.tools.join('  ·  ')}
-                </p>
-              )}
-            </div>
-          ) : <p>✗ {testResult.error}</p>}
+          {testResult.ok
+            ? <p className="font-medium">✓ 連線成功</p>
+            : <p>✗ {testResult.error}</p>
+          }
         </div>
       )}
 
@@ -375,19 +337,6 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
         </div>
       )}
 
-      {/* 型錄同步結果 */}
-      {catalogResult && (
-        <div className="px-6 py-3 border-b bg-indigo-50 text-sm text-indigo-800">
-          <p className="font-medium mb-1">✓ 型錄同步完成{catalogResult.durationMs ? `（${(catalogResult.durationMs / 1000).toFixed(1)}s）` : ''}</p>
-          <div className="flex gap-4 text-xs mt-2">
-            <span>掃描 <b>{catalogResult.products}</b> 筆</span>
-            <span className="text-green-700">新增 <b>{catalogResult.created}</b></span>
-            <span className="text-blue-700">更新 <b>{catalogResult.updated}</b></span>
-            {catalogResult.skipped > 0 && <span className="text-gray-500">跳過 <b>{catalogResult.skipped}</b></span>}
-            {catalogResult.errors > 0 && <span className="text-red-600">錯誤 <b>{catalogResult.errors}</b></span>}
-          </div>
-        </div>
-      )}
 
       <form onSubmit={handleSave} className="p-6 space-y-5">
 

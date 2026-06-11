@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/db'
 import { formatDate } from '@/lib/utils'
 import PatiscoConfigForm from './PatiscoConfigForm'
-import CompanyAliasPanel from './CompanyAliasPanel'
 
 export default async function PatiscoSyncPage() {
     const config = await prisma.sYS_PatiscoConfig.findFirst({
@@ -48,9 +47,6 @@ export default async function PatiscoSyncPage() {
 
       {/* 設定表單 */}
       <PatiscoConfigForm initialConfig={configData} />
-
-      {/* 公司別名管理 */}
-      <CompanyAliasPanel />
 
       {/* 同步統計 */}
       {logs.length > 0 && (
