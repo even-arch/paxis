@@ -290,7 +290,9 @@ async function processOurPIToCustomer(
   const piId = pi.no
 
   // 拉取 PI 完整資料（header + products 一次取齊）
+  console.log(`[patisco-sync] getOrderDetail pi.no=${pi.no} pi.id=${pi.id}`)
   const detailRes = await getOrderDetail(creds, pi.id)
+  console.log(`[patisco-sync] getOrderDetail ok=${detailRes.ok} err=${detailRes.error ?? ''} products=${detailRes.data?.products?.items?.length ?? 'none'}`)
   const orderDetail = detailRes.ok ? extractOrderDetail(detailRes.data) : null
   const tradeTermsCode = orderDetail?.payment != null ? parseInt(String(orderDetail.payment), 10) : null
   const extraCharges: PatiscoExtraCharge[] = orderDetail?.extraCharges ?? []
@@ -320,6 +322,8 @@ async function processOurPIToCustomer(
   const detailItems: PatiscoOrderDetailItem[] = detailRes.ok
     ? extractDetailProducts(detailRes.data)
     : []
+
+  console.log(`[patisco-sync] PI ${pi.no} detailItems.length=${detailItems.length}`)
 
   let products: PatiscoPIProduct[]
   let currency: string
