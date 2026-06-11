@@ -223,9 +223,6 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
           {initialConfig?.userId && (
             <span className="text-xs text-gray-400">— userId: {initialConfig.userId}</span>
           )}
-          {initialConfig?.lastTestMsg && !jwtExpired && (
-            <span className="text-xs text-gray-500">— {initialConfig.lastTestMsg}</span>
-          )}
         </div>
         {isConfigured && (
           <div className="flex gap-2">
