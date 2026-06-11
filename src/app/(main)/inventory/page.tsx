@@ -1,13 +1,19 @@
 export const dynamic = 'force-dynamic'
 import Link from 'next/link'
 import { prisma } from '@/lib/db'
+import SortableHeader from '@/components/SortableHeader'
 
-type Props = { searchParams: { search?: string; filter?: string } }
+const VALID_SORTS = ['name', 'sku', 'availableQty', 'quantity', 'reservedQty', 'pendingQty', 'safetyStock'] as const
+type SortField = typeof VALID_SORTS[number]
+
+type Props = { searchParams: { search?: string; filter?: string; sort?: string; dir?: string } }
 
 export default async function InventoryPage({
   searchParams }: Props) {
     const search = searchParams.search ?? ''
   const filter = searchParams.filter ?? ''
+  const sort: SortField = VALID_SORTS.includes(searchParams.sort as SortField) ? searchParams.sort as SortField : 'name'
+  const dir = searchParams.dir === 'desc' ? 'desc' : 'asc'
 
   const products = await prisma.pRD_Product.findMany({
     where: search
@@ -62,9 +68,31 @@ export default async function InventoryPage({
   const lowRows = rows.filter(r => r.availableQty <= r.safetyStock)
   if (filter === 'low') rows = lowRows
 
+  // in-memory sort
+  rows.sort((a, b) => {
+    const av = a[sort as keyof Row]; const bv = b[sort as keyof Row]
+    if (av === null || av === undefined) return 1
+    if (bv === null || bv === undefined) return -1
+    const cmp = typeof av === 'string' ? av.localeCompare(bv as string) : (av as number) - (bv as number)
+    return dir === 'desc' ? -cmp : cmp
+  })
+
   const totalProducts = products.length
   const withStockCount = rows.filter(r => r.quantity > 0).length
   const reservedCount = rows.filter(r => r.reservedQty > 0).length
+
+  function buildUrl(newSort: string, newDir: 'asc' | 'desc') {
+    const p = new URLSearchParams()
+    if (search) p.set('search', search)
+    if (filter) p.set('filter', filter)
+    p.set('sort', newSort)
+    p.set('dir', newDir)
+    return `/inventory?${p.toString()}`
+  }
+
+  const sh = (label: string, field: string, align: 'left' | 'right' | 'center' = 'right', className?: string) => (
+    <SortableHeader label={label} field={field} sort={sort} dir={dir} buildUrl={buildUrl} align={align} className={className} />
+  )
 
   return (
     <div>
@@ -96,10 +124,12 @@ export default async function InventoryPage({
       </div>
 
       <form method="GET" className="mb-4 flex gap-2">
+        <input type="hidden" name="sort" value={sort} />
+        <input type="hidden" name="dir" value={dir} />
+        {filter === 'low' && <input type="hidden" name="filter" value="low" />}
         <input name="search" defaultValue={search}
           placeholder="搜尋商品名稱、SKU..."
           className="border border-gray-300 rounded-md px-3 py-2 text-sm w-72 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        {filter === 'low' && <input type="hidden" name="filter" value="low" />}
         <button type="submit" className="bg-gray-100 border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-200">搜尋</button>
         {(search || filter) && (
           <Link href="/inventory" className="border border-gray-300 px-4 py-2 rounded-md text-sm text-gray-500 hover:bg-gray-50">清除</Link>
@@ -115,15 +145,19 @@ export default async function InventoryPage({
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">商品</th>
+              {sh('商品', 'name', 'left')}
               <th className="text-right px-4 py-3 font-medium text-gray-600">
-                <span className="text-blue-600">可用庫存</span>
-                <span className="text-gray-400 text-xs ml-1 font-normal">= 實際 − 預留</span>
+                <a href={buildUrl('availableQty', sort === 'availableQty' && dir === 'asc' ? 'desc' : 'asc')}
+                  className={`inline-flex items-center gap-0.5 hover:text-blue-600 select-none ${sort === 'availableQty' ? 'text-blue-600' : 'text-gray-600'}`}>
+                  <span className="text-blue-600">可用庫存</span>
+                  <span className="text-gray-400 text-xs ml-1 font-normal">= 實際 − 預留</span>
+                  {sort === 'availableQty' ? <span className="text-xs">{dir === 'asc' ? ' ↑' : ' ↓'}</span> : <span className="text-gray-300 text-xs ml-0.5">↕</span>}
+                </a>
               </th>
-              <th className="text-right px-4 py-3 font-medium text-teal-600">採購在途</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-600">實際庫存</th>
-              <th className="text-right px-4 py-3 font-medium text-purple-600">預留中</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-600">安全庫存</th>
+              {sh('採購在途', 'pendingQty', 'right', 'text-teal-600')}
+              {sh('實際庫存', 'quantity', 'right')}
+              {sh('預留中', 'reservedQty', 'right', 'text-purple-600')}
+              {sh('安全庫存', 'safetyStock', 'right')}
               <th className="text-right px-4 py-3 font-medium text-gray-600">加權成本</th>
               <th className="text-center px-4 py-3 font-medium text-gray-600">狀態</th>
               <th className="px-4 py-3" />

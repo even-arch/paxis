@@ -2,6 +2,7 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import SortableHeader from '@/components/SortableHeader'
 
 export type ProductRow = {
   id: number
@@ -23,11 +24,14 @@ type Props = {
   supplierId: number | null
   archived: boolean
   filterSupplierName?: string
+  sort?: string
+  dir?: 'asc' | 'desc'
 }
 
 export default function ProductsClient({
   products, total, page, totalPages,
   search, supplierId, archived, filterSupplierName,
+  sort = 'sku', dir = 'asc',
 }: Props) {
   const router = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -37,6 +41,9 @@ export default function ProductsClient({
   const [deletePassword, setDeletePassword] = useState('')
   const [deleteError, setDeleteError] = useState('')
   const [showExcelImportResult, setShowExcelImportResult] = useState<null | { updated: number; skipped: number; results: { sku: string; name: string; action: string; changes?: string[]; reason?: string }[] }>(null)
+  const [enriching, setEnriching] = useState(false)
+  const [enrichMsg, setEnrichMsg] = useState<string | null>(null)
+  const [enrichProgress, setEnrichProgress] = useState<{ done: number; total: number } | null>(null)
 
   const allIds = products.map(p => p.id)
   const allSelected = allIds.length > 0 && allIds.every(id => selected.has(id))
@@ -61,7 +68,15 @@ export default function ProductsClient({
     if (Number(overrides.page ?? page) > 1) params.set('page', String(overrides.page ?? page))
     if ((overrides.supplierId ?? supplierId)) params.set('supplierId', String(overrides.supplierId ?? supplierId))
     if (overrides.archived ?? archived) params.set('archived', 'true')
+    const s = (overrides.sort as string | undefined) ?? sort
+    const d = (overrides.dir as string | undefined) ?? dir
+    params.set('sort', s)
+    params.set('dir', d)
     return `/products?${params.toString()}`
+  }
+
+  function buildSortUrl(newSort: string, newDir: 'asc' | 'desc') {
+    return buildUrl({ sort: newSort, dir: newDir, page: 1 })
   }
 
   async function handleBatch(action: 'archive' | 'unarchive') {
@@ -95,6 +110,42 @@ export default function ProductsClient({
       const err = await res.json()
       setDeleteError(err.error ?? '刪除失敗')
     }
+  }
+
+  async function handleEnrich() {
+    setEnriching(true); setEnrichMsg(null); setEnrichProgress(null)
+    try {
+      const preview = await fetch('/api/admin/re-enrich').then(r => r.json())
+      if (preview.error) {
+        setEnrichMsg(`錯誤：${preview.error}`)
+        setEnriching(false)
+        return
+      }
+      const total = (preview.needName ?? 0) + (preview.needHts ?? 0)
+      if (total === 0) {
+        setEnrichMsg(`不需要豐富化（共 ${preview.total ?? 0} 筆商品，${preview.noSpec ?? 0} 筆無規格）`)
+        setEnriching(false)
+        return
+      }
+      let done = 0; let offset = 0
+      const batchSize = 5
+      while (true) {
+        const res = await fetch(`/api/admin/re-enrich?batch=${batchSize}&offset=${offset}`, { method: 'POST' })
+        const data = await res.json()
+        if (!data.ok) { setEnrichMsg(`豐富化失敗：${data.error ?? '未知錯誤'}`); break }
+        done += data.changed ?? 0
+        offset += batchSize
+        setEnrichProgress({ done, total })
+        if (!data.hasMore) {
+          setEnrichMsg(`AI 豐富化完成：${done} 筆商品已更新`)
+          break
+        }
+      }
+    } catch (e) {
+      setEnrichMsg(`錯誤：${e instanceof Error ? e.message : String(e)}`)
+    }
+    setEnriching(false)
+    router.refresh()
   }
 
   function handleExport() {
@@ -138,6 +189,12 @@ export default function ProductsClient({
               : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
             {archived ? '查看現有產品' : '查看封存產品'}
           </a>
+          <button onClick={handleEnrich} disabled={enriching || working}
+            className="border border-purple-300 text-purple-700 bg-purple-50 px-3 py-2 rounded-md text-sm font-medium hover:bg-purple-100 disabled:opacity-50">
+            {enriching
+              ? (enrichProgress ? `✨ 豐富化 ${enrichProgress.done}/${enrichProgress.total}` : '✨ 查詢中...')
+              : '✨ AI 豐富化'}
+          </button>
           <button onClick={handleExport}
             className="border border-green-300 text-green-700 bg-green-50 px-3 py-2 rounded-md text-sm font-medium hover:bg-green-100">
             ↓ 匯出 Excel{selected.size > 0 ? ` (${selected.size})` : ''}
@@ -169,6 +226,14 @@ export default function ProductsClient({
       {archived && (
         <div className="mb-3 flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 text-sm">
           <span className="text-amber-700">目前顯示封存產品</span>
+        </div>
+      )}
+
+      {/* AI 豐富化結果 */}
+      {enrichMsg && (
+        <div className="mb-4 flex items-center justify-between bg-purple-50 border border-purple-200 rounded-lg px-4 py-2 text-sm text-purple-700">
+          <span>{enrichMsg}</span>
+          <button onClick={() => setEnrichMsg(null)} className="text-purple-400 hover:text-purple-600 ml-4">×</button>
         </div>
       )}
 
@@ -225,6 +290,8 @@ export default function ProductsClient({
       <form method="GET" className="mb-4 flex gap-2">
         {supplierId && <input type="hidden" name="supplierId" value={supplierId} />}
         {archived && <input type="hidden" name="archived" value="true" />}
+        <input type="hidden" name="sort" value={sort} />
+        <input type="hidden" name="dir" value={dir} />
         <input name="search" defaultValue={search}
           placeholder="搜尋商品名稱、SKU、型號..."
           className="border border-gray-300 rounded-md px-3 py-2 text-sm w-80 focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -248,12 +315,12 @@ export default function ProductsClient({
                 <input type="checkbox" checked={allSelected} onChange={toggleAll}
                   className="rounded border-gray-300" />
               </th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">商品名稱</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">SKU</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">型號</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">單位</th>
+              <SortableHeader label="商品名稱" field="name" sort={sort} dir={dir} buildUrl={buildSortUrl} />
+              <SortableHeader label="SKU" field="sku" sort={sort} dir={dir} buildUrl={buildSortUrl} />
+              <SortableHeader label="型號" field="modelNo" sort={sort} dir={dir} buildUrl={buildSortUrl} />
+              <SortableHeader label="單位" field="unit" sort={sort} dir={dir} buildUrl={buildSortUrl} />
               <th className="text-right px-4 py-3 font-medium text-gray-600">庫存</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">建立日期</th>
+              <SortableHeader label="建立日期" field="createdAt" sort={sort} dir={dir} buildUrl={buildSortUrl} />
               <th className="px-4 py-3" />
             </tr>
           </thead>

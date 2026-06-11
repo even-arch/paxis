@@ -1,13 +1,18 @@
 export const dynamic = 'force-dynamic'
 import Link from 'next/link'
 import { prisma } from '@/lib/db'
+import SortableHeader from '@/components/SortableHeader'
 
-type Props = { searchParams: { search?: string; page?: string } }
+type Props = { searchParams: { search?: string; page?: string; sort?: string; dir?: string } }
 
-export default async function CustomersPage({
-  searchParams }: Props) {
-    const search = searchParams.search ?? ''
+const VALID_SORTS = ['name', 'shortName', 'countryCode', 'currencyCode', 'createdAt'] as const
+type SortField = typeof VALID_SORTS[number]
+
+export default async function CustomersPage({ searchParams }: Props) {
+  const search = searchParams.search ?? ''
   const page = Math.max(1, Number(searchParams.page ?? 1))
+  const sort: SortField = VALID_SORTS.includes(searchParams.sort as SortField) ? searchParams.sort as SortField : 'name'
+  const dir = searchParams.dir === 'desc' ? 'desc' : 'asc'
   const limit = 20
 
   const where = search
@@ -25,7 +30,7 @@ export default async function CustomersPage({
     prisma.cUS_Customer.count({ where }),
     prisma.cUS_Customer.findMany({
       where,
-      orderBy: { name: 'asc' },
+      orderBy: { [sort]: dir },
       skip: (page - 1) * limit,
       take: limit,
       include: { _count: { select: { salesOrders: true } } },
@@ -33,6 +38,18 @@ export default async function CustomersPage({
   ])
 
   const totalPages = Math.ceil(total / limit)
+
+  function buildUrl(newSort: string, newDir: 'asc' | 'desc') {
+    const p = new URLSearchParams()
+    if (search) p.set('search', search)
+    p.set('sort', newSort)
+    p.set('dir', newDir)
+    return `/customers?${p.toString()}`
+  }
+
+  const sh = (label: string, field: string, align?: 'left' | 'right') => (
+    <SortableHeader label={label} field={field} sort={sort} dir={dir} buildUrl={buildUrl} align={align} />
+  )
 
   return (
     <div>
@@ -45,6 +62,8 @@ export default async function CustomersPage({
       </div>
 
       <form method="GET" className="mb-4 flex gap-2">
+        <input type="hidden" name="sort" value={sort} />
+        <input type="hidden" name="dir" value={dir} />
         <input name="search" defaultValue={search}
           placeholder="搜尋客戶名稱、Email..."
           className="border border-gray-300 rounded-md px-3 py-2 text-sm w-80 focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -58,11 +77,11 @@ export default async function CustomersPage({
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">客戶名稱</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">簡稱</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">國家</th>
+              {sh('客戶名稱', 'name')}
+              {sh('簡稱', 'shortName')}
+              {sh('國家', 'countryCode')}
               <th className="text-left px-4 py-3 font-medium text-gray-600">付款條件</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">幣別</th>
+              {sh('幣別', 'currencyCode')}
               <th className="text-right px-4 py-3 font-medium text-gray-600">訂單數</th>
               <th className="px-4 py-3" />
             </tr>
@@ -102,7 +121,7 @@ export default async function CustomersPage({
           <span className="text-gray-500">共 {total} 筆</span>
           <div className="flex gap-1 ml-auto">
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-              <Link key={p} href={`/customers?search=${search}&page=${p}`}
+              <Link key={p} href={`/customers?search=${search}&sort=${sort}&dir=${dir}&page=${p}`}
                 className={`px-3 py-1 rounded-md ${p === page ? 'bg-blue-600 text-white' : 'border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
                 {p}
               </Link>

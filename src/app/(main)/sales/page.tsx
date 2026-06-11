@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 import Link from 'next/link'
 import { prisma } from '@/lib/db'
 import { formatDate, formatCurrency } from '@/lib/utils'
+import SortableHeader from '@/components/SortableHeader'
 
 const STATUS_LABELS: Record<number, { label: string; color: string }> = {
   0: { label: '草稿',    color: 'bg-gray-100 text-gray-600' },
@@ -19,13 +20,17 @@ const SOURCE_LABELS: Record<string, string> = {
   MARKETPLACE: '電商平台',
 }
 
-type Props = { searchParams: { search?: string; page?: string; customerId?: string } }
+const VALID_SORTS = ['orderNo', 'currencyCode', 'totalAmount', 'status', 'source', 'customerRequestedShipDate', 'createdAt'] as const
+type SortField = typeof VALID_SORTS[number]
 
-export default async function SalesPage({
-  searchParams }: Props) {
-    const search = searchParams.search ?? ''
+type Props = { searchParams: { search?: string; page?: string; customerId?: string; sort?: string; dir?: string } }
+
+export default async function SalesPage({ searchParams }: Props) {
+  const search = searchParams.search ?? ''
   const customerId = searchParams.customerId ? Number(searchParams.customerId) : undefined
   const page = Math.max(1, Number(searchParams.page ?? 1))
+  const sort: SortField = VALID_SORTS.includes(searchParams.sort as SortField) ? searchParams.sort as SortField : 'createdAt'
+  const dir = searchParams.dir === 'asc' ? 'asc' : 'desc'
   const limit = 20
 
   const where: Record<string, unknown> = {}
@@ -42,7 +47,7 @@ export default async function SalesPage({
     prisma.sLS_Order.count({ where }),
     prisma.sLS_Order.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { [sort]: dir },
       skip: (page - 1) * limit,
       take: limit,
       include: {
@@ -53,6 +58,19 @@ export default async function SalesPage({
   ])
 
   const totalPages = Math.ceil(total / limit)
+
+  function buildUrl(newSort: string, newDir: 'asc' | 'desc') {
+    const p = new URLSearchParams()
+    if (search) p.set('search', search)
+    if (customerId) p.set('customerId', String(customerId))
+    p.set('sort', newSort)
+    p.set('dir', newDir)
+    return `/sales?${p.toString()}`
+  }
+
+  const sh = (label: string, field: string, align?: 'left' | 'right') => (
+    <SortableHeader label={label} field={field} sort={sort} dir={dir} buildUrl={buildUrl} align={align} />
+  )
 
   return (
     <div>
@@ -71,6 +89,9 @@ export default async function SalesPage({
       </div>
 
       <form method="GET" className="mb-4 flex gap-2">
+        <input type="hidden" name="sort" value={sort} />
+        <input type="hidden" name="dir" value={dir} />
+        {customerId && <input type="hidden" name="customerId" value={customerId} />}
         <input name="search" defaultValue={search}
           placeholder="搜尋訂單號、客戶名稱..."
           className="border border-gray-300 rounded-md px-3 py-2 text-sm w-80 focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -84,14 +105,14 @@ export default async function SalesPage({
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">訂單號</th>
+              {sh('訂單號', 'orderNo')}
               <th className="text-left px-4 py-3 font-medium text-gray-600">客戶</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">幣別</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-600">金額</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">狀態</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">來源</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">希望出貨日</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">建立日期</th>
+              {sh('幣別', 'currencyCode')}
+              {sh('金額', 'totalAmount', 'right')}
+              {sh('狀態', 'status')}
+              {sh('來源', 'source')}
+              {sh('希望出貨日', 'customerRequestedShipDate')}
+              {sh('建立日期', 'createdAt')}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -135,7 +156,7 @@ export default async function SalesPage({
           <span className="text-gray-500">共 {total} 筆</span>
           <div className="flex gap-1 ml-auto">
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-              <Link key={p} href={`/sales?search=${search}&page=${p}`}
+              <Link key={p} href={`/sales?search=${search}&sort=${sort}&dir=${dir}&page=${p}`}
                 className={`px-3 py-1 rounded-md ${p === page ? 'bg-teal-600 text-white' : 'border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
                 {p}
               </Link>

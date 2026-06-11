@@ -4,7 +4,10 @@ import ProductsClient from './ProductsClient'
 
 export const dynamic = 'force-dynamic'
 
-type Props = { searchParams: { search?: string; page?: string; supplierId?: string; archived?: string } }
+const VALID_SORTS = ['name', 'sku', 'modelNo', 'unit', 'createdAt'] as const
+type SortField = typeof VALID_SORTS[number]
+
+type Props = { searchParams: { search?: string; page?: string; supplierId?: string; archived?: string; sort?: string; dir?: string } }
 
 export default async function ProductsPage({
   searchParams }: Props) {
@@ -12,6 +15,8 @@ export default async function ProductsPage({
   const page = Math.max(1, Number(searchParams.page ?? 1))
   const supplierId = searchParams.supplierId ? Number(searchParams.supplierId) : null
   const archived = searchParams.archived === 'true'
+  const sort: SortField = VALID_SORTS.includes(searchParams.sort as SortField) ? searchParams.sort as SortField : 'sku'
+  const dir = searchParams.dir === 'desc' ? 'desc' : 'asc'
   const limit = 20
 
   const filterSupplier = supplierId
@@ -39,7 +44,7 @@ export default async function ProductsPage({
     prisma.pRD_Product.count({ where }),
     prisma.pRD_Product.findMany({
       where,
-      orderBy: [{ sku: 'asc' }, { name: 'asc' }],
+      orderBy: { [sort]: dir },
       skip: (page - 1) * limit,
       take: limit,
       include: { inventoryItems: { select: { quantity: true } } },
@@ -48,6 +53,8 @@ export default async function ProductsPage({
 
   return (
     <ProductsClient
+      sort={sort}
+      dir={dir}
       products={products.map(p => ({
         id: p.id,
         name: p.name,

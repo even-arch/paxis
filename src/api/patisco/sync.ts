@@ -81,7 +81,7 @@ function execSQL(sql: any, query: string): Promise<Record<string, unknown>[]> {
   return (sql as unknown as (t: TemplateStringsArray) => Promise<Record<string, unknown>[]>)(tmpl)
 }
 
-function esc(v: string) { return v.replace(/'/g, "''") }
+function esc(v: string | null | undefined) { return (v ?? '').replace(/'/g, "''") }
 
 // getOrderDetail 的產品可能在 data.products.items（新版）或 data.detail.items（舊版）
 function extractDetailProducts(data: import('./client').GetOrderDetailResult | undefined): import('./client').PatiscoOrderDetailItem[] {
@@ -290,9 +290,7 @@ async function processOurPIToCustomer(
   const piId = pi.no
 
   // 拉取 PI 完整資料（header + products 一次取齊）
-  console.log(`[patisco-sync] getOrderDetail pi.no=${pi.no} pi.id=${pi.id}`)
   const detailRes = await getOrderDetail(creds, pi.id)
-  console.log(`[patisco-sync] getOrderDetail ok=${detailRes.ok} err=${detailRes.error ?? ''} products=${detailRes.data?.products?.items?.length ?? 'none'}`)
   const orderDetail = detailRes.ok ? extractOrderDetail(detailRes.data) : null
   const tradeTermsCode = orderDetail?.payment != null ? parseInt(String(orderDetail.payment), 10) : null
   const extraCharges: PatiscoExtraCharge[] = orderDetail?.extraCharges ?? []
@@ -323,29 +321,32 @@ async function processOurPIToCustomer(
     ? extractDetailProducts(detailRes.data)
     : []
 
-  console.log(`[patisco-sync] PI ${pi.no} detailItems.length=${detailItems.length}`)
-
   let products: PatiscoPIProduct[]
   let currency: string
 
   if (detailItems.length > 0) {
-    products = detailItems.map(i => ({
-      ID: '',
-      SKU: i.sku ?? undefined,
-      ModelNo: i.modelNo ?? undefined,
-      Specification: i.specification ?? undefined,
-      Note: i.note ?? null,
-      Quantity: i.quantity ?? '0',
-      Price: i.price ?? undefined,
-      CurrencyCode: i.currencyCode ?? undefined,
-      Unit: i.unit ?? undefined,
-      NetWeight: i.netWeight ?? null,
-      GrossWeight: i.grossWeight ?? null,
-      UnitPerCarton: i.unitPerCarton ?? null,
-      Length: i.length ?? null,
-      Width: i.width ?? null,
-      Height: i.height ?? null,
-    } satisfies PatiscoPIProduct))
+    console.log(`[patisco-sync] first detailItem keys: ${Object.keys(detailItems[0]).join(',')} | sku="${(detailItems[0] as Record<string,unknown>).sku}" SKU="${(detailItems[0] as Record<string,unknown>).SKU}"`)
+    products = detailItems.map(i => {
+      // API sometimes returns uppercase SKU instead of lowercase sku
+      const raw = i as Record<string, unknown>
+      return {
+        ID: '',
+        SKU: (i.sku || (raw.SKU as string | undefined)) ?? undefined,
+        ModelNo: (i.modelNo || (raw.ModelNo as string | undefined)) ?? undefined,
+        Specification: i.specification ?? undefined,
+        Note: i.note ?? null,
+        Quantity: i.quantity ?? '0',
+        Price: i.price ?? undefined,
+        CurrencyCode: i.currencyCode ?? undefined,
+        Unit: i.unit ?? undefined,
+        NetWeight: i.netWeight ?? null,
+        GrossWeight: i.grossWeight ?? null,
+        UnitPerCarton: i.unitPerCarton ?? null,
+        Length: i.length ?? null,
+        Width: i.width ?? null,
+        Height: i.height ?? null,
+      } satisfies PatiscoPIProduct
+    })
     const rawCurrency = detailItems[0]?.currencyCode
     currency = resolvePatiscoCurrency(rawCurrency, 'TWD')
   } else {
@@ -354,23 +355,26 @@ async function processOurPIToCustomer(
     const newItems = prodRes.ok ? (prodRes.data?.items ?? []) : []
     const oldOrders: PatiscoOrderWithProducts[] = prodRes.ok ? (prodRes.data?.orders ?? []) : []
     products = newItems.length
-      ? newItems.map(i => ({
-          ID: '',
-          SKU: i.sku ?? undefined,
-          ModelNo: i.modelNo ?? undefined,
-          Specification: i.specification ?? undefined,
-          Note: i.note ?? null,
-          Quantity: i.quantity ?? '0',
-          Price: i.price ?? undefined,
-          CurrencyCode: i.currencyCode ?? undefined,
-          Unit: i.unit ?? undefined,
-          NetWeight: i.netWeight ?? null,
-          GrossWeight: i.grossWeight ?? null,
-          UnitPerCarton: i.unitPerCarton ?? null,
-          Length: i.length ?? null,
-          Width: i.width ?? null,
-          Height: i.height ?? null,
-        } satisfies PatiscoPIProduct))
+      ? newItems.map(i => {
+          const raw = i as Record<string, unknown>
+          return {
+            ID: '',
+            SKU: (i.sku || (raw.SKU as string | undefined)) ?? undefined,
+            ModelNo: (i.modelNo || (raw.ModelNo as string | undefined)) ?? undefined,
+            Specification: i.specification ?? undefined,
+            Note: i.note ?? null,
+            Quantity: i.quantity ?? '0',
+            Price: i.price ?? undefined,
+            CurrencyCode: i.currencyCode ?? undefined,
+            Unit: i.unit ?? undefined,
+            NetWeight: i.netWeight ?? null,
+            GrossWeight: i.grossWeight ?? null,
+            UnitPerCarton: i.unitPerCarton ?? null,
+            Length: i.length ?? null,
+            Width: i.width ?? null,
+            Height: i.height ?? null,
+          } satisfies PatiscoPIProduct
+        })
       : (oldOrders[0]?.Products ?? pi.Products ?? [])
     const rawCurrency = oldOrders[0]?.CurrencyCode ?? pi.priceText?.split(' ')[1]
     currency = resolvePatiscoCurrency(rawCurrency, 'TWD')
@@ -1121,11 +1125,14 @@ async function findProduct(
     })
     if (p) return p
   }
-  // patiscoProductId 備援
-  return prisma.pRD_Product.findFirst({
-    where: { patiscoProductId: item.ID, isActive: true },
-    select: { id: true, sku: true },
-  })
+  // patiscoProductId 備援（只在 ID 非空時才查，否則 '' 會命中所有 patiscoProductId='' 的商品）
+  if (item.ID) {
+    return prisma.pRD_Product.findFirst({
+      where: { patiscoProductId: item.ID, isActive: true },
+      select: { id: true, sku: true },
+    })
+  }
+  return null
 }
 
 // ─── Helper：寫同步紀錄 ───────────────────────────────────────────────────────
@@ -1204,8 +1211,10 @@ export async function syncPatiscoDeliveryOrders(
   console.log(`[patisco-do-sync] listDeliveryOrders 拉到 ${allDOs.length} 筆`)
 
   for (const doHeader of allDOs) {
-    const docId = doHeader.id
-    const docNo = doHeader.no
+    const docId = String(doHeader.id ?? '')
+    const docNo = String(doHeader.no ?? '')
+    console.log(`[patisco-do-sync] 處理 DO docId="${docId}" docNo="${docNo}"`)
+
 
     // 去重
     const existing = await prisma.sYS_PatiscoSync.findFirst({
@@ -1224,6 +1233,11 @@ export async function syncPatiscoDeliveryOrders(
 
       const ci = ciRes.ok ? (ciRes.data?.detail ?? ciRes.data?.item ?? null) : null
       const pl = plRes.ok ? (plRes.data?.detail ?? plRes.data?.item ?? null) : null
+      const ciDataKeys = ciRes.ok ? Object.keys(ciRes.data ?? {}).join(',') : 'N/A'
+      const plDataKeys = plRes.ok ? Object.keys(plRes.data ?? {}).join(',') : 'N/A'
+      const ciSample = ciRes.ok ? JSON.stringify(ciRes.data).slice(0, 200) : ''
+      console.log(`[patisco-do-sync] DO ${docNo} ciOk=${ciRes.ok} plOk=${plRes.ok} ciDataKeys=${ciDataKeys} plDataKeys=${plDataKeys}`)
+      console.log(`[patisco-do-sync] DO ${docNo} ciSample=${ciSample}`)
       const detail = ci ?? pl
 
       if (!detail) {

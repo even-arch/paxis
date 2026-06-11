@@ -3,14 +3,19 @@ import Link from 'next/link'
 import { prisma } from '@/lib/db'
 import { formatDate } from '@/lib/utils'
 import { statusBadge } from '@/modules/purchase/poUtils'
+import SortableHeader from '@/components/SortableHeader'
 
-type Props = { searchParams: { search?: string; status?: string; page?: string } }
+const VALID_SORTS = ['poNo', 'patiscoOrderNo', 'status', 'expectedDate', 'createdAt'] as const
+type SortField = typeof VALID_SORTS[number]
 
-export default async function PurchasesPage({
-  searchParams }: Props) {
-    const search = searchParams.search ?? ''
+type Props = { searchParams: { search?: string; status?: string; page?: string; sort?: string; dir?: string } }
+
+export default async function PurchasesPage({ searchParams }: Props) {
+  const search = searchParams.search ?? ''
   const statusFilter = searchParams.status ?? ''
   const page = Math.max(1, Number(searchParams.page ?? 1))
+  const sort: SortField = VALID_SORTS.includes(searchParams.sort as SortField) ? searchParams.sort as SortField : 'createdAt'
+  const dir = searchParams.dir === 'asc' ? 'asc' : 'desc'
   const limit = 20
 
   const where: Record<string, unknown> = {}
@@ -27,7 +32,7 @@ export default async function PurchasesPage({
     prisma.pO_Order.count({ where }),
     prisma.pO_Order.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { [sort]: dir },
       skip: (page - 1) * limit,
       take: limit,
       include: {
@@ -47,6 +52,19 @@ export default async function PurchasesPage({
     { value: '4', label: '取消' },
   ]
 
+  function buildUrl(newSort: string, newDir: 'asc' | 'desc') {
+    const p = new URLSearchParams()
+    if (search) p.set('search', search)
+    if (statusFilter) p.set('status', statusFilter)
+    p.set('sort', newSort)
+    p.set('dir', newDir)
+    return `/purchases?${p.toString()}`
+  }
+
+  const sh = (label: string, field: string, align?: 'left' | 'right') => (
+    <SortableHeader label={label} field={field} sort={sort} dir={dir} buildUrl={buildUrl} align={align} />
+  )
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -64,6 +82,8 @@ export default async function PurchasesPage({
       </div>
 
       <form method="GET" className="mb-4 flex gap-2 flex-wrap">
+        <input type="hidden" name="sort" value={sort} />
+        <input type="hidden" name="dir" value={dir} />
         <input name="search" defaultValue={search}
           placeholder="搜尋供應商訂單號、Patisco 訂單號、供應商..."
           className="border border-gray-300 rounded-md px-3 py-2 text-sm w-80 focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -81,13 +101,13 @@ export default async function PurchasesPage({
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">供應商訂單號</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Patisco 訂單</th>
+              {sh('供應商訂單號', 'poNo')}
+              {sh('Patisco 訂單', 'patiscoOrderNo')}
               <th className="text-left px-4 py-3 font-medium text-gray-600">供應商</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">狀態</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">預計到貨</th>
+              {sh('狀態', 'status')}
+              {sh('預計到貨', 'expectedDate')}
               <th className="text-right px-4 py-3 font-medium text-gray-600">項目</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">建立日期</th>
+              {sh('建立日期', 'createdAt')}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -131,7 +151,7 @@ export default async function PurchasesPage({
           <span className="text-gray-500">共 {total} 筆</span>
           <div className="flex gap-1 ml-auto">
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-              <Link key={p} href={`/purchases?search=${search}&status=${statusFilter}&page=${p}`}
+              <Link key={p} href={`/purchases?search=${search}&status=${statusFilter}&sort=${sort}&dir=${dir}&page=${p}`}
                 className={`px-3 py-1 rounded-md ${p === page ? 'bg-blue-600 text-white' : 'border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
                 {p}
               </Link>
