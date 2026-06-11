@@ -399,7 +399,9 @@ export async function patiscoLogin(
 /** 實際執行登入（Email / Login ID + 密碼） */
 async function doLogin(mcpUrl: string, loginId: string, password: string): Promise<PatiscoCredentials | null> {
   try {
-    const res = await fetch(`${mcpUrl}/auth/login`, {
+    // auth 端點在根域名，不在 MCP 子路徑下（如 /mcp）
+    const origin = new URL(mcpUrl).origin
+    const res = await fetch(`${origin}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ loginId, password }),
