@@ -29,6 +29,10 @@ import {
   getBuyers,
   listOrderCopies,
   listTools,
+  getOrderDetail,
+  getOrderProducts,
+  listProformaInvoices,
+  listProformaInvoiceCopies,
 } from '@/api/patisco/client'
 
 const DEFAULT_MCP_URL = process.env.PATISCO_MCP_URL ?? 'https://mcp.patisco.com'
@@ -257,8 +261,29 @@ export async function GET(req: NextRequest) {
       }
       break
     }
+    case 'getOrderDetail': {
+      const orderId = searchParams.get('orderId') ?? ''
+      result = await getOrderDetail(creds, orderId)
+      break
+    }
+    case 'getOrderProducts': {
+      const orderId = searchParams.get('orderId') ?? ''
+      const page = Number(searchParams.get('page') ?? '1')
+      result = await getOrderProducts(creds, orderId, page)
+      break
+    }
+    case 'listProformaInvoices': {
+      const page = Number(searchParams.get('page') ?? '1')
+      result = await listProformaInvoices(creds, page)
+      break
+    }
+    case 'listProformaInvoiceCopies': {
+      const page = Number(searchParams.get('page') ?? '1')
+      result = await listProformaInvoiceCopies(creds, page)
+      break
+    }
     default:
-      return NextResponse.json({ error: `unknown tool: ${tool}`, available: ['raw','listTools','aiConfig','migration','getPIs','getBuyers','searchBuyers','getBuyerCategories','getBuyerCatalogs','getBuyerCategoryProducts','getBuyerProductDetail','listOrderCopies'] })
+      return NextResponse.json({ error: `unknown tool: ${tool}`, available: ['raw','listTools','aiConfig','migration','getPIs','getBuyers','searchBuyers','getBuyerCategories','getBuyerCatalogs','getBuyerCategoryProducts','getBuyerProductDetail','listOrderCopies','getOrderDetail','getOrderProducts','listProformaInvoices','listProformaInvoiceCopies'] })
   }
 
   return NextResponse.json(result)
