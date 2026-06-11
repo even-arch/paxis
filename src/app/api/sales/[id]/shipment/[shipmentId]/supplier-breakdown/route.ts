@@ -49,6 +49,7 @@ export async function GET(_req: NextRequest, {
 
   for (const shipItem of shipment.items) {
     const slsItem = shipItem.slsItem
+    if (!slsItem) continue
     const product = slsItem.product
     const unitPrice = Number(slsItem.unitPrice)
     const qty = shipItem.quantity

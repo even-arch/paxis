@@ -328,8 +328,8 @@ export default async function SalesDetailPage({
             piNos: s.pis.map(sp => sp.pi.piNo),
             items: s.items.map(si => ({
               id: si.id,
-              productName: si.slsItem.product.name,
-              sku: si.slsItem.product.sku ?? null,
+              productName: si.slsItem?.product.name ?? '（未知商品）',
+              sku: si.slsItem?.product.sku ?? null,
               quantity: si.quantity,
               cartons: si.cartons ?? null,
               grossWeightKg: si.grossWeightKg != null ? parseFloat(si.grossWeightKg.toString()) : null,

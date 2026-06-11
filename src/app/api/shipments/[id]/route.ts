@@ -107,12 +107,12 @@ export async function GET(_req: NextRequest, { params }: Params) {
       // 品項清單
       items: shipment.items.map(i => ({
         id:            i.id,
-        sku:           i.slsItem.product.sku ?? '',
-        name:          i.slsItem.product.name,
-        specification: i.slsItem.product.specification ?? '',
+        sku:           i.slsItem?.product.sku ?? '',
+        name:          i.slsItem?.product.name ?? '（未知商品）',
+        specification: i.slsItem?.product.specification ?? '',
         quantity:      i.quantity,
-        unitPrice:     i.slsItem.unitPrice != null ? parseFloat(i.slsItem.unitPrice.toString()) : null,
-        unit:          i.slsItem.unit ?? 'PC',
+        unitPrice:     i.slsItem?.unitPrice != null ? parseFloat(i.slsItem.unitPrice.toString()) : null,
+        unit:          i.slsItem?.unit ?? 'PC',
         cartons:       i.cartons,
         grossWeightKg: i.grossWeightKg != null ? parseFloat(i.grossWeightKg.toString()) : null,
         cbm:           i.cbm != null ? parseFloat(i.cbm.toString()) : null,

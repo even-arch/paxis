@@ -9,3 +9,4 @@ prisma/dev.db-journal
 .wrangler/
 .vercel
 .gstack/
+.env*

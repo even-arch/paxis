@@ -27,7 +27,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   if (!shipment) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   // 驗證：出貨的品項中至少有一筆屬於此訂單
-  const belongsToOrder = shipment.items.some(si => si.slsItem.orderId === orderId)
+  const belongsToOrder = shipment.items.some(si => si.slsItem?.orderId === orderId)
   if (!belongsToOrder) return NextResponse.json({ error: '出貨記錄不屬於此訂單' }, { status: 400 })
 
   // 有效的 PI id set（status=0），用來決定是否要補回 reservedQty
@@ -37,9 +37,10 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
   // 反轉庫存：quantity++，且若此品項有對應有效 PI 則 reservedQty++
   for (const si of shipment.items) {
-    const productId = si.slsItem.productId
+    const productId = si.slsItem?.productId
+    if (!productId) continue
     // 此品項所屬訂單有沒有有效 PI
-    const itemOrderId = si.slsItem.orderId
+    const itemOrderId = si.slsItem?.orderId
     const hasActivePiForItem = shipment.pis.some(
       sp => sp.pi.orderId === itemOrderId && sp.pi.status === 0
     )
@@ -69,10 +70,12 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     })
 
     // 還原 SLS_Item 已出貨數
-    await prisma.sLS_Item.update({
-      where: { id: si.slsItem.id },
-      data: { shippedQty: { decrement: si.quantity } },
-    })
+    if (si.slsItem?.id) {
+      await prisma.sLS_Item.update({
+        where: { id: si.slsItem.id },
+        data: { shippedQty: { decrement: si.quantity } },
+      })
+    }
   }
 
   // 刪除應收帳款
@@ -83,7 +86,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   await prisma.sLS_Shipment.delete({ where: { id: shipmentId } })
 
   // 重新計算所有受影響訂單的狀態
-  const affectedOrderIds = Array.from(new Set(shipment.items.map(si => si.slsItem.orderId)))
+  const affectedOrderIds = Array.from(new Set(shipment.items.map(si => si.slsItem?.orderId).filter((id): id is number => id != null)))
   for (const affOrderId of affectedOrderIds) {
     const updatedItems = await prisma.sLS_Item.findMany({ where: { orderId: affOrderId } })
     const anyShipped = updatedItems.some(i => i.shippedQty > 0)
