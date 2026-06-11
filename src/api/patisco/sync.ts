@@ -84,6 +84,16 @@ function execSQL(sql: any, query: string): Promise<Record<string, unknown>[]> {
 
 function esc(v: string) { return v.replace(/'/g, "''") }
 
+// getOrderDetail 的產品可能在 data.products.items（新版）或 data.detail.items（舊版）
+function extractDetailProducts(data: import('./client').GetOrderDetailResult | undefined): import('./client').PatiscoOrderDetailItem[] {
+  if (!data) return []
+  const topLevel = data.products?.items ?? []
+  if (topLevel.length > 0) return topLevel
+  return (data.detail as { items?: import('./client').PatiscoOrderDetailItem[] } | undefined)?.items
+    ?? (data.order as { items?: import('./client').PatiscoOrderDetailItem[] } | undefined)?.items
+    ?? []
+}
+
 export async function syncPatiscoPIs(source: SyncSource, db?: PrismaClient, dbUrl?: string, sharedCreds?: PatiscoCredentials & { _mcpUrl: string }): Promise<SyncResult> {
   const prisma = db ?? defaultPrisma
   const resolvedDbUrl = dbUrl ?? process.env.DATABASE_URL!
@@ -297,7 +307,7 @@ async function processOurPIToCustomer(
   // getOrderDetail 已包含 products（autoExpanded=true 時全部一次拿完）
   // 若 products 不在 detail 裡（舊版 fallback），再呼叫 getOrderProducts
   const detailItems: PatiscoOrderDetailItem[] = detailRes.ok
-    ? (detailRes.data?.products?.items ?? [])
+    ? extractDetailProducts(detailRes.data)
     : []
 
   let products: PatiscoPIProduct[]
@@ -537,7 +547,7 @@ async function processSupplierPI(
 
   if (!poOrder) {
     const detailItems: PatiscoOrderDetailItem[] = detailRes.ok
-      ? (detailRes.data?.products?.items ?? [])
+      ? extractDetailProducts(detailRes.data)
       : []
 
     let products: PatiscoPIProduct[]
@@ -836,17 +846,18 @@ export async function syncPatiscoSupplierPOs(source: SyncSource, db?: PrismaClie
         const detailRes = await getOrderDetail(creds, docId)
         const orderDetail = detailRes.ok ? extractOrderDetail(detailRes.data) : null
         const detailProducts: PatiscoOrderDetailItem[] = detailRes.ok
-          ? (detailRes.data?.products?.items ?? [])
+          ? extractDetailProducts(detailRes.data)
           : []
         const tradeTermsFromDetail = orderDetail?.payment != null
           ? parseInt(String(orderDetail.payment), 10)
           : tradeTermsCode
 
-        // 若 getOrderDetail 回傳 seller 完整資料，更新供應商主檔
+        // 若 getOrderDetail 回傳 seller 完整資料，更新供應商主檔（含正確名稱）
         if (orderDetail?.seller?.name) {
           await prisma.sUP_Supplier.update({
             where: { id: supplierId },
             data: {
+              name:          orderDetail.seller.name,   // 用詳情的完整名稱覆蓋清單的縮寫
               ...(orderDetail.seller.address   ? { address: orderDetail.seller.address }       : {}),
               ...(orderDetail.seller.city      ? { city: orderDetail.seller.city }             : {}),
               ...(orderDetail.seller.countryCode ? { countryCode: orderDetail.seller.countryCode } : {}),
