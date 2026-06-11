@@ -175,8 +175,17 @@ export async function syncPatiscoPIs(source: SyncSource, db?: PrismaClient, dbUr
   ) as { patiscoDocId: string; id: number; status: string }[]
   const syncMap = new Map(existingSyncRows.map(r => [r.patiscoDocId, r]))
 
+  // 25 秒預算：Vercel function 最多 30s，留 5s buffer 給回應
+  // 超時後停止，下次 sync 從 SYS_PatiscoSync 已 ok 的繼續跳過
+  const BUDGET_MS = 25_000
+  const startMs = Date.now()
+
   // 5. 逐張處理
   for (const pi of pis) {
+    if (Date.now() - startMs > BUDGET_MS) {
+      console.warn(`[patisco-sync] 已達時間預算 ${BUDGET_MS}ms，剩餘 PI 留待下次處理`)
+      break
+    }
     const docId = pi.no
     const docNo = pi.no
     const sellerName = pi.seller ?? ''
@@ -751,7 +760,15 @@ export async function syncPatiscoSupplierPOs(source: SyncSource, db?: PrismaClie
   ) as { patiscoDocId: string; id: number; status: string }[]
   const poSyncMap = new Map(poSyncRows.map(r => [r.patiscoDocId, r]))
 
+  const PO_BUDGET_MS = 20_000
+  const poStartMs = Date.now()
+
   for (const copy of copies) {
+    if (Date.now() - poStartMs > PO_BUDGET_MS) {
+      console.warn(`[patisco-po-sync] 已達時間預算，剩餘 PO 留待下次處理`)
+      break
+    }
+
     const docId: string = (copy.ID ?? copy.id ?? '').toString()
     const docNo: string = (copy.No ?? copy.no ?? '').toString()
 

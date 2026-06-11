@@ -14,6 +14,8 @@ import { syncPatiscoPIs, syncPatiscoBuyers, syncPatiscoSupplierPOs, syncPatiscoD
  * prisma 在 route handler 層取得後傳入 sync 函式，
  * 避免深層 async 鏈裡 getServerSession 讀不到 session context。
  */
+export const maxDuration = 60  // Vercel Pro 最長 60s
+
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
