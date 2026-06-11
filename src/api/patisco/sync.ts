@@ -268,7 +268,7 @@ async function processOurPIToCustomer(
 
   const piId = pi.no
 
-  // 拉取 PI 完整 header（含 extraCharges、payment/Incoterm）
+  // 拉取 PI 完整資料（header + products 一次取齊）
   const detailRes = await getOrderDetail(creds, pi.id)
   const orderDetail = detailRes.ok ? extractOrderDetail(detailRes.data) : null
   const tradeTermsCode = orderDetail?.payment != null ? parseInt(String(orderDetail.payment), 10) : null
@@ -290,38 +290,66 @@ async function processOurPIToCustomer(
           ...(b.fax          ? { fax: b.fax }                    : {}),
           ...(b.taxId        ? { taxId: b.taxId }                : {}),
         },
-      }).catch(() => {})  // 非必要，失敗不影響主流程
+      }).catch(() => {})
     }
   }
 
-  // 拉取 PI 商品明細（新版：orderId 參數，回傳 items[]；舊版 fallback：orders[]）
-  const prodRes = await getOrderProducts(creds, pi.id)
-  if (!prodRes.ok) return { ok: false, error: `getOrderProducts 失敗: ${prodRes.error}` }
+  // getOrderDetail 已包含 products（autoExpanded=true 時全部一次拿完）
+  // 若 products 不在 detail 裡（舊版 fallback），再呼叫 getOrderProducts
+  const detailItems: PatiscoOrderDetailItem[] = detailRes.ok
+    ? (detailRes.data?.products?.items ?? [])
+    : []
 
-  // 相容新版 items[] 和舊版 orders[].Products[]
-  const newItems = prodRes.data?.items
-  const oldOrders: PatiscoOrderWithProducts[] = prodRes.data?.orders ?? []
-  const products: PatiscoPIProduct[] = newItems?.length
-    ? newItems.map(i => ({
-        ID: '',
-        SKU: i.sku ?? undefined,
-        ModelNo: i.modelNo ?? undefined,
-        Specification: i.specification ?? undefined,
-        Note: i.note ?? null,
-        Quantity: i.quantity ?? '0',
-        Price: i.price ?? undefined,
-        CurrencyCode: i.currencyCode ?? undefined,
-        Unit: i.unit ?? undefined,
-        NetWeight: i.netWeight ?? null,
-        GrossWeight: i.grossWeight ?? null,
-        UnitPerCarton: i.unitPerCarton ?? null,
-        Length: i.length ?? null,
-        Width: i.width ?? null,
-        Height: i.height ?? null,
-      } satisfies PatiscoPIProduct))
-    : (oldOrders[0]?.Products ?? pi.Products ?? [])
-  const rawCurrencyCode = oldOrders[0]?.CurrencyCode ?? pi.priceText?.split(' ')[1]
-  const currency = resolvePatiscoCurrency(rawCurrencyCode, 'TWD')
+  let products: PatiscoPIProduct[]
+  let currency: string
+
+  if (detailItems.length > 0) {
+    products = detailItems.map(i => ({
+      ID: '',
+      SKU: i.sku ?? undefined,
+      ModelNo: i.modelNo ?? undefined,
+      Specification: i.specification ?? undefined,
+      Note: i.note ?? null,
+      Quantity: i.quantity ?? '0',
+      Price: i.price ?? undefined,
+      CurrencyCode: i.currencyCode ?? undefined,
+      Unit: i.unit ?? undefined,
+      NetWeight: i.netWeight ?? null,
+      GrossWeight: i.grossWeight ?? null,
+      UnitPerCarton: i.unitPerCarton ?? null,
+      Length: i.length ?? null,
+      Width: i.width ?? null,
+      Height: i.height ?? null,
+    } satisfies PatiscoPIProduct))
+    const rawCurrency = detailItems[0]?.currencyCode
+    currency = resolvePatiscoCurrency(rawCurrency, 'TWD')
+  } else {
+    // fallback：呼叫 getOrderProducts
+    const prodRes = await getOrderProducts(creds, pi.id)
+    const newItems = prodRes.ok ? (prodRes.data?.items ?? []) : []
+    const oldOrders: PatiscoOrderWithProducts[] = prodRes.ok ? (prodRes.data?.orders ?? []) : []
+    products = newItems.length
+      ? newItems.map(i => ({
+          ID: '',
+          SKU: i.sku ?? undefined,
+          ModelNo: i.modelNo ?? undefined,
+          Specification: i.specification ?? undefined,
+          Note: i.note ?? null,
+          Quantity: i.quantity ?? '0',
+          Price: i.price ?? undefined,
+          CurrencyCode: i.currencyCode ?? undefined,
+          Unit: i.unit ?? undefined,
+          NetWeight: i.netWeight ?? null,
+          GrossWeight: i.grossWeight ?? null,
+          UnitPerCarton: i.unitPerCarton ?? null,
+          Length: i.length ?? null,
+          Width: i.width ?? null,
+          Height: i.height ?? null,
+        } satisfies PatiscoPIProduct))
+      : (oldOrders[0]?.Products ?? pi.Products ?? [])
+    const rawCurrency = oldOrders[0]?.CurrencyCode ?? pi.priceText?.split(' ')[1]
+    currency = resolvePatiscoCurrency(rawCurrency, 'TWD')
+  }
 
   // ── 找或建 SLS_Order ──────────────────────────────────────────────────────
   let order = await prisma.sLS_Order.findFirst({
@@ -496,7 +524,7 @@ async function processSupplierPI(
   })
   if (existingSupPI) return { ok: true }
 
-  // 拉 PI header（extraCharges、tradeTermsCode）
+  // 拉 PI 完整資料（header + products 一次取齊）
   const detailRes = await getOrderDetail(creds, pi.id)
   const orderDetail = detailRes.ok ? extractOrderDetail(detailRes.data) : null
   const tradeTermsCode = orderDetail?.payment != null ? parseInt(String(orderDetail.payment), 10) : null
@@ -508,30 +536,57 @@ async function processSupplierPI(
   })
 
   if (!poOrder) {
-    // 拉明細，嘗試建草稿 PO_Order
-    const prodRes = await getOrderProducts(creds, pi.id)
-    const newItems = prodRes.ok ? (prodRes.data?.items ?? []) : []
-    const oldOrders = prodRes.ok ? (prodRes.data?.orders ?? []) : []
-    const products: PatiscoPIProduct[] = newItems.length
-      ? newItems.map(i => ({
-          ID: '',
-          SKU: i.sku ?? undefined,
-          ModelNo: i.modelNo ?? undefined,
-          Specification: i.specification ?? undefined,
-          Note: i.note ?? null,
-          Quantity: i.quantity ?? '0',
-          Price: i.price ?? undefined,
-          CurrencyCode: i.currencyCode ?? undefined,
-          Unit: i.unit ?? undefined,
-          NetWeight: i.netWeight ?? null,
-          GrossWeight: i.grossWeight ?? null,
-          UnitPerCarton: i.unitPerCarton ?? null,
-          Length: i.length ?? null,
-          Width: i.width ?? null,
-          Height: i.height ?? null,
-        } satisfies PatiscoPIProduct))
-      : (oldOrders[0]?.Products ?? pi.Products ?? [])
-    const rawCurrency = oldOrders[0]?.CurrencyCode ?? pi.priceText?.split(' ')[1]
+    const detailItems: PatiscoOrderDetailItem[] = detailRes.ok
+      ? (detailRes.data?.products?.items ?? [])
+      : []
+
+    let products: PatiscoPIProduct[]
+    let rawCurrency: string | undefined
+
+    if (detailItems.length > 0) {
+      products = detailItems.map(i => ({
+        ID: '',
+        SKU: i.sku ?? undefined,
+        ModelNo: i.modelNo ?? undefined,
+        Specification: i.specification ?? undefined,
+        Note: i.note ?? null,
+        Quantity: i.quantity ?? '0',
+        Price: i.price ?? undefined,
+        CurrencyCode: i.currencyCode ?? undefined,
+        Unit: i.unit ?? undefined,
+        NetWeight: i.netWeight ?? null,
+        GrossWeight: i.grossWeight ?? null,
+        UnitPerCarton: i.unitPerCarton ?? null,
+        Length: i.length ?? null,
+        Width: i.width ?? null,
+        Height: i.height ?? null,
+      } satisfies PatiscoPIProduct))
+      rawCurrency = detailItems[0]?.currencyCode
+    } else {
+      const prodRes = await getOrderProducts(creds, pi.id)
+      const newItems = prodRes.ok ? (prodRes.data?.items ?? []) : []
+      const oldOrders = prodRes.ok ? (prodRes.data?.orders ?? []) : []
+      products = newItems.length
+        ? newItems.map(i => ({
+            ID: '',
+            SKU: i.sku ?? undefined,
+            ModelNo: i.modelNo ?? undefined,
+            Specification: i.specification ?? undefined,
+            Note: i.note ?? null,
+            Quantity: i.quantity ?? '0',
+            Price: i.price ?? undefined,
+            CurrencyCode: i.currencyCode ?? undefined,
+            Unit: i.unit ?? undefined,
+            NetWeight: i.netWeight ?? null,
+            GrossWeight: i.grossWeight ?? null,
+            UnitPerCarton: i.unitPerCarton ?? null,
+            Length: i.length ?? null,
+            Width: i.width ?? null,
+            Height: i.height ?? null,
+          } satisfies PatiscoPIProduct))
+        : (oldOrders[0]?.Products ?? pi.Products ?? [])
+      rawCurrency = oldOrders[0]?.CurrencyCode ?? pi.priceText?.split(' ')[1]
+    }
 
     poOrder = await prisma.pO_Order.create({
       data: {
