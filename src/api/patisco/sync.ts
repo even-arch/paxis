@@ -1027,7 +1027,12 @@ function matchCustomerWithAlias(
   // 1. 別名表：已知 CUSTOMER（無論是否已關聯主檔，都不再詢問）
   const aliasEntry = aliasMap.get(low)
   if (aliasEntry?.role === 'CUSTOMER') {
-    return aliasEntry.customerId ? { id: aliasEntry.customerId } : { id: null }
+    if (aliasEntry.customerId) {
+      // 驗證 customerId 確實存在於當前客戶清單，避免 stale FK 違反
+      const exists = customers.find(c => c.id === aliasEntry.customerId)
+      return exists ? { id: aliasEntry.customerId } : 'UNKNOWN'
+    }
+    return { id: null }
   }
   // 別名表標記為 OTHER → 明確忽略
   if (aliasEntry?.role === 'OTHER') return null
@@ -1062,7 +1067,11 @@ function matchSupplierWithAlias(
   // 1. 別名表：已知 SUPPLIER（無論是否已關聯主檔，都不再詢問）
   const aliasEntry = aliasMap.get(low)
   if (aliasEntry?.role === 'SUPPLIER') {
-    return aliasEntry.supplierId ? { id: aliasEntry.supplierId } : { id: null }
+    if (aliasEntry.supplierId) {
+      const exists = suppliers.find(s => s.id === aliasEntry.supplierId)
+      return exists ? { id: aliasEntry.supplierId } : 'UNKNOWN'
+    }
+    return { id: null }
   }
   // 別名表標記為 OTHER → 明確忽略
   if (aliasEntry?.role === 'OTHER') return null
