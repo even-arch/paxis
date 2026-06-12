@@ -1244,11 +1244,12 @@ export async function syncPatiscoDeliveryOrders(
   db?: PrismaClient,
   dbUrl?: string,
   sharedCreds?: PatiscoCredentials & { _mcpUrl: string },
-): Promise<SyncResult> {
+  batchLimit = 5,   // 每次最多處理幾筆新 DO（避免 Vercel 60s 超時）
+): Promise<SyncResult & { hasMore?: boolean }> {
   const prisma = db ?? defaultPrisma
   const resolvedDbUrl = dbUrl ?? process.env.DATABASE_URL!
   const sql = neon(resolvedDbUrl)
-  const result: SyncResult = { total: 0, skipped: 0, processed: 0, errors: 0, details: [] }
+  const result: SyncResult & { hasMore?: boolean } = { total: 0, skipped: 0, processed: 0, errors: 0, details: [] }
 
   const creds = sharedCreds ?? await patiscoLogin(prisma)
   if (!creds) {
@@ -1277,12 +1278,12 @@ export async function syncPatiscoDeliveryOrders(
   result.total = allDOs.length
   console.log(`[patisco-do-sync] listDeliveryOrders 拉到 ${allDOs.length} 筆`)
 
-  const DO_BUDGET_MS = 38_000
-  const doStartMs = Date.now()
+  let processedThisBatch = 0
 
   for (const doHeader of allDOs) {
-    if (Date.now() - doStartMs > DO_BUDGET_MS) {
-      console.warn(`[patisco-do-sync] 已達時間預算 ${DO_BUDGET_MS}ms，剩餘出貨單留待下次處理`)
+    if (processedThisBatch >= batchLimit) {
+      result.hasMore = true
+      console.warn(`[patisco-do-sync] 已達批次上限 ${batchLimit} 筆，剩餘留待下次處理`)
       break
     }
     const docId = String(doHeader.id ?? '')
@@ -1616,6 +1617,7 @@ export async function syncPatiscoDeliveryOrders(
       await recordSync(sql, 'DO', docId, docNo, source, 'ok',
         { customerId, itemCount: packingItems.length }, null)
       result.processed++
+      processedThisBatch++
       result.details.push({
         patiscoDocNo: docNo,
         status: 'ok',
@@ -1627,11 +1629,12 @@ export async function syncPatiscoDeliveryOrders(
       console.error(`[patisco-do-sync] 處理 DO ${docNo} 失敗`, err)
       await recordSync(sql, 'DO', docId, docNo, source, 'error', null, msg)
       result.errors++
+      processedThisBatch++
       result.details.push({ patiscoDocNo: docNo, status: 'error', msg })
     }
   }
 
-  console.log(`[patisco-do-sync] 完成 processed=${result.processed} skipped=${result.skipped} errors=${result.errors}`)
+  console.log(`[patisco-do-sync] 完成 processed=${result.processed} skipped=${result.skipped} errors=${result.errors} hasMore=${result.hasMore}`)
   return result
 }
 

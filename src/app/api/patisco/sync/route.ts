@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
 
   // 在 route handler 層取一次 prisma，確保 session context 正確
   
-  const body = await req.json().catch(() => ({})) as { type?: string }
+  const body = await req.json().catch(() => ({})) as { type?: string; batchLimit?: number }
   const type = body.type ?? 'all'
 
   const start = Date.now()
@@ -40,7 +40,8 @@ export async function POST(req: NextRequest) {
       result.po = await syncPatiscoSupplierPOs('manual', prisma)
     }
     if (type === 'deliveries' || type === 'all') {
-      result.deliveries = await syncPatiscoDeliveryOrders('manual', prisma)
+      const batchLimit = body.batchLimit as number | undefined
+      result.deliveries = await syncPatiscoDeliveryOrders('manual', prisma, undefined, undefined, batchLimit ?? 5)
     }
     if (type === 'backfill-shipment-pi') {
       result.backfill = await backfillShipmentPILinks('manual', prisma)
