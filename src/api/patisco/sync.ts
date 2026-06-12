@@ -1273,26 +1273,15 @@ export async function syncPatiscoDeliveryOrders(
         getDeliveryOrderDetail(creds, lookupId, 'packingList'),
       ])
 
-      let ci = ciRes.ok ? (ciRes.data?.detail ?? ciRes.data?.item ?? null) : null
-      let pl = plRes.ok ? (plRes.data?.detail ?? plRes.data?.item ?? null) : null
-      const ciDataKeys = ciRes.ok ? Object.keys(ciRes.data ?? {}).join(',') : 'N/A'
-      const plDataKeys = plRes.ok ? Object.keys(plRes.data ?? {}).join(',') : 'N/A'
-      const ciSample = ciRes.ok ? JSON.stringify(ciRes.data).slice(0, 300) : ''
-      console.log(`[patisco-do-sync] DO ${docNo} id=${lookupId} copyId=${copyId} ciOk=${ciRes.ok} plOk=${plRes.ok} ciDataKeys=${ciDataKeys} plDataKeys=${plDataKeys}`)
-      console.log(`[patisco-do-sync] DO ${docNo} ciSample=${ciSample}`)
-
-      // 若 id 拿不到資料且有 copyId，改用 copyId 重試
-      if (!ci && !pl && copyId && copyId !== lookupId) {
-        console.log(`[patisco-do-sync] DO ${docNo} id 無資料，改用 copyId=${copyId} 重試`)
-        const [ciRes2, plRes2] = await Promise.all([
-          getDeliveryOrderDetail(creds, copyId, 'commercialInvoice'),
-          getDeliveryOrderDetail(creds, copyId, 'packingList'),
-        ])
-        ci = ciRes2.ok ? (ciRes2.data?.detail ?? ciRes2.data?.item ?? null) : null
-        pl = plRes2.ok ? (plRes2.data?.detail ?? plRes2.data?.item ?? null) : null
-        console.log(`[patisco-do-sync] DO ${docNo} copyId retry: ciOk=${ciRes2.ok} plOk=${plRes2.ok} ciKeys=${ciRes2.ok ? Object.keys(ciRes2.data ?? {}).join(',') : 'N/A'}`)
-        console.log(`[patisco-do-sync] DO ${docNo} copyId ciSample=${ciRes2.ok ? JSON.stringify(ciRes2.data).slice(0, 300) : ''}`)
+      // Patisco API 直接回傳 detail 物件（不包在 detail/item 裡），fallback 才試 detail/item
+      const extractDetail = (res: typeof ciRes) => {
+        if (!res.ok || !res.data) return null
+        const d = res.data
+        return d.detail ?? d.item ?? (d.id ? d : null)
       }
+      const ci = extractDetail(ciRes)
+      const pl = extractDetail(plRes)
+      console.log(`[patisco-do-sync] DO ${docNo} id=${lookupId} ciOk=${ciRes.ok} plOk=${plRes.ok} ci=${!!ci} pl=${!!pl}`)
 
       const detail = ci ?? pl
 
@@ -1380,16 +1369,20 @@ export async function syncPatiscoDeliveryOrders(
       })
 
       const shipmentData = {
-        shipmentNo:     docNo,
+        shipmentNo:         docNo,
         customerId,
         currencyCode,
-        actualShipDate: shipDate,
-        portOfLoading:  (detail as { port?: string }).port ?? null,
-        patiscoDocId:   docId,
-        patiscoDocNo:   docNo,
+        actualShipDate:     shipDate,
+        portOfLoading:      detail.port ?? null,
+        portOfDischarge:    detail.to ?? null,
+        // CI 文件的 no 就是 CI 號，PL 文件的 no 就是 PL 號
+        ...(ci  ? { commercialInvNo: ci.no }  : {}),
+        ...(pl  ? { packingListNo:   pl.no }   : {}),
+        patiscoDocId:       docId,
+        patiscoDocNo:       docNo,
         ...(ciExchangeRate ? { ciExchangeRate } : {}),
-        source:         'PATISCO',
-        performedBy:    systemUserId,
+        source:             'PATISCO',
+        performedBy:        systemUserId,
       }
 
       const shipment = existingShipment

@@ -837,7 +837,9 @@ export async function getDeliveryOrderDetail(
   shipmentId: string,
   documentType: 'packingList' | 'commercialInvoice',
 ) {
-  return mcpCall<{ detail?: PatiscoShipmentDetail; item?: PatiscoShipmentDetail }>(
+  // API 實際上直接回傳 PatiscoShipmentDetail，不包在 detail/item 裡面
+  // 但保留 detail/item 欄位作為 fallback（型別 union）
+  return mcpCall<PatiscoShipmentDetail & { detail?: PatiscoShipmentDetail; item?: PatiscoShipmentDetail }>(
     creds, 'getDeliveryOrderDetail', { shipmentId, documentType }
   )
 }
