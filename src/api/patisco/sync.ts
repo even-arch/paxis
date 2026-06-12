@@ -1485,36 +1485,50 @@ export async function syncPatiscoDeliveryOrders(
           const sku = packing.sku?.trim()
           if (!sku) continue
 
+          const rawSku = sku  // packing 的原始 SKU，即使 product 不存在也保留
+          const rawProductName = (packing as { productName?: string; name?: string }).productName
+            ?? (packing as { productName?: string; name?: string }).name
+            ?? null
+
+          // 查產品 —— 找不到也不丟棄，rawSku 保留原始資料
           const product = await prisma.pRD_Product.findFirst({
             where: { sku, isActive: true },
             select: { id: true },
           })
-          if (!product) continue
-
-          // 找對應的 SLS_Item（從 sourceOrderID 或 sourceOrderNo 關聯的 SLS_Order）
-          const packingSrcOrderId = (packing as { sourceOrderID?: string }).sourceOrderID
-          const packingSrcOrderNo = (packing as { sourceOrderNo?: string }).sourceOrderNo
-          const sourcePI = packingSrcOrderId || packingSrcOrderNo
-            ? await prisma.sLS_PI.findFirst({
-                where: {
-                  OR: [
-                    ...(packingSrcOrderId ? [{ patiscoDocId: packingSrcOrderId }] : []),
-                    ...(packingSrcOrderNo ? [{ piNo: packingSrcOrderNo }] : []),
-                  ],
-                },
-                select: { orderId: true },
-              })
-            : null
-
-          const slsItem = sourcePI
-            ? await prisma.sLS_Item.findFirst({
-                where: { orderId: sourcePI.orderId, productId: product.id },
-                select: { id: true },
-              })
-            : null
+          if (!product) {
+            console.warn(`[patisco-do-sync] DO ${docNo} SKU "${sku}" 在 PRD_Product 找不到，保留為 rawSku`)
+          }
 
           const qty = parseInt(String((packing as { quantity?: string }).quantity ?? '0'), 10) || 0
           if (qty === 0) continue
+
+          // 來源 PI 識別：多重 fallback（數字 ID → PI 號碼字串，兩者都試）
+          const srcOrderId = (packing as { sourceOrderID?: string }).sourceOrderID?.trim()
+          const srcOrderNo = (packing as { sourceOrderNo?: string }).sourceOrderNo?.trim()
+          const piConditions: Array<Record<string, string>> = []
+          if (srcOrderId) {
+            piConditions.push({ patiscoDocId: srcOrderId })
+            // 舊資料：patiscoDocId 可能存的是 PI 號碼字串，順便試 srcOrderId 當 piNo
+            piConditions.push({ piNo: srcOrderId })
+          }
+          if (srcOrderNo) {
+            piConditions.push({ piNo: srcOrderNo })
+            piConditions.push({ patiscoDocId: srcOrderNo })
+          }
+          const srcPI = piConditions.length > 0
+            ? await prisma.sLS_PI.findFirst({
+                where: { OR: piConditions },
+                select: { id: true, orderId: true },
+              })
+            : null
+
+          // 找對應的 SLS_Item（需要 product + order 都存在才有意義）
+          const slsItem = srcPI && product
+            ? await prisma.sLS_Item.findFirst({
+                where: { orderId: srcPI.orderId, productId: product.id },
+                select: { id: true },
+              })
+            : null
 
           // PL 版的 packing 有重量/材積欄位
           type PLPacking = import('./client').PatiscoShipmentPackingPL
@@ -1526,12 +1540,11 @@ export async function syncPatiscoDeliveryOrders(
 
           const grossWt   = plItem?.totalGrossWeight ?? plItem?.grossWeight ?? null
           const netWt     = plItem?.totalNetWeight   ?? plItem?.netWeight   ?? null
-          const totalFt3  = plItem?.totalDimension ?? plItem?.imperialTotalDimension ?? null  // Patisco 回傳 ft³
+          const totalFt3  = plItem?.totalDimension ?? plItem?.imperialTotalDimension ?? null
           const FT3_TO_M3 = new Decimal('0.028317')
           const cubicFt   = totalFt3 ? new Decimal(totalFt3) : null
           const cbm       = cubicFt  ? cubicFt.mul(FT3_TO_M3).toDecimalPlaces(6) : null
 
-          // 直接用 quantityOfCartons（Patisco 已算好），fallback 才自己除
           const cartonsRaw = plItem?.quantityOfCartons
             ? parseInt(String(plItem.quantityOfCartons), 10)
             : null
@@ -1541,38 +1554,23 @@ export async function syncPatiscoDeliveryOrders(
           const cartons = cartonsRaw
             ?? (unitsPerCarton && unitsPerCarton > 0 ? Math.floor(qty / unitsPerCarton) : null)
 
-          // 箱號範圍：從 caseNumbers 陣列提取（每個 PI 從 1 起算）
+          // 箱號範圍：從 caseNumbers 陣列提取
           const caseNums = (plItem as import('./client').PatiscoShipmentPackingPL)?.caseNumbers ?? []
           let cartonNoFrom: string | null = null
           let cartonNoTo:   string | null = null
           if (caseNums.length > 0) {
-            const first = caseNums[0]
-            const last  = caseNums[caseNums.length - 1]
-            cartonNoFrom = first.caseNo1 ?? null
-            cartonNoTo   = last.caseNo1  ?? null
+            cartonNoFrom = caseNums[0].caseNo1 ?? null
+            cartonNoTo   = caseNums[caseNums.length - 1].caseNo1 ?? null
           }
-
-          // 找來源 PI ID
-          const srcOrderId = (packing as { sourceOrderID?: string }).sourceOrderID
-          const srcOrderNo = (packing as { sourceOrderNo?: string }).sourceOrderNo
-          const srcPI = srcOrderId || srcOrderNo
-            ? await prisma.sLS_PI.findFirst({
-                where: {
-                  OR: [
-                    ...(srcOrderId ? [{ patiscoDocId: srcOrderId }] : []),
-                    ...(srcOrderNo ? [{ piNo: srcOrderNo }] : []),
-                  ],
-                },
-                select: { id: true },
-              })
-            : null
 
           await prisma.sLS_ShipmentItem.create({
             data: {
-              shipmentId:    shipment.id,
-              slsItemId:     slsItem?.id ?? null,
-              piId:          srcPI?.id   ?? null,
-              quantity:      qty,
+              shipmentId:      shipment.id,
+              slsItemId:       slsItem?.id   ?? null,
+              piId:            srcPI?.id     ?? null,
+              rawSku,
+              rawProductName,
+              quantity:        qty,
               cartons,
               cartonNoFrom,
               cartonNoTo,
@@ -1583,8 +1581,8 @@ export async function syncPatiscoDeliveryOrders(
             },
           })
 
-          // INV_Movement: 出貨 → quantity--, reservedQty--（只在首次建立，避免重複扣庫存）
-          if (isNewShipment) {
+          // INV_Movement: 出貨 → quantity--, reservedQty--（只在首次建立，且 product 必須存在）
+          if (isNewShipment && product) {
             const stock = await prisma.iNV_Stock.findUnique({
               where: { productId: product.id },
               select: { quantity: true, reservedQty: true },

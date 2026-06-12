@@ -45,6 +45,13 @@ export async function POST(req: NextRequest) {
     if (type === 'backfill-shipment-pi') {
       result.backfill = await backfillShipmentPILinks('manual', prisma)
     }
+    if (type === 'reset-do-sync') {
+      // 清除所有 DO 的 ok 狀態，讓下次同步強制重新處理
+      const deleted = await prisma.sYS_PatiscoSync.deleteMany({
+        where: { docType: 'DO', status: 'ok' },
+      })
+      result.reset = { deleted: deleted.count }
+    }
 
     return NextResponse.json({
       ok: true,

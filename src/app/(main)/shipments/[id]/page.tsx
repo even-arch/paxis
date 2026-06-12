@@ -240,8 +240,15 @@ export default async function ShipmentDetailPage({ params }: Props) {
                       {group.items.map(item => (
                         <tr key={item.id} className="hover:bg-gray-50 border-t border-gray-100">
                           {multiGroup && <td className="px-4 py-2" />}
-                          <td className="px-4 py-2 font-mono text-xs text-gray-600">{item.slsItem?.product?.sku ?? '-'}</td>
-                          <td className="px-4 py-2 text-gray-700">{item.slsItem?.product?.name ?? '-'}</td>
+                          <td className="px-4 py-2 font-mono text-xs text-gray-600">
+                            {item.slsItem?.product?.sku ?? item.rawSku ?? '-'}
+                            {!item.slsItem && item.rawSku && (
+                              <span className="ml-1 text-amber-500 text-xs" title="SKU 尚未在商品主檔建檔">⚠</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2 text-gray-700">
+                            {item.slsItem?.product?.name ?? item.rawProductName ?? '-'}
+                          </td>
                           <td className="px-4 py-2 text-right text-gray-700">
                             {item.quantity.toLocaleString()}
                             {item.slsItem?.unit && <span className="text-gray-400 text-xs ml-1">{item.slsItem.unit}</span>}

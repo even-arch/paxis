@@ -267,6 +267,14 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
               className="text-sm px-3 py-1 border border-orange-300 text-orange-700 rounded hover:bg-orange-50 disabled:opacity-50">
               {syncing ? '...' : '🔗 補建 PI 關聯'}
             </button>
+            <button onClick={async () => {
+              if (!confirm('這將清除所有出貨單的同步快取，下次同步時強制重新從 Patisco 拉取明細。確定嗎？')) return
+              await runSync('reset-do-sync')
+              setTimeout(() => runSync('deliveries'), 500)
+            }} disabled={syncing}
+              className="text-sm px-3 py-1 border border-red-300 text-red-700 rounded hover:bg-red-50 disabled:opacity-50">
+              {syncing ? '...' : '🔄 重建出貨明細'}
+            </button>
           </div>
         )}
       </div>

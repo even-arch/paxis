@@ -896,6 +896,10 @@ model SLS_ShipmentItem {
   piId          Int?
   pi            SLS_PI?      @relation(fields: [piId], references: [id])
 
+  // Patisco 原始欄位：product 找不到時也不丟資料
+  rawSku        String?        // Patisco packing 的 SKU（product 不存在時仍保留）
+  rawProductName String?       // Patisco packing 的品名
+
   quantity      Int
 
   // 箱號（每張 PI 各自從 1 起算，對應麥頭上的 C/NO.）
