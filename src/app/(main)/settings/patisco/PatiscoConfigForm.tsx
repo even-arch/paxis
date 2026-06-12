@@ -152,6 +152,11 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type }),
       })
+      const ct = res.headers.get('content-type') ?? ''
+      if (!ct.includes('json')) {
+        const text = await res.text()
+        throw new Error(`伺服器錯誤（HTTP ${res.status}）：${text.slice(0, 120)}`)
+      }
       const data = await res.json()
       clearInterval(timer)
       setSyncing(false)
@@ -159,6 +164,7 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
         setSyncResult({
           buyers: data.buyers,
           pi: data.pi,
+          po: data.po,
           deliveries: data.deliveries,
           durationMs: data.durationMs,
         })
@@ -166,10 +172,11 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
         setMsg({ type: 'error', text: `同步失敗：${data.error ?? '未知錯誤'}` })
       }
       router.refresh()
-    } catch {
+    } catch (err) {
       clearInterval(timer)
       setSyncing(false)
-      setMsg({ type: 'error', text: '同步請求失敗（可能超時），請再試一次或改用單項同步' })
+      const errMsg = err instanceof Error ? err.message : '未知錯誤'
+      setMsg({ type: 'error', text: `[${type}] ${errMsg}` })
     }
   }
 
