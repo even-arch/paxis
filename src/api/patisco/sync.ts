@@ -1248,7 +1248,14 @@ export async function syncPatiscoDeliveryOrders(
   result.total = allDOs.length
   console.log(`[patisco-do-sync] listDeliveryOrders 拉到 ${allDOs.length} 筆`)
 
+  const DO_BUDGET_MS = 45_000
+  const doStartMs = Date.now()
+
   for (const doHeader of allDOs) {
+    if (Date.now() - doStartMs > DO_BUDGET_MS) {
+      console.warn(`[patisco-do-sync] 已達時間預算 ${DO_BUDGET_MS}ms，剩餘出貨單留待下次處理`)
+      break
+    }
     const docId = String(doHeader.id ?? '')
     const docNo = String(doHeader.no ?? '')
     console.log(`[patisco-do-sync] 處理 DO docId="${docId}" docNo="${docNo}"`)

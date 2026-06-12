@@ -76,6 +76,7 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
     buyers?: { created: number; updated: number; errors: number; total: number }
     pi?: { processed: number; skipped: number; errors: number; details?: Array<{patiscoDocNo:string; status:string; msg?:string}> }
     shipments?: { processed: number; skipped: number; errors: number }
+    deliveries?: { processed: number; skipped: number; errors: number; total: number }
     durationMs?: number
   } | null>(null)
 
@@ -140,7 +141,7 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
   }
 
 
-  async function handleManualSync() {
+  async function runSync(type: string) {
     setSyncing(true); setSyncResult(null); setMsg(null); setSyncElapsed(0)
     const startTime = Date.now()
     const timer = setInterval(() => setSyncElapsed(Math.floor((Date.now() - startTime) / 1000)), 500)
@@ -148,7 +149,7 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
       const res = await fetch('/api/patisco/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'all' }),
+        body: JSON.stringify({ type }),
       })
       const data = await res.json()
       clearInterval(timer)
@@ -156,8 +157,8 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
       if (data.ok) {
         setSyncResult({
           buyers: data.buyers,
-          pi: data.pi,      // includes details[]
-          shipments: data.shipments,
+          pi: data.pi,
+          deliveries: data.deliveries,
           durationMs: data.durationMs,
         })
       } else {
@@ -167,9 +168,11 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
     } catch {
       clearInterval(timer)
       setSyncing(false)
-      setMsg({ type: 'error', text: '同步請求失敗，請檢查網路' })
+      setMsg({ type: 'error', text: '同步請求失敗（可能超時），請再試一次或改用單項同步' })
     }
   }
+
+  const handleManualSync = () => runSync('all')
 
   // 連線狀態顏色
   const statusColor = initialConfig?.lastTestStatus === 'ok' ? 'bg-green-500'
@@ -213,6 +216,10 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
                   同步中 {syncElapsed > 0 ? `${syncElapsed}s` : ''}
                 </>
               ) : '手動同步'}
+            </button>
+            <button onClick={() => runSync('deliveries')} disabled={syncing}
+              className="text-sm px-3 py-1 border border-blue-300 text-blue-700 rounded hover:bg-blue-50 disabled:opacity-50">
+              {syncing ? '...' : '📦 同步出貨單'}
             </button>
           </div>
         )}
