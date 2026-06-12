@@ -75,6 +75,7 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
   const [syncResult, setSyncResult] = useState<{
     buyers?: { created: number; updated: number; errors: number; total: number }
     pi?: { processed: number; skipped: number; errors: number; details?: Array<{patiscoDocNo:string; status:string; msg?:string}> }
+    po?: { processed: number; skipped: number; errors: number; details?: Array<{patiscoDocNo:string; status:string; msg?:string}> }
     shipments?: { processed: number; skipped: number; errors: number }
     deliveries?: { processed: number; skipped: number; errors: number; total: number }
     durationMs?: number
@@ -172,7 +173,41 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
     }
   }
 
-  const handleManualSync = () => runSync('all')
+  const handleManualSync = async () => {
+    setSyncing(true); setSyncResult(null); setMsg(null); setSyncElapsed(0)
+    const startTime = Date.now()
+    const timer = setInterval(() => setSyncElapsed(Math.floor((Date.now() - startTime) / 1000)), 500)
+    const combined: Record<string, unknown> = {}
+    try {
+      for (const type of ['buyers', 'pi', 'po', 'deliveries'] as const) {
+        const res = await fetch('/api/patisco/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type }),
+        })
+        const ct = res.headers.get('content-type') ?? ''
+        if (!ct.includes('json')) {
+          const text = await res.text()
+          throw new Error(`[${type}] 伺服器錯誤（HTTP ${res.status}）：${text.slice(0, 120)}`)
+        }
+        const data = await res.json()
+        if (!data.ok) throw new Error(`[${type}] ${data.error ?? '同步失敗'}`)
+        if (data.buyers)    combined.buyers    = data.buyers
+        if (data.pi)        combined.pi        = data.pi
+        if (data.po)        combined.po        = data.po
+        if (data.deliveries) combined.deliveries = data.deliveries
+      }
+      clearInterval(timer)
+      setSyncing(false)
+      setSyncResult({ ...combined, durationMs: Date.now() - startTime })
+      router.refresh()
+    } catch (err) {
+      clearInterval(timer)
+      setSyncing(false)
+      const msg = err instanceof Error ? err.message : '未知錯誤'
+      setMsg({ type: 'error', text: `同步失敗：${msg}` })
+    }
+  }
 
   // 連線狀態顏色
   const statusColor = initialConfig?.lastTestStatus === 'ok' ? 'bg-green-500'
@@ -220,6 +255,10 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
             <button onClick={() => runSync('deliveries')} disabled={syncing}
               className="text-sm px-3 py-1 border border-blue-300 text-blue-700 rounded hover:bg-blue-50 disabled:opacity-50">
               {syncing ? '...' : '📦 同步出貨單'}
+            </button>
+            <button onClick={() => runSync('backfill-shipment-pi')} disabled={syncing}
+              className="text-sm px-3 py-1 border border-orange-300 text-orange-700 rounded hover:bg-orange-50 disabled:opacity-50">
+              {syncing ? '...' : '🔗 補建 PI 關聯'}
             </button>
           </div>
         )}
@@ -283,6 +322,21 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
                   <div>
                     <p className="text-red-500">錯誤 {syncResult.pi.errors}</p>
                     {syncResult.pi.details?.filter(d=>d.status==='error').slice(0,3).map((d,i)=>(
+                      <p key={i} className="text-red-400 text-xs mt-0.5 truncate">{d.patiscoDocNo}: {d.msg}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {syncResult.po && (
+              <div className="bg-white rounded px-3 py-2 border border-blue-100">
+                <p className="font-medium text-blue-700 mb-1">📦 採購 PO 同步</p>
+                <p>處理 <span className="font-bold">{syncResult.po.processed}</span></p>
+                <p>跳過 <span className="font-bold">{syncResult.po.skipped}</span></p>
+                {syncResult.po.errors > 0 && (
+                  <div>
+                    <p className="text-red-500">錯誤 {syncResult.po.errors}</p>
+                    {syncResult.po.details?.filter(d=>d.status==='error').slice(0,3).map((d,i)=>(
                       <p key={i} className="text-red-400 text-xs mt-0.5 truncate">{d.patiscoDocNo}: {d.msg}</p>
                     ))}
                   </div>
@@ -363,7 +417,7 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
         {mode === 'token' && (
           <div className="space-y-4 p-4 bg-blue-50 rounded-md border border-blue-100">
             <p className="text-xs text-blue-600">
-              需要先登入 <a href="https://mcp.patisco.com/login.html" target="_blank" rel="noopener noreferrer" className="underline">mcp.patisco.com/login.html</a> 取得 JWT Token 和 API Key，再貼到這裡。JWT 有時效性，過期後需要重新取得。建議改用「帳號 + 密碼」模式。
+              需要先前往 <a href="https://mcp.patisco.com/docs/" target="_blank" rel="noopener noreferrer" className="underline">mcp.patisco.com/docs/</a> 取得 JWT Token 和 API Key（可直接帶入所有 key 值），再貼到這裡。JWT 有時效性，過期後需要重新取得。建議改用「帳號 + 密碼」模式。
             </p>
             <div>
               <label className={lbl}>

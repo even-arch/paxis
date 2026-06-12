@@ -89,6 +89,7 @@ model SYS_User {
   shipments        SLS_Shipment[]
   stockMovements   INV_Movement[]
   invAdjustments   INV_Adjustment[]
+  deliveryNotes    SLS_DeliveryNote[]
 
   @@map("SYS_User")
 }
@@ -258,6 +259,7 @@ model PRD_Product {
   mktSkuMappings    MKT_SkuMapping[]
   invMovements      INV_Movement[]
   invAdjustments    INV_Adjustment[]
+  deliveryNoteItems SLS_DeliveryNoteItem[]
 
   @@index([sku])
   @@index([modelNo])
@@ -450,11 +452,13 @@ model CUS_Customer {
 
   // 收款週期（天數，null 表示未設定）
   collectionCycleDays Int?
+  shippingMarkTemplate String?  // 麥頭範本，用 {orderNo} 代入訂單號碼
 
   salesOrders       SLS_Order[]
   shipments         SLS_Shipment[]
   contacts          CUS_Contact[]
   receivables       FIN_Receivable[]
+  deliveryNotes     SLS_DeliveryNote[]
   customerProducts  CUS_CustomerProduct[]
   companyAliases    SYS_CompanyAlias[]
 
@@ -524,8 +528,9 @@ model PO_Order {
   // 0 = 主動補貨, 1 = 接單後採購（isMadeToOrder）, 2 = 安全庫存觸發
   sourceType      Int      @default(0)
 
-  patiscoOrderNo  String?
-  patiscoOrderId  String?
+  patiscoOrderNo    String?
+  patiscoOrderId    String?
+  patiscoStatus     String?   // Patisco 文件狀態：'0'=Editing, '1'=Confirmed
 
   createdBy     Int
   creator       SYS_User  @relation(fields: [createdBy], references: [id])
@@ -594,6 +599,7 @@ model PO_SupplierPI {
   patiscoDocId     String?
   patiscoDocNo     String?
   patiscoCreatedAt DateTime? // Patisco 原始建立時間（createdDate YYYYMMDDHHmmss）
+  patiscoStatus    String?   // Patisco 文件狀態：'0'=Editing, '1'=Confirmed
 
   items       PO_SupplierPIItem[]
 
@@ -700,11 +706,12 @@ model SLS_Order {
   performedAt DateTime @default(now())
 
   // Patisco 溯源
-  patiscoBuyerId  String?    // Patisco buyerCompanyId（webhook 帶來）
-  patiscoBuyerName String? // 買家公司名稱快照
-  patiscoDocId    String?
-  patiscoDocNo    String?
+  patiscoBuyerId   String?    // Patisco buyerCompanyId（webhook 帶來）
+  patiscoBuyerName String?   // 買家公司名稱快照
+  patiscoDocId     String?
+  patiscoDocNo     String?
   patiscoCreatedAt DateTime? // Patisco 原始建立時間（createdDate YYYYMMDDHHmmss）
+  patiscoStatus    String?   // Patisco 文件狀態：'0'=Editing, '1'=Confirmed
 
   createdBy   Int
   creator     SYS_User  @relation("SLS_Order_creator", fields: [createdBy], references: [id])
@@ -713,8 +720,9 @@ model SLS_Order {
 
   items          SLS_Item[]
   pis            SLS_PI[]
-  purchaseOrders PO_Order[]    @relation("SLS_PO_OrderLink") // 此銷售訂單衍生的採購單（可多張）
+  purchaseOrders PO_Order[]    @relation("SLS_PO_OrderLink")
   mktOrders      MKT_Order[]
+  deliveryNotes  SLS_DeliveryNote[]
 
   @@index([customerId, status])
   @@index([orderNo])
@@ -779,13 +787,16 @@ model SLS_PI {
   performer   SYS_User? @relation(fields: [performedBy], references: [id])
   performedAt DateTime @default(now())
 
-  patiscoDocId  String?
-  patiscoDocNo  String?
+  patiscoDocId     String?
+  patiscoDocNo     String?
   patiscoCreatedAt DateTime? // Patisco 原始建立時間（createdDate YYYYMMDDHHmmss）
+  patiscoStatus    String?   // Patisco 文件狀態：'0'=Editing, '1'=Confirmed
 
-  items       SLS_PIItem[]
-  shipmentPIs SLS_ShipmentPI[]
+  items          SLS_PIItem[]
+  shipmentPIs    SLS_ShipmentPI[]
+  shipmentItems  SLS_ShipmentItem[]
   stockMovements INV_Movement[]
+  deliveryNotes  SLS_DeliveryNote[]
 
   @@index([orderId])
   @@map("SLS_PI")
@@ -881,16 +892,28 @@ model SLS_ShipmentItem {
   shipment      SLS_Shipment @relation(fields: [shipmentId], references: [id])
   slsItemId     Int?
   slsItem       SLS_Item?    @relation(fields: [slsItemId], references: [id])
+  // 直接記錄來源 PI，方便按 PI 分組顯示（同一 DO 可含多張 PI）
+  piId          Int?
+  pi            SLS_PI?      @relation(fields: [piId], references: [id])
 
   quantity      Int
 
-  // 裝箱資料（Packing List 必要欄位）
-  cartons       Int?       // 箱數
-  grossWeightKg Decimal?  // 毛重（kg）
-  netWeightKg   Decimal?  // 淨重（kg）
-  cbm           Decimal?  // 材積（m³）
+  // 箱號（每張 PI 各自從 1 起算，對應麥頭上的 C/NO.）
+  cartons       Int?           // 箱數
+  cartonNoFrom  String?        // 起始箱號（如 "1"）
+  cartonNoTo    String?        // 結束箱號（如 "10"；與 From 相同則只有一箱）
+
+  // 重量（kg）：淨重 = 貨物本身；毛重 = 含包裝箱
+  grossWeightKg Decimal?       // 毛重 kg
+  netWeightKg   Decimal?       // 淨重 kg
+
+  // 材積：兩種單位並存，互相換算（1 ft³ = 0.028317 m³）
+  // 台灣供應商習慣報 ft³，海關/船公司用 m³，兩者皆存
+  cubicFt       Decimal?       // 材積 ft³（Patisco 原始值）
+  cbm           Decimal?       // 材積 m³（= cubicFt × 0.028317）
 
   @@index([shipmentId])
+  @@index([piId])
   @@map("SLS_ShipmentItem")
 }
 
@@ -1303,11 +1326,75 @@ model MKT_OrderItem {
   orderId      Int
   order        MKT_Order @relation(fields: [orderId], references: [id])
   platformSku  String
-  paxisSku     String?  // SKU 對照後填入
+  paxisSku     String?
   productId    Int?
   itemName     String?
   qty          Int
   unitPrice    Decimal?
 
   @@map("MKT_OrderItem")
+}
+
+// =============================================================================
+// 簡易出貨單 (SLS_DeliveryNote)
+// 我方出貨給客戶的國內銷貨單，一式三聯（存根/客戶/司機）
+// 資料從 SLS_PI 或 SLS_Order 帶入品項
+// status: DRAFT → DISPATCHED → RECEIVED
+// =============================================================================
+
+model SLS_DeliveryNote {
+  id            Int      @id @default(autoincrement())
+  docNo         String   @unique               // DN-YYYYMMDD-XXXX
+  customerId    Int?
+  customer      CUS_Customer?  @relation(fields: [customerId], references: [id])
+  slsPiId       Int?
+  slsPi         SLS_PI?        @relation(fields: [slsPiId], references: [id])
+  slsOrderId    Int?
+  slsOrder      SLS_Order?     @relation(fields: [slsOrderId], references: [id])
+
+  issueDate     DateTime
+  deliveryDate  DateTime?
+
+  contactName   String?                        // 聯絡人
+  contactPhone  String?                        // 電話
+
+  deliveryAddr  String?                        // 送貨地址
+  freightCo     String?                        // 貨運行
+  vehicleNo     String?                        // 車號
+
+  shippingMark  String?                        // 麥頭
+  note          String?                        // 備註
+  counterpartNo String?                        // 對方單號（客戶 PO 號）
+
+  status        String   @default("DRAFT")     // DRAFT | DISPATCHED | RECEIVED
+
+  performedBy   Int?
+  performer     SYS_User? @relation(fields: [performedBy], references: [id])
+  performedAt   DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  items         SLS_DeliveryNoteItem[]
+
+  @@index([customerId])
+  @@index([slsPiId])
+  @@index([slsOrderId])
+  @@map("SLS_DeliveryNote")
+}
+
+model SLS_DeliveryNoteItem {
+  id             Int      @id @default(autoincrement())
+  deliveryNoteId Int
+  deliveryNote   SLS_DeliveryNote @relation(fields: [deliveryNoteId], references: [id], onDelete: Cascade)
+  productId      Int?
+  product        PRD_Product? @relation(fields: [productId], references: [id])
+
+  description    String?
+  quantity       Int      @default(0)
+  unit           String?
+  cartons        Int?
+  grossWeightKg  Decimal?
+
+  @@index([deliveryNoteId])
+  @@map("SLS_DeliveryNoteItem")
 }

@@ -36,12 +36,14 @@ export default async function ShipmentDetailPage({ params }: Props) {
       items: {
         include: {
           slsItem: {
-            include: {
+            select: {
+              unit: true,
               product: { select: { sku: true, name: true } },
             },
           },
+          pi: { select: { id: true, piNo: true } },
         },
-        orderBy: { id: 'asc' },
+        orderBy: [{ piId: 'asc' }, { id: 'asc' }],
       },
     },
   })
@@ -116,39 +118,170 @@ export default async function ShipmentDetailPage({ params }: Props) {
         </div>
       )}
 
-      {shipment.items.length > 0 && (
-        <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
-          <div className="px-5 py-3 border-b border-gray-100">
-            <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">裝箱明細</h2>
-          </div>
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="text-left px-4 py-2 font-medium text-gray-600">SKU</th>
-                <th className="text-left px-4 py-2 font-medium text-gray-600">品名</th>
-                <th className="text-right px-4 py-2 font-medium text-gray-600">數量</th>
-                <th className="text-right px-4 py-2 font-medium text-gray-600">箱數</th>
-                <th className="text-right px-4 py-2 font-medium text-gray-600">毛重 (kg)</th>
-                <th className="text-right px-4 py-2 font-medium text-gray-600">淨重 (kg)</th>
-                <th className="text-right px-4 py-2 font-medium text-gray-600">材積 (m³)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {shipment.items.map(item => (
-                <tr key={item.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2 font-mono text-xs text-gray-600">{item.slsItem?.product?.sku ?? '-'}</td>
-                  <td className="px-4 py-2 text-gray-700">{item.slsItem?.product?.name ?? '-'}</td>
-                  <td className="px-4 py-2 text-right text-gray-700">{item.quantity.toLocaleString()}</td>
-                  <td className="px-4 py-2 text-right text-gray-500">{item.cartons ?? '-'}</td>
-                  <td className="px-4 py-2 text-right text-gray-500">{item.grossWeightKg?.toString() ?? '-'}</td>
-                  <td className="px-4 py-2 text-right text-gray-500">{item.netWeightKg?.toString() ?? '-'}</td>
-                  <td className="px-4 py-2 text-right text-gray-500">{item.cbm?.toString() ?? '-'}</td>
+      {shipment.items.length > 0 && (() => {
+        // 以 PI 為單位分組（piId=null 的歸到 '未關聯' 群組）
+        type Item = typeof shipment.items[number]
+        const groups = new Map<string, { label: string; piId: number | null; items: Item[] }>()
+        for (const item of shipment.items) {
+          const key = item.piId != null ? String(item.piId) : '__none__'
+          if (!groups.has(key)) {
+            groups.set(key, {
+              label: item.pi?.piNo ?? '未關聯 PI',
+              piId: item.piId,
+              items: [],
+            })
+          }
+          groups.get(key)!.items.push(item)
+        }
+        const groupList = Array.from(groups.values())
+        const multiGroup = groupList.length > 1
+
+        const cartonLabel = (item: Item) => {
+          if (!item.cartonNoFrom) return '-'
+          if (item.cartonNoTo && item.cartonNoTo !== item.cartonNoFrom)
+            return `${item.cartonNoFrom}–${item.cartonNoTo}`
+          return item.cartonNoFrom
+        }
+
+        // 每個 PI 群組的加總（按 distinct 箱號去重）
+        const groupSummary = (items: Item[]) => {
+          const totalQty = items.reduce((s, i) => s + i.quantity, 0)
+          // 同一箱號只算一次重量/材積（多品項共箱）
+          const seenBoxes = new Map<string, Item>()
+          for (const i of items) {
+            const key = i.cartonNoFrom ?? `__item_${i.id}`
+            if (!seenBoxes.has(key)) seenBoxes.set(key, i)
+          }
+          const distinctBoxes = Array.from(seenBoxes.values())
+          const totalCartons = distinctBoxes.filter(i => i.cartonNoFrom).length
+          const allNums = items.map(i => i.cartonNoFrom).filter(Boolean).map(Number).filter(n => !isNaN(n))
+          const minBox = allNums.length ? Math.min(...allNums) : null
+          const maxNums = items.map(i => i.cartonNoTo ?? i.cartonNoFrom).filter(Boolean).map(Number).filter(n => !isNaN(n))
+          const maxBox = maxNums.length ? Math.max(...maxNums) : null
+          const totalGW  = distinctBoxes.reduce((s, i) => s + Number(i.grossWeightKg ?? 0), 0)
+          const totalNW  = distinctBoxes.reduce((s, i) => s + Number(i.netWeightKg ?? 0), 0)
+          const totalFt3 = distinctBoxes.reduce((s, i) => s + Number(i.cubicFt ?? 0), 0)
+          const totalCbm = distinctBoxes.reduce((s, i) => s + Number(i.cbm ?? 0), 0)
+          const rangeLabel = minBox != null && maxBox != null
+            ? minBox === maxBox ? String(minBox) : `${minBox}–${maxBox}`
+            : '-'
+          return { totalQty, totalCartons, rangeLabel, totalGW, totalNW, totalFt3, totalCbm }
+        }
+
+        const fmt = (n: number) => n > 0 ? n.toFixed(n % 1 === 0 ? 0 : 3).replace(/\.?0+$/, '') : '-'
+
+        // 全單總計
+        const grandTotalCartons = groupList.reduce((sum, group) => {
+          const distinct = new Set(group.items.map(i => i.cartonNoFrom).filter(Boolean))
+          return sum + distinct.size
+        }, 0)
+        // 數量按單位分群
+        const qtyByUnit = new Map<string, number>()
+        for (const item of shipment.items) {
+          const unit = item.slsItem?.unit?.trim() || 'PC'
+          qtyByUnit.set(unit, (qtyByUnit.get(unit) ?? 0) + item.quantity)
+        }
+        const unitEntries = Array.from(qtyByUnit.entries()).sort((a, b) => b[1] - a[1])
+        // 全單重量/材積加總（每個 PI 組內去重）
+        let grandGW = 0, grandNW = 0, grandFt3 = 0, grandCbm = 0
+        for (const group of groupList) {
+          const s = groupSummary(group.items)
+          grandGW += s.totalGW
+          grandNW += s.totalNW
+          grandFt3 += s.totalFt3
+          grandCbm += s.totalCbm
+        }
+
+        return (
+          <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
+            <div className="px-5 py-3 border-b border-gray-100">
+              <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">裝箱明細</h2>
+            </div>
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  {multiGroup && <th className="text-left px-4 py-2 font-medium text-gray-600 w-32">PI</th>}
+                  <th className="text-left px-4 py-2 font-medium text-gray-600">SKU</th>
+                  <th className="text-left px-4 py-2 font-medium text-gray-600">品名</th>
+                  <th className="text-right px-4 py-2 font-medium text-gray-600">數量</th>
+                  <th className="text-right px-4 py-2 font-medium text-gray-600">箱數</th>
+                  <th className="text-center px-4 py-2 font-medium text-gray-600">C/NO.</th>
+                  <th className="text-right px-4 py-2 font-medium text-gray-600">毛重 (kg)</th>
+                  <th className="text-right px-4 py-2 font-medium text-gray-600">淨重 (kg)</th>
+                  <th className="text-right px-4 py-2 font-medium text-gray-600">ft³</th>
+                  <th className="text-right px-4 py-2 font-medium text-gray-600">m³</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {groupList.map((group, gi) => {
+                  const s = groupSummary(group.items)
+                  return (
+                    <>
+                      {/* PI 群組標題 + 加總列 */}
+                      <tr key={`g-${gi}`} className="bg-teal-50 border-t-2 border-teal-200">
+                        {multiGroup && (
+                          <td className="px-4 py-2">
+                            <span className="text-xs font-bold text-teal-700 font-mono">{group.label}</span>
+                          </td>
+                        )}
+                        <td colSpan={2} className="px-4 py-2 text-xs font-semibold text-teal-800">
+                          {multiGroup ? '' : <span className="font-mono font-bold">PI: {group.label}</span>}
+                          {!multiGroup && ' '}
+                          <span className="text-gray-500 font-normal">合計</span>
+                        </td>
+                        <td className="px-4 py-2 text-right font-semibold text-teal-800">{s.totalQty.toLocaleString()}</td>
+                        <td className="px-4 py-2 text-right font-semibold text-teal-800">{s.totalCartons > 0 ? s.totalCartons : '-'}</td>
+                        <td className="px-4 py-2 text-center font-semibold text-teal-800 font-mono text-xs">{s.rangeLabel}</td>
+                        <td className="px-4 py-2 text-right font-semibold text-teal-800">{fmt(s.totalGW)}</td>
+                        <td className="px-4 py-2 text-right font-semibold text-teal-800">{fmt(s.totalNW)}</td>
+                        <td className="px-4 py-2 text-right font-semibold text-teal-800">{fmt(s.totalFt3)}</td>
+                        <td className="px-4 py-2 text-right font-semibold text-teal-800">{fmt(s.totalCbm)}</td>
+                      </tr>
+                      {group.items.map(item => (
+                        <tr key={item.id} className="hover:bg-gray-50 border-t border-gray-100">
+                          {multiGroup && <td className="px-4 py-2" />}
+                          <td className="px-4 py-2 font-mono text-xs text-gray-600">{item.slsItem?.product?.sku ?? '-'}</td>
+                          <td className="px-4 py-2 text-gray-700">{item.slsItem?.product?.name ?? '-'}</td>
+                          <td className="px-4 py-2 text-right text-gray-700">
+                            {item.quantity.toLocaleString()}
+                            {item.slsItem?.unit && <span className="text-gray-400 text-xs ml-1">{item.slsItem.unit}</span>}
+                          </td>
+                          <td className="px-4 py-2 text-right text-gray-500">{item.cartons ?? '-'}</td>
+                          <td className="px-4 py-2 text-center text-gray-500 text-xs font-mono">{cartonLabel(item)}</td>
+                          <td className="px-4 py-2 text-right text-gray-500">{item.grossWeightKg?.toString() ?? '-'}</td>
+                          <td className="px-4 py-2 text-right text-gray-500">{item.netWeightKg?.toString() ?? '-'}</td>
+                          <td className="px-4 py-2 text-right text-gray-500">{item.cubicFt?.toString() ?? '-'}</td>
+                          <td className="px-4 py-2 text-right text-gray-500">{item.cbm?.toString() ?? '-'}</td>
+                        </tr>
+                      ))}
+                    </>
+                  )
+                })}
+                {/* 全單總計列 */}
+                {multiGroup && (
+                  <tr className="bg-gray-800 border-t-2 border-gray-600">
+                    <td colSpan={3} className="px-4 py-3 text-sm font-bold text-white">
+                      TOTAL
+                      <span className="ml-3 font-normal text-gray-300 text-xs">
+                        {unitEntries.map(([unit, qty]) => `${qty.toLocaleString()} ${unit}`).join(' / ')}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right font-bold text-white">
+                      {shipment.items.reduce((s, i) => s + i.quantity, 0).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-right font-bold text-white">{grandTotalCartons > 0 ? grandTotalCartons : '-'}</td>
+                    <td className="px-4 py-3 text-center text-gray-400 text-xs">—</td>
+                    <td className="px-4 py-3 text-right font-bold text-white">{fmt(grandGW)}</td>
+                    <td className="px-4 py-3 text-right font-bold text-white">{fmt(grandNW)}</td>
+                    <td className="px-4 py-3 text-right font-bold text-white">{fmt(grandFt3)}</td>
+                    <td className="px-4 py-3 text-right font-bold text-white">{fmt(grandCbm)}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )
+      })()}
 
       {shipment.items.length === 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-700">

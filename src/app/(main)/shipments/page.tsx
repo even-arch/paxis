@@ -68,6 +68,11 @@ export default async function ShipmentsPage({ searchParams }: Props) {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">出貨單</h1>
+        <Link href="/shipments/import"
+          className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium px-4 py-2 rounded-md transition-colors">
+          <span>📥</span>
+          <span>AI 匯入出貨文件</span>
+        </Link>
       </div>
 
       <form method="GET" className="mb-4 flex gap-2">

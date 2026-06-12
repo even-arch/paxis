@@ -27,9 +27,8 @@ const b2bGroups: NavGroup[] = [
   {
     section: '客戶端',
     items: [
-      { label: '客戶',          href: '/customers',              icon: '🤝' },
-      { label: '客戶訂單',      href: '/sales',                  icon: '📋' },
-      { label: '匯入出貨文件',  href: '/sales/shipment-import',  icon: '🗂️' },
+      { label: '客戶',      href: '/customers', icon: '🤝' },
+      { label: '客戶訂單',  href: '/sales',     icon: '📋' },
     ],
   },
   {
@@ -43,6 +42,7 @@ const b2bGroups: NavGroup[] = [
     section: '物流',
     items: [
       { label: '出貨單', href: '/shipments', icon: '📦' },
+      { label: '簡易出貨單', href: '/delivery-notes', icon: '🧾' },
       { label: 'UPS 出貨', href: '/shipping', icon: '🚚' },
     ],
   },
@@ -99,7 +99,7 @@ function isActive(pathname: string, item: NavItem): boolean {
   if (item.exact) return pathname === item.href
   if (pathname === item.href) return true
   if (item.href === '/sales') {
-    return pathname.startsWith('/sales/') && pathname !== '/sales/shipment-import'
+    return pathname.startsWith('/sales/')
   }
   return pathname.startsWith(item.href + '/')
 }
