@@ -1403,30 +1403,48 @@ export async function syncPatiscoDeliveryOrders(
             select: { id: true },
           })
 
-      // 6. 建立 SLS_ShipmentPI 關聯（PL 和 CI 都有 packings[].sourceOrderID）
-      // sourceOrderID = Patisco PI 的 id，對應 SLS_PI.patiscoDocId
+      // 6. 建立 SLS_ShipmentPI 關聯
+      // 策略一：從 detail.orders[]（最完整，有所有 PI 號碼）→ 用 piNo 或 patiscoDocId 查
+      // 策略二：從 packings[].sourceOrderID → 用 patiscoDocId 查（補漏）
       const packingItems = (pl ?? ci)?.packings ?? []
 
-      // 收集關聯的 PI sourceOrderIDs（去重）
-      const seenSrcIds = new Set<string>()
-      for (const p of packingItems) {
-        const sid = (p as { sourceOrderID?: string }).sourceOrderID
-        if (sid) seenSrcIds.add(sid)
-      }
-      const sourceOrderIds = Array.from(seenSrcIds)
+      const linkedPiIds = new Set<number>()
 
-      for (const srcId of sourceOrderIds) {
+      // 策略一：用 orders[].no（PI 號）找 SLS_PI
+      const ordersList = detail.orders ?? []
+      for (const ord of ordersList) {
+        const piNo = ord.no?.trim()
+        const srcId = ord.id?.trim()
+        if (!piNo && !srcId) continue
         const pi = await prisma.sLS_PI.findFirst({
-          where: { patiscoDocId: srcId },
+          where: piNo
+            ? { OR: [{ piNo }, ...(srcId ? [{ patiscoDocId: srcId }] : [])] }
+            : { patiscoDocId: srcId! },
           select: { id: true },
         })
-        if (!pi) continue
+        if (pi) linkedPiIds.add(pi.id)
+      }
+
+      // 策略二：從 packings[].sourceOrderID 補漏（有時 orders[] 不完整）
+      for (const p of packingItems) {
+        const sid = (p as { sourceOrderID?: string }).sourceOrderID
+        if (!sid) continue
+        const pi = await prisma.sLS_PI.findFirst({
+          where: { patiscoDocId: sid },
+          select: { id: true },
+        })
+        if (pi) linkedPiIds.add(pi.id)
+      }
+
+      for (const piId of Array.from(linkedPiIds)) {
         await prisma.sLS_ShipmentPI.upsert({
-          where: { shipmentId_piId: { shipmentId: shipment.id, piId: pi.id } },
-          create: { shipmentId: shipment.id, piId: pi.id },
+          where: { shipmentId_piId: { shipmentId: shipment.id, piId } },
+          create: { shipmentId: shipment.id, piId },
           update: {},
         })
       }
+
+      console.log(`[patisco-do-sync] DO ${docNo} 關聯 PI 數量: ${linkedPiIds.size}（orders=${ordersList.length} packingSrcIds=${new Set(packingItems.map(p => (p as {sourceOrderID?:string}).sourceOrderID).filter(Boolean)).size}）`)
 
       // 7. 建立 SLS_ShipmentItem + INV_Movement（跳過已存在的）
       const alreadyHasItems = await prisma.sLS_ShipmentItem.count({
@@ -1444,11 +1462,17 @@ export async function syncPatiscoDeliveryOrders(
           })
           if (!product) continue
 
-          // 找對應的 SLS_Item（從 sourceOrderID 關聯的 SLS_Order）
+          // 找對應的 SLS_Item（從 sourceOrderID 或 sourceOrderNo 關聯的 SLS_Order）
           const packingSrcOrderId = (packing as { sourceOrderID?: string }).sourceOrderID
-          const sourcePI = packingSrcOrderId
+          const packingSrcOrderNo = (packing as { sourceOrderNo?: string }).sourceOrderNo
+          const sourcePI = packingSrcOrderId || packingSrcOrderNo
             ? await prisma.sLS_PI.findFirst({
-                where: { patiscoDocId: packingSrcOrderId },
+                where: {
+                  OR: [
+                    ...(packingSrcOrderId ? [{ patiscoDocId: packingSrcOrderId }] : []),
+                    ...(packingSrcOrderNo ? [{ piNo: packingSrcOrderNo }] : []),
+                  ],
+                },
                 select: { orderId: true },
               })
             : null
