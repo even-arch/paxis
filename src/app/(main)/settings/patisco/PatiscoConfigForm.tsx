@@ -66,6 +66,7 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
 
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
+  const [showRepairTools, setShowRepairTools] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [syncElapsed, setSyncElapsed] = useState(0)
   const [msg, setMsg] = useState<{ type: 'ok' | 'error'; text: string } | null>(null)
@@ -304,21 +305,10 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
                 </>
               ) : '手動同步'}
             </button>
-            <button onClick={handleSyncDeliveries} disabled={syncing}
-              className="text-sm px-3 py-1 border border-blue-300 text-blue-700 rounded hover:bg-blue-50 disabled:opacity-50">
-              {syncing ? '...' : '📦 同步出貨單'}
-            </button>
-            <button onClick={() => runSync('backfill-shipment-pi')} disabled={syncing}
-              className="text-sm px-3 py-1 border border-orange-300 text-orange-700 rounded hover:bg-orange-50 disabled:opacity-50">
-              {syncing ? '...' : '🔗 補建 PI 關聯'}
-            </button>
-            <button onClick={async () => {
-              if (!confirm('這將清除所有出貨單的同步快取，下次同步時強制重新從 Patisco 拉取明細。確定嗎？')) return
-              await runSync('reset-do-sync')
-              setTimeout(() => handleSyncDeliveries(), 500)
-            }} disabled={syncing}
-              className="text-sm px-3 py-1 border border-red-300 text-red-700 rounded hover:bg-red-50 disabled:opacity-50">
-              {syncing ? '...' : '🔄 重建出貨明細'}
+            <button onClick={() => setShowRepairTools(v => !v)}
+              className="text-sm px-2 py-1 border border-gray-200 text-gray-400 rounded hover:bg-gray-50"
+              title="進階修補操作">
+              ···
             </button>
           </div>
         )}
@@ -345,6 +335,31 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
       {jwtExpired && (
         <div className="px-6 py-2 bg-orange-50 border-b border-orange-200 text-sm text-orange-700">
           ⚠ JWT Token 已過期（{initialConfig?.jwtExpiresAt?.slice(0, 10)}）。請切換到「Token 模式」重新貼上，或在「帳密模式」下儲存帳密讓系統自動重新登入。
+        </div>
+      )}
+
+      {/* 進階修補操作（折疊） */}
+      {showRepairTools && (
+        <div className="px-6 py-3 border-b bg-gray-50 text-sm">
+          <p className="text-xs text-gray-500 mb-2">進階操作 — 一般情況不需使用</p>
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={handleSyncDeliveries} disabled={syncing}
+              className="text-xs px-3 py-1.5 border border-blue-300 text-blue-700 rounded hover:bg-blue-50 disabled:opacity-50">
+              {syncing ? '...' : '📦 同步出貨單'}
+            </button>
+            <button onClick={() => runSync('backfill-shipment-pi')} disabled={syncing}
+              className="text-xs px-3 py-1.5 border border-orange-300 text-orange-700 rounded hover:bg-orange-50 disabled:opacity-50">
+              {syncing ? '...' : '🔗 補建 PI 關聯'}
+            </button>
+            <button onClick={async () => {
+              if (!confirm('這將清除所有出貨單的同步快取，下次同步時強制重新從 Patisco 拉取明細。確定嗎？')) return
+              await runSync('reset-do-sync')
+              setTimeout(() => handleSyncDeliveries(), 500)
+            }} disabled={syncing}
+              className="text-xs px-3 py-1.5 border border-red-300 text-red-700 rounded hover:bg-red-50 disabled:opacity-50">
+              {syncing ? '...' : '🔄 重建出貨明細'}
+            </button>
+          </div>
         </div>
       )}
 
