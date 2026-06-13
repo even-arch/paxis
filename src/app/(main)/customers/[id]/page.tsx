@@ -3,13 +3,12 @@ import Link from 'next/link'
 import { prisma } from '@/lib/db'
 import { formatDate } from '@/lib/utils'
 import DeleteCustomerButton from './DeleteCustomerButton'
-import CustomerProductPanel from './CustomerProductPanel'
 
 type Props = { params: { id: string } }
 
 export default async function CustomerDetailPage({
   params }: Props) {
-    const [customer, recentOrders, customerProducts] = await Promise.all([
+    const [customer, recentOrders, purchasedItems] = await Promise.all([
     prisma.cUS_Customer.findUnique({
       where: { id: Number(params.id) },
       include: { contacts: true },
@@ -20,10 +19,11 @@ export default async function CustomerDetailPage({
       take: 20,
       include: { _count: { select: { items: true } } },
     }),
-    prisma.cUS_CustomerProduct.findMany({
-      where: { customerId: Number(params.id) },
+    prisma.sLS_Item.findMany({
+      where: { order: { customerId: Number(params.id) } },
+      distinct: ['productId'],
       include: { product: { select: { id: true, name: true, sku: true } } },
-      orderBy: { lastOrderDate: 'desc' },
+      orderBy: { product: { name: 'asc' } },
     }),
   ])
 
@@ -130,16 +130,32 @@ export default async function CustomerDetailPage({
           )}
         </Card>
 
-        {/* 曾購商品 */}
-        <Card title={`曾購商品（${customerProducts.length} 項）`}>
-          <CustomerProductPanel
-            customerId={customer.id}
-            products={customerProducts.map(p => ({
-              ...p,
-              lastUnitPrice: p.lastUnitPrice ? String(p.lastUnitPrice) : null,
-              lastOrderDate: p.lastOrderDate ? p.lastOrderDate.toISOString() : null,
-            }))}
-          />
+        {/* 曾購商品（從訂單自動勾稽） */}
+        <Card title={`曾購商品（${purchasedItems.length} 項）`}>
+          {purchasedItems.length === 0 ? (
+            <p className="text-sm text-gray-400">尚無訂單記錄，建立客戶訂單後自動更新。</p>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {purchasedItems.map(item => (
+                <div key={item.productId} className="flex items-center justify-between py-2">
+                  <div>
+                    <span className="text-sm font-medium text-gray-800">{item.product?.name ?? '-'}</span>
+                    {item.product?.sku && (
+                      <span className="ml-2 text-xs font-mono text-gray-400">{item.product.sku}</span>
+                    )}
+                  </div>
+                  <Link href={`/products/${item.productId}`} className="text-xs text-blue-500 hover:underline">
+                    查看商品 →
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
+          {purchasedItems.length > 0 && (
+            <Link href={`/sales?customerId=${params.id}`} className="text-xs text-blue-600 hover:underline mt-3 block">
+              查看此客戶所有訂單 →
+            </Link>
+          )}
         </Card>
 
         <p className="text-xs text-gray-400">建立時間：{formatDate(customer.createdAt)}</p>

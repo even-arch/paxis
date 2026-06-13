@@ -22,15 +22,21 @@ type Props = {
   totalPages: number
   search: string
   supplierId: number | null
+  customerId: number | null
   archived: boolean
   filterSupplierName?: string
+  filterCustomerName?: string
+  suppliers: { id: number; label: string }[]
+  customers: { id: number; label: string }[]
   sort?: string
   dir?: 'asc' | 'desc'
 }
 
 export default function ProductsClient({
   products, total, page, totalPages,
-  search, supplierId, archived, filterSupplierName,
+  search, supplierId, customerId, archived,
+  filterSupplierName, filterCustomerName,
+  suppliers, customers,
   sort = 'sku', dir = 'asc',
 }: Props) {
   const router = useRouter()
@@ -66,7 +72,10 @@ export default function ProductsClient({
     const params = new URLSearchParams()
     if ((overrides.search ?? search)) params.set('search', String(overrides.search ?? search))
     if (Number(overrides.page ?? page) > 1) params.set('page', String(overrides.page ?? page))
-    if ((overrides.supplierId ?? supplierId)) params.set('supplierId', String(overrides.supplierId ?? supplierId))
+    const sid = 'supplierId' in overrides ? overrides.supplierId : supplierId
+    if (sid) params.set('supplierId', String(sid))
+    const cid = 'customerId' in overrides ? overrides.customerId : customerId
+    if (cid) params.set('customerId', String(cid))
     if (overrides.archived ?? archived) params.set('archived', 'true')
     const s = (overrides.sort as string | undefined) ?? sort
     const d = (overrides.dir as string | undefined) ?? dir
@@ -214,11 +223,12 @@ export default function ProductsClient({
         </div>
       </div>
 
-      {/* 供應商過濾提示 */}
-      {filterSupplierName && (
+      {/* 供應商/客戶過濾提示 */}
+      {(filterSupplierName || filterCustomerName) && (
         <div className="mb-3 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-sm">
-          <span className="text-blue-700">供應商篩選：<strong>{filterSupplierName}</strong></span>
-          <a href={archived ? '/products?archived=true' : '/products'} className="ml-auto text-xs text-blue-500 hover:underline">清除篩選</a>
+          {filterSupplierName && <span className="text-blue-700">供應商：<strong>{filterSupplierName}</strong></span>}
+          {filterCustomerName && <span className="text-blue-700">客戶：<strong>{filterCustomerName}</strong></span>}
+          <a href={buildUrl({ supplierId: null, customerId: null, page: 1 })} className="ml-auto text-xs text-blue-500 hover:underline">清除篩選</a>
         </div>
       )}
 
@@ -287,19 +297,28 @@ export default function ProductsClient({
       )}
 
       {/* 搜尋列 */}
-      <form method="GET" className="mb-4 flex gap-2">
-        {supplierId && <input type="hidden" name="supplierId" value={supplierId} />}
+      <form method="GET" className="mb-4 flex gap-2 flex-wrap">
         {archived && <input type="hidden" name="archived" value="true" />}
         <input type="hidden" name="sort" value={sort} />
         <input type="hidden" name="dir" value={dir} />
         <input name="search" defaultValue={search}
           placeholder="搜尋商品名稱、SKU、型號..."
-          className="border border-gray-300 rounded-md px-3 py-2 text-sm w-80 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          className="border border-gray-300 rounded-md px-3 py-2 text-sm w-72 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <select name="supplierId" defaultValue={supplierId ?? ''}
+          className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">全部供應商</option>
+          {suppliers.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+        </select>
+        <select name="customerId" defaultValue={customerId ?? ''}
+          className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">全部客戶</option>
+          {customers.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+        </select>
         <button type="submit" className="bg-gray-100 border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-200">
           搜尋
         </button>
-        {search && (
-          <a href={buildUrl({ search: '', page: 1 })}
+        {(search || supplierId || customerId) && (
+          <a href={buildUrl({ search: '', supplierId: null, customerId: null, page: 1 })}
             className="border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-50 text-gray-500">
             清除
           </a>

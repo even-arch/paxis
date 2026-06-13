@@ -8,11 +8,18 @@ import SortableHeader from '@/components/SortableHeader'
 const VALID_SORTS = ['poNo', 'patiscoOrderNo', 'status', 'expectedDate', 'orderDate'] as const
 type SortField = typeof VALID_SORTS[number]
 
-type Props = { searchParams: { search?: string; status?: string; page?: string; sort?: string; dir?: string } }
+type Props = {
+  searchParams: {
+    search?: string; sku?: string; status?: string
+    supplierId?: string; page?: string; sort?: string; dir?: string
+  }
+}
 
 export default async function PurchasesPage({ searchParams }: Props) {
   const search = searchParams.search ?? ''
+  const sku = searchParams.sku ?? ''
   const statusFilter = searchParams.status ?? ''
+  const supplierId = searchParams.supplierId ? Number(searchParams.supplierId) : undefined
   const page = Math.max(1, Number(searchParams.page ?? 1))
   const sort: SortField = VALID_SORTS.includes(searchParams.sort as SortField) ? searchParams.sort as SortField : 'orderDate'
   const dir = searchParams.dir === 'asc' ? 'asc' : 'desc'
@@ -20,15 +27,19 @@ export default async function PurchasesPage({ searchParams }: Props) {
 
   const where: Record<string, unknown> = {}
   if (statusFilter !== '') where.status = Number(statusFilter)
+  if (supplierId) where.supplierId = supplierId
+  if (sku) {
+    where.items = { some: { product: { sku: { contains: sku, mode: 'insensitive' } } } }
+  }
   if (search) {
     where.OR = [
-      { poNo: { contains: search } },
-      { patiscoOrderNo: { contains: search } },
-      { supplier: { name: { contains: search } } },
+      { poNo: { contains: search, mode: 'insensitive' } },
+      { patiscoOrderNo: { contains: search, mode: 'insensitive' } },
+      { supplier: { name: { contains: search, mode: 'insensitive' } } },
     ]
   }
 
-  const [total, orders] = await Promise.all([
+  const [total, orders, suppliers] = await Promise.all([
     prisma.pO_Order.count({ where }),
     prisma.pO_Order.findMany({
       where,
@@ -40,9 +51,14 @@ export default async function PurchasesPage({ searchParams }: Props) {
         _count: { select: { items: true } },
       },
     }),
+    prisma.sUP_Supplier.findMany({
+      select: { id: true, name: true, shortName: true },
+      orderBy: { name: 'asc' },
+    }),
   ])
 
   const totalPages = Math.ceil(total / limit)
+  const hasFilter = !!(search || sku || statusFilter || supplierId)
   const statusOptions = [
     { value: '', label: '全部狀態' },
     { value: '0', label: '草稿' },
@@ -55,7 +71,9 @@ export default async function PurchasesPage({ searchParams }: Props) {
   function buildUrl(newSort: string, newDir: 'asc' | 'desc') {
     const p = new URLSearchParams()
     if (search) p.set('search', search)
+    if (sku) p.set('sku', sku)
     if (statusFilter) p.set('status', statusFilter)
+    if (supplierId) p.set('supplierId', String(supplierId))
     p.set('sort', newSort)
     p.set('dir', newDir)
     return `/purchases?${p.toString()}`
@@ -85,14 +103,24 @@ export default async function PurchasesPage({ searchParams }: Props) {
         <input type="hidden" name="sort" value={sort} />
         <input type="hidden" name="dir" value={dir} />
         <input name="search" defaultValue={search}
-          placeholder="搜尋供應商訂單號、Patisco 訂單號、供應商..."
-          className="border border-gray-300 rounded-md px-3 py-2 text-sm w-80 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          placeholder="搜尋訂單號..."
+          className="border border-gray-300 rounded-md px-3 py-2 text-sm w-48 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <input name="sku" defaultValue={sku}
+          placeholder="產品 SKU..."
+          className="border border-gray-300 rounded-md px-3 py-2 text-sm w-36 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <select name="supplierId" defaultValue={supplierId ?? ''}
+          className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">全部供應商</option>
+          {suppliers.map(s => (
+            <option key={s.id} value={s.id}>{s.shortName ?? s.name}</option>
+          ))}
+        </select>
         <select name="status" defaultValue={statusFilter}
           className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
           {statusOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
         <button type="submit" className="bg-gray-100 border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-200">搜尋</button>
-        {(search || statusFilter) && (
+        {hasFilter && (
           <Link href="/purchases" className="border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-50 text-gray-500">清除</Link>
         )}
       </form>
@@ -113,7 +141,7 @@ export default async function PurchasesPage({ searchParams }: Props) {
           <tbody className="divide-y divide-gray-100">
             {orders.length === 0 && (
               <tr><td colSpan={7} className="text-center py-12 text-gray-400">
-                尚無供應商訂單
+                {hasFilter ? '找不到符合條件的訂單' : '尚無供應商訂單'}
               </td></tr>
             )}
             {orders.map((o: typeof orders[0]) => {
@@ -150,12 +178,20 @@ export default async function PurchasesPage({ searchParams }: Props) {
         <div className="flex items-center gap-2 mt-4 text-sm">
           <span className="text-gray-500">共 {total} 筆</span>
           <div className="flex gap-1 ml-auto">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-              <Link key={p} href={`/purchases?search=${search}&status=${statusFilter}&sort=${sort}&dir=${dir}&page=${p}`}
-                className={`px-3 py-1 rounded-md ${p === page ? 'bg-blue-600 text-white' : 'border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
-                {p}
-              </Link>
-            ))}
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => {
+              const pp = new URLSearchParams()
+              if (search) pp.set('search', search)
+              if (sku) pp.set('sku', sku)
+              if (statusFilter) pp.set('status', statusFilter)
+              if (supplierId) pp.set('supplierId', String(supplierId))
+              pp.set('sort', sort); pp.set('dir', dir); pp.set('page', String(p))
+              return (
+                <Link key={p} href={`/purchases?${pp.toString()}`}
+                  className={`px-3 py-1 rounded-md ${p === page ? 'bg-blue-600 text-white' : 'border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+                  {p}
+                </Link>
+              )
+            })}
           </div>
         </div>
       )}

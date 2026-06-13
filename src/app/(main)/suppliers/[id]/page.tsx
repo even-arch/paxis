@@ -9,7 +9,7 @@ type Props = { params: { id: string } }
 
 export default async function SupplierDetailPage({
   params }: Props) {
-    const [supplier, recentOrders, allProducts] = await Promise.all([
+    const [supplier, recentOrders, allProducts, orderedItems] = await Promise.all([
     prisma.sUP_Supplier.findUnique({
       where: { id: Number(params.id) },
       include: {
@@ -33,6 +33,12 @@ export default async function SupplierDetailPage({
       where: { isActive: true },
       select: { id: true, name: true, sku: true },
       orderBy: { name: 'asc' },
+    }),
+    prisma.pO_Item.findMany({
+      where: { order: { supplierId: Number(params.id) } },
+      distinct: ['productId'],
+      include: { product: { select: { id: true, name: true, sku: true } } },
+      orderBy: { product: { name: 'asc' } },
     }),
   ])
 
@@ -136,7 +142,35 @@ export default async function SupplierDetailPage({
           )}
         </Card>
 
-        {/* 供應商商品對應 */}
+        {/* 供應商商品對應（從採購訂單自動勾稽） */}
+        <Card title={`供應商商品對應（${orderedItems.length} 項）`}>
+          {orderedItems.length === 0 ? (
+            <p className="text-sm text-gray-400">尚無採購訂單記錄，建立訂單後自動更新。</p>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {orderedItems.map(item => (
+                <div key={item.productId} className="flex items-center justify-between py-2">
+                  <div>
+                    <span className="text-sm font-medium text-gray-800">{item.product?.name ?? '-'}</span>
+                    {item.product?.sku && (
+                      <span className="ml-2 text-xs font-mono text-gray-400">{item.product.sku}</span>
+                    )}
+                  </div>
+                  <Link href={`/products/${item.productId}`} className="text-xs text-blue-500 hover:underline">
+                    查看商品 →
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
+          {orderedItems.length > 0 && (
+            <Link href={`/purchases?supplierId=${params.id}`} className="text-xs text-blue-600 hover:underline mt-3 block">
+              查看此供應商所有訂單 →
+            </Link>
+          )}
+        </Card>
+
+        {/* 手動商品對應（維護 SUP_SupplierProduct 關係） */}
         <div className="flex items-center justify-end mb-1">
           <Link href={`/products?supplierId=${params.id}`}
             className="text-xs text-blue-600 hover:underline">
