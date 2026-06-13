@@ -29,15 +29,13 @@ export async function POST(_req: NextRequest) {
   const creds = await patiscoLogin(prisma)
   if (!creds) return fail('登入失敗，請確認帳號密碼')
 
-  // 第二層：tools/list（確認 MCP server 正常回應）
+  // 第二層：tools/list（僅供參考，不作為失敗條件）
   let toolCount = 0
   try {
     const tools = await listTools(creds) as { result?: { tools?: { name: string }[] } } | null
-    if (!tools) return fail('tools/list 無回應，MCP server 可能未啟動')
-    toolCount = tools.result?.tools?.length ?? 0
-    if (toolCount === 0) return fail('tools/list 回傳空結果，MCP server 可能異常')
-  } catch (e) {
-    return fail(`tools/list 失敗：${e instanceof Error ? e.message : String(e)}`)
+    toolCount = tools?.result?.tools?.length ?? 0
+  } catch {
+    // tools/list 失敗不中斷，繼續驗證實際資料查詢
   }
 
   // 第三層：實際資料查詢（拉第 1 頁 PI，驗證資料 API 可用）
