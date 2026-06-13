@@ -79,6 +79,8 @@ export default function FinancePage() {
   const [payables, setPayables] = useState<Payable[]>([])
   const [receivables, setReceivables] = useState<Receivable[]>([])
   const [loading, setLoading] = useState(true)
+  const [backfilling, setBackfilling] = useState(false)
+  const [backfillResult, setBackfillResult] = useState<{ ar: { created: number; skipped: number }; ap: { created: number; skipped: number } } | null>(null)
 
   // 付款對話框
   const [payDialog, setPayDialog] = useState<Payable | null>(null)
@@ -105,6 +107,16 @@ export default function FinancePage() {
   const [recRate, setRecRate] = useState('')
   const [recDateInput, setRecDateInput] = useState('')
   const [recNote, setRecNote] = useState('')
+
+  async function handleBackfill() {
+    setBackfilling(true)
+    setBackfillResult(null)
+    const res = await fetch('/api/finance/backfill', { method: 'POST' })
+    const data = await res.json()
+    setBackfillResult(data)
+    setBackfilling(false)
+    load()
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -213,8 +225,27 @@ export default function FinancePage() {
 
   return (
     <div className="p-6">
-      <h1 className="text-xl font-semibold mb-1">對帳 / 付款</h1>
-      <p className="text-sm text-gray-500 mb-5">追蹤應付帳款（供應商）與應收帳款（客戶）</p>
+      <div className="flex items-start justify-between mb-1">
+        <h1 className="text-xl font-semibold">對帳 / 付款</h1>
+        <button
+          onClick={handleBackfill}
+          disabled={backfilling}
+          className="text-sm border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-50 disabled:opacity-50 text-gray-600"
+        >
+          {backfilling ? '補建中…' : '⟳ 從出貨文件補建帳款'}
+        </button>
+      </div>
+      <p className="text-sm text-gray-500 mb-3">追蹤應付帳款（供應商）與應收帳款（客戶）</p>
+
+      {backfillResult && (
+        <div className="mb-4 flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-sm text-blue-700">
+          <span>
+            補建完成：應收 +{backfillResult.ar.created} 筆（略過 {backfillResult.ar.skipped} 筆）、
+            應付 +{backfillResult.ap.created} 筆（略過 {backfillResult.ap.skipped} 筆）
+          </span>
+          <button onClick={() => setBackfillResult(null)} className="ml-4 text-blue-400 hover:text-blue-600">×</button>
+        </div>
+      )}
 
       {/* 摘要 */}
       <div className="grid grid-cols-3 gap-4 mb-6">
