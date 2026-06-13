@@ -78,9 +78,12 @@ type EstimateRow = {
   actualShipDate: string
   customer: { id: number | null; name: string }
   ar: { foreign: number; currency: string; rate: number; twd: number; fromRecord: boolean; receivableStatus: number | null }
-  ap: { twd: number; items: { poNo: string; supplierName: string; amountTWD: number; currency: string }[] }
+  ap: { twd: number; items: { poNo: string; supplierName: string; amountTWD: number; currency: string; matchType: string }[] }
   gross: { twd: number; pct: number | null }
   hasPoLink: boolean
+  warnings: string[]
+  unmatchedOrders: string[]
+  nullAmountPos: string[]
 }
 
 export default function FinancePage() {
@@ -740,6 +743,7 @@ function EstimatesTab({
   loaded: boolean
   onRefresh: () => void
 }) {
+  const [expandedId, setExpandedId] = useState<number | null>(null)
   const totalArTWD = estimates.reduce((s, r) => s + r.ar.twd, 0)
   const totalApTWD = estimates.reduce((s, r) => s + r.ap.twd, 0)
   const totalGross = totalArTWD - totalApTWD
@@ -797,40 +801,103 @@ function EstimatesTab({
             )}
             {estimates.map(r => {
               const grossColor = r.gross.twd >= 0 ? 'text-green-700' : 'text-red-600'
+              const hasWarning = r.warnings.length > 0
+              const isExpanded = expandedId === r.shipmentId
               return (
-                <tr key={r.shipmentId} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-mono text-xs text-blue-600">
-                    <Link href={`/shipments/${r.shipmentId}`} className="hover:underline">{r.shipmentNo}</Link>
-                  </td>
-                  <td className="px-4 py-3 text-gray-700 text-xs">
-                    {r.customer.id
-                      ? <Link href={`/customers/${r.customer.id}`} className="hover:underline">{r.customer.name}</Link>
-                      : <span className="text-gray-400">{r.customer.name}</span>}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(r.actualShipDate)}</td>
-                  <td className="px-4 py-3 text-right font-mono">
-                    <span title={`${r.ar.foreign.toFixed(2)} ${r.ar.currency} × ${r.ar.rate}`}>
-                      {r.ar.twd > 0 ? r.ar.twd.toLocaleString('zh-TW', { maximumFractionDigits: 0 }) : '—'}
-                    </span>
-                    {r.ar.fromRecord && <span className="ml-1 text-xs text-gray-400">✓</span>}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono">
-                    {r.ap.twd > 0 ? r.ap.twd.toLocaleString('zh-TW', { maximumFractionDigits: 0 }) : <span className="text-gray-300">—</span>}
-                  </td>
-                  <td className={`px-4 py-3 text-right font-mono font-medium ${r.ap.twd > 0 ? grossColor : 'text-gray-300'}`}>
-                    {r.ap.twd > 0
-                      ? `${r.gross.twd >= 0 ? '+' : ''}${r.gross.twd.toLocaleString('zh-TW', { maximumFractionDigits: 0 })}`
-                      : '—'}
-                  </td>
-                  <td className={`px-4 py-3 text-right text-xs ${r.ap.twd > 0 ? grossColor : 'text-gray-300'}`}>
-                    {r.gross.pct != null && r.ap.twd > 0 ? `${r.gross.pct.toFixed(1)}%` : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-gray-500">
-                    {r.ap.items.length > 0
-                      ? r.ap.items.map(i => i.supplierName).join('、')
-                      : <span className="text-gray-300">無採購訂單連結</span>}
-                  </td>
-                </tr>
+                <>
+                  <tr key={r.shipmentId}
+                    className={`hover:bg-gray-50 cursor-pointer ${hasWarning ? 'bg-amber-50/40' : ''}`}
+                    onClick={() => setExpandedId(isExpanded ? null : r.shipmentId)}
+                  >
+                    <td className="px-4 py-3 font-mono text-xs text-blue-600">
+                      <span className="flex items-center gap-1">
+                        <span className="text-gray-400 text-xs">{isExpanded ? '▼' : '▶'}</span>
+                        <Link href={`/shipments/${r.shipmentId}`} className="hover:underline" onClick={e => e.stopPropagation()}>{r.shipmentNo}</Link>
+                        {hasWarning && <span title={r.warnings.join('\n')} className="text-amber-500">⚠️</span>}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-700 text-xs">
+                      {r.customer.id
+                        ? <Link href={`/customers/${r.customer.id}`} className="hover:underline">{r.customer.name}</Link>
+                        : <span className="text-gray-400">{r.customer.name}</span>}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(r.actualShipDate)}</td>
+                    <td className="px-4 py-3 text-right font-mono">
+                      <span title={`${r.ar.foreign.toFixed(2)} ${r.ar.currency} × ${r.ar.rate}`}>
+                        {r.ar.twd > 0 ? r.ar.twd.toLocaleString('zh-TW', { maximumFractionDigits: 0 }) : '—'}
+                      </span>
+                      {r.ar.fromRecord && <span className="ml-1 text-xs text-gray-400">✓</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono">
+                      {r.ap.twd > 0 ? r.ap.twd.toLocaleString('zh-TW', { maximumFractionDigits: 0 }) : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className={`px-4 py-3 text-right font-mono font-medium ${r.ap.twd > 0 ? grossColor : 'text-gray-300'}`}>
+                      {r.ap.twd > 0
+                        ? `${r.gross.twd >= 0 ? '+' : ''}${r.gross.twd.toLocaleString('zh-TW', { maximumFractionDigits: 0 })}`
+                        : '—'}
+                    </td>
+                    <td className={`px-4 py-3 text-right text-xs ${r.ap.twd > 0 ? grossColor : 'text-gray-300'}`}>
+                      {r.gross.pct != null && r.ap.twd > 0 ? `${r.gross.pct.toFixed(1)}%` : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-500">
+                      {r.ap.items.length > 0
+                        ? r.ap.items.map(i => i.supplierName).join('、')
+                        : <span className="text-gray-300">無採購訂單連結</span>}
+                    </td>
+                  </tr>
+                  {isExpanded && (
+                    <tr key={`${r.shipmentId}-detail`} className="bg-gray-50">
+                      <td colSpan={8} className="px-6 py-4 text-xs">
+                        <div className="grid grid-cols-2 gap-6">
+                          {/* AR 明細 */}
+                          <div>
+                            <p className="font-semibold text-blue-700 mb-2">應收明細（AR）</p>
+                            {r.ar.fromRecord
+                              ? <p className="text-gray-600">來源：FIN_Receivable 記錄 → TWD {r.ar.twd.toLocaleString('zh-TW', { maximumFractionDigits: 0 })}</p>
+                              : <p className="text-gray-600">來源：PI 訂單加總 + HC → TWD {r.ar.twd.toLocaleString('zh-TW', { maximumFractionDigits: 0 })}</p>
+                            }
+                            <p className="text-gray-400 mt-1">CI 匯率：1 TWD = {r.ar.rate > 0 ? (1/r.ar.rate).toFixed(4) : '—'} EUR</p>
+                          </div>
+                          {/* AP 明細 */}
+                          <div>
+                            <p className="font-semibold text-amber-700 mb-2">應付明細（AP）</p>
+                            {r.ap.items.length > 0 ? (
+                              <table className="w-full text-xs mb-2">
+                                <thead><tr className="text-gray-400">
+                                  <th className="text-left pb-1">PO 號</th>
+                                  <th className="text-left pb-1">供應商</th>
+                                  <th className="text-right pb-1">TWD</th>
+                                  <th className="text-left pb-1 pl-2">配對方式</th>
+                                </tr></thead>
+                                <tbody>{r.ap.items.map((item, i) => (
+                                  <tr key={i} className="border-t border-gray-100">
+                                    <td className="py-1 font-mono">{item.poNo}</td>
+                                    <td className="py-1 pl-2">{item.supplierName}</td>
+                                    <td className="py-1 text-right font-mono">{item.amountTWD > 0 ? item.amountTWD.toLocaleString('zh-TW', { maximumFractionDigits: 0 }) : <span className="text-red-400">無金額</span>}</td>
+                                    <td className="py-1 pl-2 text-gray-400">{item.matchType === 'linked' ? '直連' : '單號配對'}</td>
+                                  </tr>
+                                ))}</tbody>
+                              </table>
+                            ) : <p className="text-gray-400 mb-2">無配對的 PO</p>}
+                            {/* 警告 */}
+                            {r.unmatchedOrders.length > 0 && (
+                              <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded">
+                                <p className="font-medium text-amber-700 mb-1">⚠ 找不到 PO 的訂單（成本缺失）</p>
+                                {r.unmatchedOrders.map(o => <p key={o} className="text-amber-600 font-mono">{o}</p>)}
+                              </div>
+                            )}
+                            {r.nullAmountPos.length > 0 && (
+                              <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded">
+                                <p className="font-medium text-orange-700 mb-1">⚠ PO 已配對但金額為空</p>
+                                {r.nullAmountPos.map(o => <p key={o} className="text-orange-600 font-mono">{o}</p>)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
               )
             })}
           </tbody>

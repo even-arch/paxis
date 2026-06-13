@@ -165,6 +165,31 @@ export async function GET() {
     const grossTWD = arTWD - apTWD
     const grossPct = arTWD > 0 ? (grossTWD / arTWD) * 100 : null
 
+    // 診斷：找出沒配到 PO 的 order，以及配到但金額為 null 的 PO
+    const unmatchedOrders: string[] = []
+    const nullAmountPos: string[] = []
+
+    for (const sp of s.pis) {
+      const slsOrder = sp.pi.order
+      const bySlsId = poBySlsId.get(slsOrder.id) ?? []
+      const byNo = poByPoNo.get(slsOrder.orderNo)
+
+      if (bySlsId.length === 0 && !byNo) {
+        unmatchedOrders.push(slsOrder.orderNo)
+      } else {
+        const candidates = bySlsId.length > 0 ? bySlsId : (byNo ? [byNo] : [])
+        for (const po of candidates) {
+          if (!po.totalAmount && po.items.length === 0) nullAmountPos.push(po.poNo)
+        }
+      }
+    }
+
+    const warnings: string[] = []
+    if (unmatchedOrders.length > 0)
+      warnings.push(`${unmatchedOrders.length} 張訂單找不到 PO：${unmatchedOrders.join('、')}`)
+    if (nullAmountPos.length > 0)
+      warnings.push(`${nullAmountPos.length} 張 PO 金額為空：${nullAmountPos.join('、')}`)
+
     return {
       shipmentId: s.id,
       shipmentNo: s.shipmentNo,
@@ -189,6 +214,9 @@ export async function GET() {
         pct: grossPct,
       },
       hasPoLink: apItems.length > 0,
+      warnings,
+      unmatchedOrders,
+      nullAmountPos,
     }
   })
 
