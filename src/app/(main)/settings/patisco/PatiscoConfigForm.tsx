@@ -70,7 +70,7 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
   const [syncElapsed, setSyncElapsed] = useState(0)
   const [msg, setMsg] = useState<{ type: 'ok' | 'error'; text: string } | null>(null)
   const [testResult, setTestResult] = useState<{
-    ok: boolean; tools?: string[]; msg?: string; error?: string
+    ok: boolean; tools?: string[]; toolCount?: number; piCount?: number; msg?: string; error?: string
   } | null>(null)
   const [syncResult, setSyncResult] = useState<{
     buyers?: { created: number; updated: number; errors: number; total: number }
@@ -181,36 +181,42 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
   }
 
   // 出貨單分批同步：每次最多 5 筆，自動重試直到 hasMore=false
+  // 通用：呼叫 /api/patisco/sync 並取得 JSON，HTTP 錯誤直接拋出
+  const callSync = async (body: Record<string, unknown>) => {
+    const res = await fetch('/api/patisco/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const ct = res.headers.get('content-type') ?? ''
+    if (!ct.includes('json')) {
+      const text = await res.text()
+      throw new Error(`伺服器錯誤（HTTP ${res.status}）：${text.slice(0, 120)}`)
+    }
+    const data = await res.json()
+    if (!data.ok) throw new Error(data.error ?? '同步失敗')
+    return data
+  }
+
   const handleSyncDeliveries = async () => {
     setSyncing(true); setSyncResult(null); setMsg(null); setSyncElapsed(0)
     const startTime = Date.now()
     const timer = setInterval(() => setSyncElapsed(Math.floor((Date.now() - startTime) / 1000)), 500)
-    let totalProcessed = 0, totalSkipped = 0, totalErrors = 0, batch = 1
+    let totalProcessed = 0, totalErrors = 0
     try {
+      // 逐筆處理佇列（每次 1 筆 ≈ 30s，不含 seed，不會超時）
+      // seed 由 cron 自動補充，或點「掃描新出貨單」手動觸發
       while (true) {
-        const res = await fetch('/api/patisco/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'deliveries', batchLimit: 5 }),
-        })
-        const ct = res.headers.get('content-type') ?? ''
-        if (!ct.includes('json')) {
-          const text = await res.text()
-          throw new Error(`批次 ${batch} 伺服器錯誤（HTTP ${res.status}）：${text.slice(0, 120)}`)
-        }
-        const data = await res.json()
-        if (!data.ok) throw new Error(`批次 ${batch}：${data.error ?? '同步失敗'}`)
-        const d = data.deliveries ?? {}
-        totalProcessed += d.processed ?? 0
-        totalSkipped   += d.skipped   ?? 0
-        totalErrors    += d.errors    ?? 0
+        const data = await callSync({ type: 'process-next-do' })
+        const d = data.do ?? {}
+        if (!d.processed) break  // 佇列空了
+        if (d.error) totalErrors++; else totalProcessed++
         if (!d.hasMore) break
-        batch++
       }
       clearInterval(timer)
       setSyncing(false)
       setSyncResult({
-        deliveries: { processed: totalProcessed, skipped: totalSkipped, errors: totalErrors, total: totalProcessed + totalSkipped },
+        deliveries: { processed: totalProcessed, skipped: 0, errors: totalErrors, total: totalProcessed + totalErrors },
         durationMs: Date.now() - startTime,
       })
       router.refresh()
@@ -228,43 +234,21 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
     const combined: Record<string, unknown> = {}
     try {
       for (const type of ['buyers', 'pi', 'po'] as const) {
-        const res = await fetch('/api/patisco/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type }),
-        })
-        const ct = res.headers.get('content-type') ?? ''
-        if (!ct.includes('json')) {
-          const text = await res.text()
-          throw new Error(`[${type}] 伺服器錯誤（HTTP ${res.status}）：${text.slice(0, 120)}`)
-        }
-        const data = await res.json()
-        if (!data.ok) throw new Error(`[${type}] ${data.error ?? '同步失敗'}`)
+        const data = await callSync({ type })
         if (data.buyers) combined.buyers = data.buyers
         if (data.pi)     combined.pi     = data.pi
         if (data.po)     combined.po     = data.po
       }
-      // deliveries 分批同步（每次 5 筆，避免 Vercel 504）
-      let dProc = 0, dSkip = 0, dErr = 0, dBatch = 1
+      // deliveries：逐筆處理佇列（seed 由 cron 負責）
+      let dProc = 0, dErr = 0
       while (true) {
-        const res = await fetch('/api/patisco/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'deliveries', batchLimit: 5 }),
-        })
-        const ct = res.headers.get('content-type') ?? ''
-        if (!ct.includes('json')) {
-          const text = await res.text()
-          throw new Error(`[deliveries 批次${dBatch}] 伺服器錯誤（HTTP ${res.status}）：${text.slice(0, 120)}`)
-        }
-        const data = await res.json()
-        if (!data.ok) throw new Error(`[deliveries 批次${dBatch}] ${data.error ?? '同步失敗'}`)
-        const d = data.deliveries ?? {}
-        dProc += d.processed ?? 0; dSkip += d.skipped ?? 0; dErr += d.errors ?? 0
+        const data = await callSync({ type: 'process-next-do' })
+        const d = data.do ?? {}
+        if (!d.processed) break
+        if (d.error) dErr++; else dProc++
         if (!d.hasMore) break
-        dBatch++
       }
-      combined.deliveries = { processed: dProc, skipped: dSkip, errors: dErr, total: dProc + dSkip }
+      combined.deliveries = { processed: dProc, skipped: 0, errors: dErr, total: dProc + dErr }
       clearInterval(timer)
       setSyncing(false)
       setSyncResult({ ...combined, durationMs: Date.now() - startTime })
@@ -331,7 +315,7 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
             <button onClick={async () => {
               if (!confirm('這將清除所有出貨單的同步快取，下次同步時強制重新從 Patisco 拉取明細。確定嗎？')) return
               await runSync('reset-do-sync')
-              setTimeout(() => runSync('deliveries'), 500)
+              setTimeout(() => handleSyncDeliveries(), 500)
             }} disabled={syncing}
               className="text-sm px-3 py-1 border border-red-300 text-red-700 rounded hover:bg-red-50 disabled:opacity-50">
               {syncing ? '...' : '🔄 重建出貨明細'}
@@ -367,10 +351,16 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
       {/* 測試結果 */}
       {testResult && (
         <div className={`px-6 py-3 border-b text-sm ${testResult.ok ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-700'}`}>
-          {testResult.ok
-            ? <p className="font-medium">✓ 連線成功</p>
-            : <p>✗ {testResult.error}</p>
-          }
+          {testResult.ok ? (
+            <div>
+              <p className="font-medium">✓ 連線正常（三層驗證通過）</p>
+              <p className="text-xs mt-1 opacity-75">
+                登入成功 · {testResult.toolCount} 個工具 · PI 查詢回傳 {testResult.piCount} 筆
+              </p>
+            </div>
+          ) : (
+            <p>✗ {testResult.error}</p>
+          )}
         </div>
       )}
 
