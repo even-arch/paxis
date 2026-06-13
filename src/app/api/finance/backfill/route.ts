@@ -14,7 +14,7 @@ export async function POST() {
 
   // ── AR：從 SLS_Shipment 補建 FIN_Receivable ────────────────────────────
   const shipmentsWithoutReceivable = await prisma.sLS_Shipment.findMany({
-    where: { receivable: null },
+    where: {},
     include: {
       pis: {
         include: {
@@ -37,6 +37,7 @@ export async function POST() {
 
   let arCreated = 0
   let arSkipped = 0
+  let arUpdated = 0
 
   for (const shipment of shipmentsWithoutReceivable) {
     const orders = shipment.pis.map(sp => sp.pi.order).filter(o => o.totalAmount != null)
@@ -68,23 +69,24 @@ export async function POST() {
     const rateAtInvoice = 1 / ciRate                   // EUR→TWD 匯率（約 36）
     const customerId = shipment.customerId ?? orders.find(o => o.customerId)?.customerId ?? null
 
-    await prisma.fIN_Receivable.create({
-      data: {
-        shipmentId: shipment.id,
-        customerId,
-        currencyCode: 'EUR',
-        amountForeign,
-        rateAtInvoice,
-        amountTWD,
-        status: 0,
-      },
-    })
-    arCreated++
+    const existing = await prisma.fIN_Receivable.findUnique({ where: { shipmentId: shipment.id } })
+    if (existing) {
+      await prisma.fIN_Receivable.update({
+        where: { shipmentId: shipment.id },
+        data: { customerId, currencyCode: 'EUR', amountForeign, rateAtInvoice, amountTWD },
+      })
+      arUpdated++
+    } else {
+      await prisma.fIN_Receivable.create({
+        data: { shipmentId: shipment.id, customerId, currencyCode: 'EUR', amountForeign, rateAtInvoice, amountTWD, status: 0 },
+      })
+      arCreated++
+    }
   }
 
   // ── AP：從 PO_Receipt 補建 FIN_Payable ────────────────────────────────
   const receiptsWithoutPayable = await prisma.pO_Receipt.findMany({
-    where: { payable: null },
+    where: {},
     include: {
       order: {
         select: {
@@ -99,6 +101,7 @@ export async function POST() {
 
   let apCreated = 0
   let apSkipped = 0
+  let apUpdated = 0
 
   for (const receipt of receiptsWithoutPayable) {
     const order = receipt.order
@@ -108,21 +111,24 @@ export async function POST() {
     }
 
     const amountTWD = Number(order.totalAmount) * Number(order.exchangeRate ?? 1)
-
-    await prisma.fIN_Payable.create({
-      data: {
-        supplierId: order.supplierId,
-        receiptId: receipt.id,
-        amountTWD,
-        status: 0,
-      },
-    })
-    apCreated++
+    const existing = await prisma.fIN_Payable.findUnique({ where: { receiptId: receipt.id } })
+    if (existing) {
+      await prisma.fIN_Payable.update({
+        where: { receiptId: receipt.id },
+        data: { supplierId: order.supplierId, amountTWD },
+      })
+      apUpdated++
+    } else {
+      await prisma.fIN_Payable.create({
+        data: { supplierId: order.supplierId, receiptId: receipt.id, amountTWD, status: 0 },
+      })
+      apCreated++
+    }
   }
 
   return NextResponse.json({
     ok: true,
-    ar: { created: arCreated, skipped: arSkipped },
-    ap: { created: apCreated, skipped: apSkipped },
+    ar: { created: arCreated, updated: arUpdated, skipped: arSkipped },
+    ap: { created: apCreated, updated: apUpdated, skipped: apSkipped },
   })
 }
