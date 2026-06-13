@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
+import NotificationBell from './NotificationBell'
 
 type NavItem  = { label: string; href: string; icon: string; exact?: boolean }
 type NavGroup = { section: string; items: NavItem[] }
@@ -185,9 +186,12 @@ export default function Sidebar({ companyName = 'PAXIS' }: { companyName?: strin
     <aside className="w-56 bg-gray-900 text-white flex flex-col">
 
       {/* ── 頂部 Logo ── */}
-      <div className="px-5 pt-4 pb-3 border-b border-gray-700">
-        <h1 className="text-lg font-bold">PAXIS</h1>
-        <p className="text-xs text-gray-400">{companyName}</p>
+      <div className="px-4 pt-4 pb-3 border-b border-gray-700 flex items-start justify-between">
+        <div>
+          <h1 className="text-lg font-bold">PAXIS</h1>
+          <p className="text-xs text-gray-400">{companyName}</p>
+        </div>
+        <NotificationBell />
       </div>
 
       {/* ── 模式切換器 ── */}
