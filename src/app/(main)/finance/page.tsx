@@ -72,8 +72,19 @@ function isDueSoon(dueDate: string | null, status: number) {
   return diff > 0 && diff < 7 * 86400000
 }
 
+type EstimateRow = {
+  shipmentId: number
+  shipmentNo: string
+  actualShipDate: string
+  customer: { id: number | null; name: string }
+  ar: { foreign: number; currency: string; rate: number; twd: number; fromRecord: boolean; receivableStatus: number | null }
+  ap: { twd: number; items: { poNo: string; supplierName: string; amountTWD: number; currency: string }[] }
+  gross: { twd: number; pct: number | null }
+  hasPoLink: boolean
+}
+
 export default function FinancePage() {
-  const [tab, setTab] = useState<'pay' | 'rec'>('pay')
+  const [tab, setTab] = useState<'pay' | 'rec' | 'est'>('pay')
   const [payFilter, setPayFilter] = useState('')
   const [recFilter, setRecFilter] = useState('')
   const [payables, setPayables] = useState<Payable[]>([])
@@ -81,6 +92,8 @@ export default function FinancePage() {
   const [loading, setLoading] = useState(true)
   const [backfilling, setBackfilling] = useState(false)
   const [backfillResult, setBackfillResult] = useState<{ ar: { created: number; skipped: number }; ap: { created: number; skipped: number } } | null>(null)
+  const [estimates, setEstimates] = useState<EstimateRow[]>([])
+  const [estimatesLoaded, setEstimatesLoaded] = useState(false)
 
   // 付款對話框
   const [payDialog, setPayDialog] = useState<Payable | null>(null)
@@ -107,6 +120,18 @@ export default function FinancePage() {
   const [recRate, setRecRate] = useState('')
   const [recDateInput, setRecDateInput] = useState('')
   const [recNote, setRecNote] = useState('')
+
+  async function loadEstimates() {
+    if (estimatesLoaded) return
+    const data = await fetch('/api/finance/estimates').then(r => r.json())
+    setEstimates(data)
+    setEstimatesLoaded(true)
+  }
+
+  function switchTab(t: 'pay' | 'rec' | 'est') {
+    setTab(t)
+    if (t === 'est') loadEstimates()
+  }
 
   async function handleBackfill() {
     setBackfilling(true)
@@ -267,17 +292,23 @@ export default function FinancePage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1 w-fit">
-        <button onClick={() => setTab('pay')}
+        <button onClick={() => switchTab('pay')}
           className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === 'pay' ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}>
           應付帳款
         </button>
-        <button onClick={() => setTab('rec')}
+        <button onClick={() => switchTab('rec')}
           className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === 'rec' ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}>
           應收帳款
         </button>
+        <button onClick={() => switchTab('est')}
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === 'est' ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}>
+          毛利估算
+        </button>
       </div>
 
-      {loading ? <div className="text-sm text-gray-400">載入中…</div> : tab === 'pay' ? (
+      {tab === 'est' ? (
+        <EstimatesTab estimates={estimates} loaded={estimatesLoaded} onRefresh={() => { setEstimatesLoaded(false); loadEstimates() }} />
+      ) : loading ? <div className="text-sm text-gray-400">載入中…</div> : tab === 'pay' ? (
         <>
           <div className="flex gap-2 mb-3">
             {['', '0', '1', '2'].map(v => (
@@ -690,6 +721,113 @@ export default function FinancePage() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function EstimatesTab({
+  estimates, loaded, onRefresh,
+}: {
+  estimates: EstimateRow[]
+  loaded: boolean
+  onRefresh: () => void
+}) {
+  const totalArTWD = estimates.reduce((s, r) => s + r.ar.twd, 0)
+  const totalApTWD = estimates.reduce((s, r) => s + r.ap.twd, 0)
+  const totalGross = totalArTWD - totalApTWD
+  const avgGrossPct = totalArTWD > 0 ? (totalGross / totalArTWD) * 100 : 0
+
+  return (
+    <div>
+      {/* 摘要 */}
+      <div className="grid grid-cols-4 gap-4 mb-5">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-xs text-blue-500 font-medium">估算應收合計（TWD）</p>
+          <p className="text-xl font-bold text-blue-700 mt-1">{totalArTWD.toLocaleString('zh-TW', { maximumFractionDigits: 0 })}</p>
+        </div>
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <p className="text-xs text-amber-500 font-medium">估算應付合計（TWD）</p>
+          <p className="text-xl font-bold text-amber-700 mt-1">{totalApTWD.toLocaleString('zh-TW', { maximumFractionDigits: 0 })}</p>
+        </div>
+        <div className={`border rounded-lg p-4 ${totalGross >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+          <p className={`text-xs font-medium ${totalGross >= 0 ? 'text-green-600' : 'text-red-600'}`}>估算毛利合計（TWD）</p>
+          <p className={`text-xl font-bold mt-1 ${totalGross >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+            {totalGross >= 0 ? '+' : ''}{totalGross.toLocaleString('zh-TW', { maximumFractionDigits: 0 })}
+          </p>
+        </div>
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <p className="text-xs text-gray-500 font-medium">平均毛利率</p>
+          <p className="text-xl font-bold text-gray-700 mt-1">{avgGrossPct.toFixed(1)}%</p>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs text-gray-400">以出貨單為基準，從銷售訂單→採購訂單鏈估算。無採購訂單連結的出貨顯示為「—」。</p>
+        <button onClick={onRefresh} className="text-xs text-blue-600 hover:underline">{loaded ? '重新載入' : '載入中…'}</button>
+      </div>
+
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b border-gray-100">
+            <tr>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">出貨單號</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">客戶</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">出貨日</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-600">估算應收 (TWD)</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-600">估算應付 (TWD)</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-600">毛利 (TWD)</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-600">毛利率</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">供應商</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {!loaded && (
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">載入中…</td></tr>
+            )}
+            {loaded && estimates.length === 0 && (
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">無出貨資料</td></tr>
+            )}
+            {estimates.map(r => {
+              const grossColor = r.gross.twd >= 0 ? 'text-green-700' : 'text-red-600'
+              return (
+                <tr key={r.shipmentId} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 font-mono text-xs text-blue-600">
+                    <Link href={`/shipments/${r.shipmentId}`} className="hover:underline">{r.shipmentNo}</Link>
+                  </td>
+                  <td className="px-4 py-3 text-gray-700 text-xs">
+                    {r.customer.id
+                      ? <Link href={`/customers/${r.customer.id}`} className="hover:underline">{r.customer.name}</Link>
+                      : <span className="text-gray-400">{r.customer.name}</span>}
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(r.actualShipDate)}</td>
+                  <td className="px-4 py-3 text-right font-mono">
+                    <span title={`${r.ar.foreign.toFixed(2)} ${r.ar.currency} × ${r.ar.rate}`}>
+                      {r.ar.twd > 0 ? r.ar.twd.toLocaleString('zh-TW', { maximumFractionDigits: 0 }) : '—'}
+                    </span>
+                    {r.ar.fromRecord && <span className="ml-1 text-xs text-gray-400">✓</span>}
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono">
+                    {r.ap.twd > 0 ? r.ap.twd.toLocaleString('zh-TW', { maximumFractionDigits: 0 }) : <span className="text-gray-300">—</span>}
+                  </td>
+                  <td className={`px-4 py-3 text-right font-mono font-medium ${r.ap.twd > 0 ? grossColor : 'text-gray-300'}`}>
+                    {r.ap.twd > 0
+                      ? `${r.gross.twd >= 0 ? '+' : ''}${r.gross.twd.toLocaleString('zh-TW', { maximumFractionDigits: 0 })}`
+                      : '—'}
+                  </td>
+                  <td className={`px-4 py-3 text-right text-xs ${r.ap.twd > 0 ? grossColor : 'text-gray-300'}`}>
+                    {r.gross.pct != null && r.ap.twd > 0 ? `${r.gross.pct.toFixed(1)}%` : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-gray-500">
+                    {r.ap.items.length > 0
+                      ? r.ap.items.map(i => i.supplierName).join('、')
+                      : <span className="text-gray-300">無採購訂單連結</span>}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
