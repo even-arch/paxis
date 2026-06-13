@@ -242,11 +242,13 @@ export default function FinancePage() {
     load()
   }
 
+  // 新記錄 amountTWD 是台幣，舊記錄（currencyCode='TWD'）amountForeign 才是台幣
+  const rTWD = (r: Receivable) => Number(r.amountTWD ?? r.amountForeign)
+
   // 摘要數字
   const totalPayable = payables.filter(p => p.status < 2).reduce((s, p) => s + Number(p.amountTWD) - Number(p.paidAmountTWD ?? 0), 0)
-  const totalReceivable = receivables.filter(r => r.status < 2).reduce((s, r) => s + Number(r.amountForeign) - Number(r.collectedForeign ?? 0), 0)
+  const totalReceivable = receivables.filter(r => r.status < 2).reduce((s, r) => s + rTWD(r) - Number(r.collectedForeign ?? 0), 0)
   const totalFxGainLoss = receivables.filter(r => r.fxGainLoss).reduce((s, r) => s + Number(r.fxGainLoss ?? 0), 0)
-  const recCurrency = receivables[0]?.currencyCode ?? 'EUR'
 
   return (
     <div className="p-6">
@@ -280,7 +282,7 @@ export default function FinancePage() {
         </div>
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <p className="text-xs text-blue-500 font-medium">待收客戶款</p>
-          <p className="text-2xl font-bold text-blue-700 mt-1">{recCurrency} {fmt(String(totalReceivable), 2)}</p>
+          <p className="text-2xl font-bold text-blue-700 mt-1">TWD {fmt(String(totalReceivable), 0)}</p>
         </div>
         <div className={`border rounded-lg p-4 ${totalFxGainLoss >= 0 ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
           <p className={`text-xs font-medium ${totalFxGainLoss >= 0 ? 'text-green-600' : 'text-amber-600'}`}>本期匯差（已收款）</p>
@@ -433,7 +435,7 @@ export default function FinancePage() {
                           {fmtDate(r.dueDate)}{overdue ? ' ⚠ 逾期' : soon ? ' ⚡ 即將到期' : ''}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right font-mono">{fmt(r.amountForeign, 2)}</td>
+                      <td className="px-4 py-3 text-right font-mono">{fmt(String(rTWD(r)), 0)}</td>
                       <td className="px-4 py-3 text-right font-mono text-xs">{fmt(r.rateAtInvoice, 4)}</td>
                       <td className="px-4 py-3 text-right font-mono text-xs">{r.rateAtCollection ? fmt(r.rateAtCollection, 4) : '—'}</td>
                       <td className="px-4 py-3 text-right font-mono text-xs">
@@ -689,7 +691,7 @@ export default function FinancePage() {
                 <input type="number" step="0.01" value={recForeign} onChange={e => setRecForeign(e.target.value)}
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
                 <p className="text-xs text-gray-400 mt-1">
-                  CI 報帳：TWD {fmt(recDialog.amountForeign, 0)} × {fmt(recDialog.rateAtInvoice, 4)} = EUR {(Number(recDialog.amountForeign) * Number(recDialog.rateAtInvoice)).toFixed(2)}
+                  CI 報帳：TWD {fmt(String(rTWD(recDialog)), 0)} × {fmt(recDialog.rateAtInvoice, 4)} = EUR {(rTWD(recDialog) * Number(recDialog.rateAtInvoice)).toFixed(2)}
                 </p>
               </div>
               <div>
@@ -711,9 +713,9 @@ export default function FinancePage() {
               {recForeign && recRate && (
                 <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
                   <div>實收台幣：TWD {(Number(recForeign) * Number(recRate)).toFixed(0)}</div>
-                  <div>原始應收：TWD {fmt(recDialog.amountForeign, 0)}</div>
-                  <div className={Number(recForeign) * Number(recRate) >= Number(recDialog.amountForeign) ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                    匯差：TWD {(Number(recForeign) * Number(recRate) - Number(recDialog.amountForeign)).toFixed(0)}
+                  <div>原始應收：TWD {fmt(String(rTWD(recDialog)), 0)}</div>
+                  <div className={Number(recForeign) * Number(recRate) >= rTWD(recDialog) ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+                    匯差：TWD {(Number(recForeign) * Number(recRate) - rTWD(recDialog)).toFixed(0)}
                   </div>
                 </div>
               )}
