@@ -3,14 +3,43 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 
-/**
- * GET /api/finance/estimates
- * 以出貨單為錨點，估算每張出貨的應收（AR）與應付（AP），計算毛利。
- * 純估算，不依賴 PO_Receipt，不建立任何記錄。
- */
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // 預載所有 PO_Order（含品項金額）— 用於 poNo 配對
+  const allPOs = await prisma.pO_Order.findMany({
+    select: {
+      id: true,
+      poNo: true,
+      totalAmount: true,
+      currencyCode: true,
+      exchangeRate: true,
+      salesOrderId: true,
+      supplier: { select: { id: true, name: true, shortName: true } },
+      items: { select: { unitPrice: true, quantity: true } },
+    },
+  })
+
+  // 建立兩個查詢 map：salesOrderId → PO，及 poNo → PO
+  const poBySlsId = new Map<number, typeof allPOs>()
+  const poByPoNo = new Map<string, typeof allPOs[0]>()
+  for (const po of allPOs) {
+    if (po.salesOrderId) {
+      const arr = poBySlsId.get(po.salesOrderId) ?? []
+      arr.push(po)
+      poBySlsId.set(po.salesOrderId, arr)
+    }
+    poByPoNo.set(po.poNo, po)
+  }
+
+  function poAmountTWD(po: typeof allPOs[0]): number {
+    // 優先用 totalAmount，否則從品項加總
+    const base = po.totalAmount
+      ? Number(po.totalAmount)
+      : po.items.reduce((s, i) => s + Number(i.unitPrice) * i.quantity, 0)
+    return base * Number(po.exchangeRate ?? 1)
+  }
 
   const shipments = await prisma.sLS_Shipment.findMany({
     orderBy: { actualShipDate: 'desc' },
@@ -18,7 +47,6 @@ export async function GET() {
       customer: { select: { id: true, name: true, shortName: true } },
       receivable: {
         select: {
-          id: true,
           amountForeign: true,
           currencyCode: true,
           rateAtInvoice: true,
@@ -37,16 +65,6 @@ export async function GET() {
                   totalAmount: true,
                   currencyCode: true,
                   exchangeRate: true,
-                  purchaseOrders: {
-                    select: {
-                      id: true,
-                      poNo: true,
-                      totalAmount: true,
-                      currencyCode: true,
-                      exchangeRate: true,
-                      supplier: { select: { id: true, name: true, shortName: true } },
-                    },
-                  },
                 },
               },
             },
@@ -57,7 +75,7 @@ export async function GET() {
   })
 
   const rows = shipments.map(s => {
-    // AR：優先用已建的 FIN_Receivable，否則從訂單加總估算
+    // ── AR ────────────────────────────────────────────────────────────────
     let arForeign = 0
     let arCurrency = s.currencyCode ?? 'EUR'
     let arRate = Number(s.ciExchangeRate ?? 0)
@@ -78,20 +96,40 @@ export async function GET() {
       arTWD = arForeign * arRate
     }
 
-    // AP：從銷售訂單 → 採購訂單推算（取供應商 PI 金額，若無則用 PO 金額）
-    const poMap = new Map<number, { poNo: string; supplierName: string; amountTWD: number; currency: string }>()
+    // ── AP：三層 fallback ──────────────────────────────────────────────────
+    // 1. salesOrderId 直連（最準確）
+    // 2. poNo = SLS_Order.orderNo（大多數 Patisco 資料）
+    // 3. 找不到 → 顯示 —
+    const poMap = new Map<number, { poNo: string; supplierName: string; amountTWD: number; currency: string; matchType: string }>()
+
     for (const sp of s.pis) {
-      for (const po of sp.pi.order.purchaseOrders) {
+      const slsOrder = sp.pi.order
+
+      // fallback 1：salesOrderId
+      const bySlsId = poBySlsId.get(slsOrder.id) ?? []
+      for (const po of bySlsId) {
         if (poMap.has(po.id)) continue
-        if (!po.totalAmount) continue
-        const rate = Number(po.exchangeRate ?? 1)
-        const amountTWD = Number(po.totalAmount) * rate
         poMap.set(po.id, {
           poNo: po.poNo,
           supplierName: po.supplier.shortName ?? po.supplier.name,
-          amountTWD,
+          amountTWD: poAmountTWD(po),
           currency: po.currencyCode,
+          matchType: 'linked',
         })
+      }
+
+      // fallback 2：poNo = orderNo
+      if (bySlsId.length === 0) {
+        const po = poByPoNo.get(slsOrder.orderNo)
+        if (po && !poMap.has(po.id)) {
+          poMap.set(po.id, {
+            poNo: po.poNo,
+            supplierName: po.supplier.shortName ?? po.supplier.name,
+            amountTWD: poAmountTWD(po),
+            currency: po.currencyCode,
+            matchType: 'byOrderNo',
+          })
+        }
       }
     }
 
