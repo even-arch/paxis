@@ -57,7 +57,10 @@ export async function GET() {
       pis: {
         include: {
           pi: {
-            include: {
+            select: {
+              piNo: true,
+              orderId: true,
+              extraCharges: true,
               order: {
                 select: {
                   id: true,
@@ -74,26 +77,50 @@ export async function GET() {
     },
   })
 
+  // extraCharges JSON 類型：
+  //   type "0" / "2" = 百分比（amount = 5 → +5%）
+  //   type "1"       = 固定金額（amount = 4756 → +4756 TWD）
+  // 回傳 { pctMultiplier, flatTWD }
+  function calcExtraCharges(extraCharges: unknown): { pctMultiplier: number; flatTWD: number } {
+    if (!extraCharges || !Array.isArray(extraCharges)) return { pctMultiplier: 1, flatTWD: 0 }
+    let pct = 0, flat = 0
+    for (const c of extraCharges as { type?: string; amount?: string }[]) {
+      if (!c.amount) continue
+      if (c.type === '1') flat += Number(c.amount)
+      else pct += Number(c.amount)  // type "0" / "2" = 百分比
+    }
+    return { pctMultiplier: 1 + pct / 100, flatTWD: flat }
+  }
+
   const rows = shipments.map(s => {
     // ── AR ────────────────────────────────────────────────────────────────
-    let arForeign = 0
-    let arCurrency = s.currencyCode ?? 'EUR'
-    let arRate = Number(s.ciExchangeRate ?? 0)
+    // ciExchangeRate 是 TWD→EUR 的方向（例如 0.0278 = 1 TWD = 0.0278 EUR）
+    // SLS_Order.totalAmount 是台幣金額，不需再乘匯率
     let arTWD = 0
+    let arForeign = 0  // EUR 顯示用
+    let arCurrency = 'EUR'
     let arFromRecord = false
 
-    if (s.receivable) {
+    const ciRate = Number(s.ciExchangeRate ?? 0)  // TWD → EUR
+
+    if (s.receivable && s.receivable.currencyCode !== 'TWD') {
+      // 正確格式的 EUR 記錄（新版 backfill 建的）：amountForeign=EUR, rateAtInvoice=EUR→TWD
       arForeign = Number(s.receivable.amountForeign)
-      arCurrency = s.receivable.currencyCode
-      arRate = Number(s.receivable.rateAtInvoice)
       arTWD = Number(s.receivable.amountTWD)
+      arCurrency = 'EUR'
       arFromRecord = true
     } else {
-      const orders = s.pis.map(sp => sp.pi.order).filter(o => o.totalAmount != null)
-      arForeign = orders.reduce((sum, o) => sum + Number(o.totalAmount ?? 0), 0)
-      if (orders[0]) arCurrency = orders[0].currencyCode
-      arRate = arRate || Number(orders[0]?.exchangeRate ?? 0)
-      arTWD = arForeign * arRate
+      // 從 PI → Order 計算，加上 PI 層級的 extraCharges（百分比 + 固定金額）
+      arTWD = s.pis.reduce((sum, sp) => {
+        const o = sp.pi.order
+        if (!o.totalAmount) return sum
+        const base = o.currencyCode === 'TWD'
+          ? Number(o.totalAmount)
+          : Number(o.totalAmount) * Number(o.exchangeRate ?? 1)
+        const { pctMultiplier, flatTWD } = calcExtraCharges(sp.pi.extraCharges)
+        return sum + base * pctMultiplier + flatTWD
+      }, 0)
+      arForeign = ciRate > 0 ? arTWD * ciRate : 0
     }
 
     // ── AP：三層 fallback ──────────────────────────────────────────────────
@@ -148,7 +175,7 @@ export async function GET() {
       ar: {
         foreign: arForeign,
         currency: arCurrency,
-        rate: arRate,
+        rate: ciRate > 0 ? 1 / ciRate : 0,
         twd: arTWD,
         fromRecord: arFromRecord,
         receivableStatus: s.receivable?.status ?? null,

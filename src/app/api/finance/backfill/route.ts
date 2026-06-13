@@ -47,26 +47,35 @@ export async function POST() {
       continue
     }
 
-    // 所有關聯訂單金額加總（通常是同一幣別）
-    const currency = orders[0].currencyCode
-    const amountForeign = orders.reduce((s, o) => s + Number(o.totalAmount ?? 0), 0)
-    const rate = Number(shipment.ciExchangeRate ?? orders[0].exchangeRate ?? 0)
+    // 訂單金額加總（SLS_Order.totalAmount 是台幣，currencyCode=TWD，rate=1）
+    const amountTWD = orders.reduce((s, o) => {
+      const amt = Number(o.totalAmount ?? 0)
+      const rate = Number(o.exchangeRate ?? 1)
+      return s + (o.currencyCode === 'TWD' ? amt : amt * rate)
+    }, 0)
 
-    if (amountForeign <= 0 || rate <= 0) {
+    // ciExchangeRate 是 TWD→EUR（例如 0.0278 = 1 TWD = 0.0278 EUR）
+    // amountForeign（EUR）= TWD × ciExchangeRate
+    // rateAtInvoice（EUR→TWD）= 1 / ciExchangeRate
+    const ciRate = Number(shipment.ciExchangeRate ?? 0)
+
+    if (amountTWD <= 0 || ciRate <= 0) {
       arSkipped++
       continue
     }
 
+    const amountForeign = amountTWD * ciRate          // EUR 金額
+    const rateAtInvoice = 1 / ciRate                   // EUR→TWD 匯率（約 36）
     const customerId = shipment.customerId ?? orders.find(o => o.customerId)?.customerId ?? null
 
     await prisma.fIN_Receivable.create({
       data: {
         shipmentId: shipment.id,
         customerId,
-        currencyCode: currency,
+        currencyCode: 'EUR',
         amountForeign,
-        rateAtInvoice: rate,
-        amountTWD: amountForeign * rate,
+        rateAtInvoice,
+        amountTWD,
         status: 0,
       },
     })

@@ -393,7 +393,7 @@ export default function FinancePage() {
                   <th className="text-left px-4 py-3 font-medium text-gray-600">客戶訂單</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">出貨日</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">到期日</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600">應收 (EUR)</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-600">應收 (TWD)</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-600">報帳匯率</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-600">押匯匯率</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-600">匯差 (TWD)</th>
@@ -449,7 +449,7 @@ export default function FinancePage() {
                       <td className="px-4 py-3 text-right">
                         {r.status < 2 && (
                           <div className="flex flex-col items-end gap-1">
-                            <button onClick={() => { setRecDialog(r); setRecForeign(String(Number(r.amountForeign))); setRecRate(r.rateAtInvoice); setRecDateInput(''); setRecNote(r.note ?? '') }}
+                            <button onClick={() => { setRecDialog(r); setRecForeign((Number(r.amountForeign) * Number(r.rateAtInvoice)).toFixed(2)); setRecRate(''); setRecDateInput(''); setRecNote(r.note ?? '') }}
                               className="text-xs text-blue-600 hover:underline">記錄收款</button>
                             {r.status === 0 && !r.rateAtCollection && (
                               <span className="text-xs text-amber-500" title="收款後請填入銀行押匯匯率以計算匯差">
@@ -685,16 +685,18 @@ export default function FinancePage() {
             </p>
             <div className="space-y-3">
               <div>
-                <label className="text-xs text-gray-500 block mb-1">實收金額（{recDialog.currencyCode}）</label>
+                <label className="text-xs text-gray-500 block mb-1">實收歐元金額（EUR）</label>
                 <input type="number" step="0.01" value={recForeign} onChange={e => setRecForeign(e.target.value)}
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-                <p className="text-xs text-gray-400 mt-1">應收：{recDialog.currencyCode} {fmt(recDialog.amountForeign, 2)}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  CI 報帳：TWD {fmt(recDialog.amountForeign, 0)} × {fmt(recDialog.rateAtInvoice, 4)} = EUR {(Number(recDialog.amountForeign) * Number(recDialog.rateAtInvoice)).toFixed(2)}
+                </p>
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">押匯匯率（{recDialog.currencyCode}/TWD）</label>
+                <label className="text-xs text-gray-500 block mb-1">押匯匯率（EUR → TWD）</label>
                 <input type="number" step="0.0001" value={recRate} onChange={e => setRecRate(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-                <p className="text-xs text-gray-400 mt-1">報帳匯率：{fmt(recDialog.rateAtInvoice, 4)}</p>
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="如：36.00" />
+                <p className="text-xs text-gray-400 mt-1">報帳匯率（TWD→EUR）：{fmt(recDialog.rateAtInvoice, 4)}，倒算 EUR→TWD ≈ {recDialog.rateAtInvoice ? (1 / Number(recDialog.rateAtInvoice)).toFixed(2) : '—'}</p>
               </div>
               <div>
                 <label className="text-xs text-gray-500 block mb-1">收款日期</label>
@@ -708,7 +710,11 @@ export default function FinancePage() {
               </div>
               {recForeign && recRate && (
                 <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
-                  預估匯差：TWD {(Number(recForeign) * Number(recRate) - Number(recForeign) * Number(recDialog.rateAtInvoice)).toFixed(0)}
+                  <div>實收台幣：TWD {(Number(recForeign) * Number(recRate)).toFixed(0)}</div>
+                  <div>原始應收：TWD {fmt(recDialog.amountForeign, 0)}</div>
+                  <div className={Number(recForeign) * Number(recRate) >= Number(recDialog.amountForeign) ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+                    匯差：TWD {(Number(recForeign) * Number(recRate) - Number(recDialog.amountForeign)).toFixed(0)}
+                  </div>
                 </div>
               )}
             </div>

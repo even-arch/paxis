@@ -112,7 +112,7 @@ export default async function DashboardPage() {
   const poStatusLabel = (s: number) => s === 1 ? '已送出' : '部分到貨'
 
   const pendingPayTWD = Number(pendingPayables._sum.amountTWD ?? 0)
-  const pendingRecEUR = Number(pendingReceivables._sum.amountForeign ?? 0)
+  const pendingRecTWD = Number(pendingReceivables._sum.amountForeign ?? 0)
   const fxGainLoss = Number(thisMonthReceivables._sum.fxGainLoss ?? 0)
 
   const syncMinutesAgo = lastSync
@@ -179,7 +179,7 @@ export default async function DashboardPage() {
         <Link href="/finance?tab=receivable" className="bg-white rounded-lg shadow p-5 hover:shadow-md">
           <p className="text-xs text-gray-500">待收帳款（{pendingReceivables._count} 筆）</p>
           <p className="text-xl font-semibold text-gray-800 mt-1">
-            {pendingRecEUR.toLocaleString('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}
+            {pendingRecTWD.toLocaleString('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 })}
           </p>
         </Link>
         <Link href="/finance" className="bg-white rounded-lg shadow p-5 hover:shadow-md">
