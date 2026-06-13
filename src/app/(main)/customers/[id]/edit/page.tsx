@@ -27,6 +27,7 @@ export default async function EditCustomerPage({
     paymentTerms: customer.paymentTerms ?? '',
     currencyCode: customer.currencyCode ?? '',
     patiscoBuyerId: customer.patiscoBuyerId ? String(customer.patiscoBuyerId) : '',
+    shippingMarkTemplate: customer.shippingMarkTemplate ?? '',
     note: customer.note ?? '',
   }
 

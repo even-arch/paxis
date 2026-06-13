@@ -153,11 +153,14 @@ export default async function ShipmentDetailPage({ params }: Props) {
             if (!seenBoxes.has(key)) seenBoxes.set(key, i)
           }
           const distinctBoxes = Array.from(seenBoxes.values())
-          const totalCartons = distinctBoxes.filter(i => i.cartonNoFrom).length
           const allNums = items.map(i => i.cartonNoFrom).filter(Boolean).map(Number).filter(n => !isNaN(n))
           const minBox = allNums.length ? Math.min(...allNums) : null
           const maxNums = items.map(i => i.cartonNoTo ?? i.cartonNoFrom).filter(Boolean).map(Number).filter(n => !isNaN(n))
           const maxBox = maxNums.length ? Math.max(...maxNums) : null
+          // 箱數 = 最大箱號 - 最小箱號 + 1（C/NO. 範圍）；沒有箱號時 fallback 加總各列 cartons
+          const totalCartons: number | null = (minBox != null && maxBox != null)
+            ? maxBox - minBox + 1
+            : (items.reduce((s, i) => s + (i.cartons ?? 0), 0) || null)
           const totalGW  = distinctBoxes.reduce((s, i) => s + Number(i.grossWeightKg ?? 0), 0)
           const totalNW  = distinctBoxes.reduce((s, i) => s + Number(i.netWeightKg ?? 0), 0)
           const totalFt3 = distinctBoxes.reduce((s, i) => s + Number(i.cubicFt ?? 0), 0)
@@ -172,8 +175,8 @@ export default async function ShipmentDetailPage({ params }: Props) {
 
         // 全單總計
         const grandTotalCartons = groupList.reduce((sum, group) => {
-          const distinct = new Set(group.items.map(i => i.cartonNoFrom).filter(Boolean))
-          return sum + distinct.size
+          const s = groupSummary(group.items)
+          return sum + (s.totalCartons ?? 0)
         }, 0)
         // 數量按單位分群
         const qtyByUnit = new Map<string, number>()
@@ -230,7 +233,7 @@ export default async function ShipmentDetailPage({ params }: Props) {
                           <span className="text-gray-500 font-normal">合計</span>
                         </td>
                         <td className="px-4 py-2 text-right font-semibold text-teal-800">{s.totalQty.toLocaleString()}</td>
-                        <td className="px-4 py-2 text-right font-semibold text-teal-800">{s.totalCartons > 0 ? s.totalCartons : '-'}</td>
+                        <td className="px-4 py-2 text-right font-semibold text-teal-800">{(s.totalCartons ?? 0) > 0 ? s.totalCartons : '-'}</td>
                         <td className="px-4 py-2 text-center font-semibold text-teal-800 font-mono text-xs">{s.rangeLabel}</td>
                         <td className="px-4 py-2 text-right font-semibold text-teal-800">{fmt(s.totalGW)}</td>
                         <td className="px-4 py-2 text-right font-semibold text-teal-800">{fmt(s.totalNW)}</td>

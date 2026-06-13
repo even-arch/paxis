@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/patisco-sync",
-      "schedule": "*/30 * * * *"
+      "schedule": "*/5 * * * *"
     }
   ]
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { syncPatiscoPIs, syncPatiscoBuyers, syncPatiscoSellers, syncPatiscoSupplierPOs } from '@/api/patisco/sync'
+import { syncPatiscoPIs, syncPatiscoBuyers, syncPatiscoSellers, syncPatiscoSupplierPOs, processNextPendingDO, seedDOQueue } from '@/api/patisco/sync'
 import { patiscoLogin } from '@/api/patisco/client'
 import { prisma } from '@/lib/db'
 
@@ -14,6 +14,8 @@ async function rawMcpCall(creds: { jwt: string; apiKey: string; _mcpUrl?: string
   })
   return res.json()
 }
+
+export const maxDuration = 300
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -55,6 +57,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ tool, args, raw })
     }
 
+    // DO 佇列：每次 cron 只處理 1 筆；佇列空了才 seed（避免每次都打 Patisco 清單 API）
+    const pendingCount = await prisma.sYS_PatiscoSync.count({ where: { docType: 'DO', status: 'pending' } })
+    if (pendingCount === 0) {
+      await seedDOQueue(prisma, creds ?? undefined)
+    }
+    const doResult = await processNextPendingDO('cron', prisma, dbUrl, creds ?? undefined)
+
+    // sellers/buyers/PI/PO 仍照常跑（這些都很快）
     const sellerResult = await syncPatiscoSellers('cron', prisma, creds ?? undefined)
     const buyerResult  = await syncPatiscoBuyers('cron', prisma, creds ?? undefined)
     const piResult     = await syncPatiscoPIs('cron', prisma, dbUrl, creds ?? undefined)
@@ -63,6 +73,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       durationMs: Date.now() - start,
+      do: doResult,
       sellers: sellerResult,
       buyers: buyerResult,
       pi: piResult,

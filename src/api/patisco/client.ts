@@ -55,7 +55,7 @@ async function ensureMcpSession(mcpUrl: string, jwt: string, apiKey: string): Pr
           clientInfo: { name: 'paxis', version: '1.0' },
         },
       }),
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(8_000),
     })
     const sessionId = res.headers.get('mcp-session-id')
     if (sessionId) {
@@ -405,7 +405,7 @@ async function doLogin(mcpUrl: string, loginId: string, password: string): Promi
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ loginId, password }),
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(10_000),
     })
     if (!res.ok) {
       console.error('[patisco] 登入失敗', res.status, await res.text())
@@ -455,7 +455,7 @@ async function mcpCall<T>(
         method: 'tools/call',
         params: { name: tool, arguments: args },
       }),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(20_000),
     })
 
     if (!res.ok) {

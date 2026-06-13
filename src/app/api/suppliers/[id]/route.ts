@@ -50,6 +50,7 @@ export async function PUT(req: NextRequest, {
       taxId: body.taxId || null,
       paymentTerms: body.paymentTerms || null,
       currencyCode: body.currencyCode || null,
+      defaultTradeTerms: body.defaultTradeTerms || null,
       note: body.note || null,
     },
   })

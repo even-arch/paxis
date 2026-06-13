@@ -17,14 +17,17 @@ export type CustomerFormData = {
   taxId: string
   paymentTerms: string
   currencyCode: string
+  defaultTradeTerms: string
   patiscoBuyerId: string
+  shippingMarkTemplate: string
   note: string
 }
 
 const empty: CustomerFormData = {
   name: '', shortName: '', address: '', city: '', countryCode: '',
   postalCode: '', phoneNo: '', fax: '', email: '', contactPerson: '',
-  taxId: '', paymentTerms: '', currencyCode: '', patiscoBuyerId: '', note: '',
+  taxId: '', paymentTerms: '', currencyCode: '', defaultTradeTerms: '',
+  patiscoBuyerId: '', shippingMarkTemplate: '', note: '',
 }
 
 const COUNTRIES = [
@@ -45,6 +48,16 @@ const PAYMENT_TERMS = [
   'T/T 30 days', 'T/T 60 days', 'T/T 90 days',
   'L/C at sight', 'L/C 30 days', 'L/C 60 days',
   'D/P', 'D/A 30 days', '100% advance',
+]
+
+const TRADE_TERMS = [
+  { value: 'FOB', label: 'FOB — 船上交貨' },
+  { value: 'FOR', label: 'FOR — 鐵路交貨' },
+  { value: 'EXW', label: 'EXW — 出廠交貨' },
+  { value: 'CIF', label: 'CIF — 到岸含保費' },
+  { value: 'CFR', label: 'CFR — 到目的港含運費' },
+  { value: 'FCA', label: 'FCA — 貨交承運人' },
+  { value: 'DDP', label: 'DDP — 完稅後交貨' },
 ]
 
 type Props = {
@@ -112,6 +125,12 @@ export default function CustomerForm({ initialData, customerId }: Props) {
               {PAYMENT_TERMS.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </Field>
+          <Field label="報價原則（Incoterms）">
+            <select value={form.defaultTradeTerms} onChange={e => set('defaultTradeTerms', e.target.value)} className={inp}>
+              <option value="">未設定</option>
+              {TRADE_TERMS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+          </Field>
           <Field label="統一編號 / Tax ID">
             <input type="text" value={form.taxId} onChange={e => set('taxId', e.target.value)} className={inp} />
           </Field>
@@ -161,6 +180,21 @@ export default function CustomerForm({ initialData, customerId }: Props) {
             <input type="text" value={form.postalCode} onChange={e => set('postalCode', e.target.value)} className={inp} />
           </Field>
         </div>
+      </section>
+
+      <section className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-base font-semibold text-gray-700 mb-1">麥頭範本</h2>
+        <p className="text-xs text-gray-400 mb-3">
+          建立出貨單時自動帶入。用 <code className="bg-gray-100 px-1 rounded">{'{orderNo}'}</code> 代表訂單號碼，出貨時會自動替換。
+        </p>
+        <Field label="">
+          <textarea
+            value={form.shippingMarkTemplate}
+            onChange={e => set('shippingMarkTemplate', e.target.value)}
+            className={`${inp} h-28 font-mono text-xs`}
+            placeholder={'例：\n客戶名稱\nP/O NO. {orderNo}\nMADE IN TAIWAN'}
+          />
+        </Field>
       </section>
 
       <section className="bg-white rounded-lg shadow p-6">

@@ -61,7 +61,9 @@ export async function POST(req: NextRequest) {
       taxId: body.taxId || null,
       paymentTerms: body.paymentTerms || null,
       currencyCode: body.currencyCode || null,
+      defaultTradeTerms: body.defaultTradeTerms || null,
       patiscoBuyerId: body.patiscoBuyerId ? String(body.patiscoBuyerId) : null,
+      shippingMarkTemplate: body.shippingMarkTemplate || null,
       note: body.note || null,
     },
   })

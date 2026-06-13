@@ -17,13 +17,14 @@ export type SupplierFormData = {
   taxId: string
   paymentTerms: string
   currencyCode: string
+  defaultTradeTerms: string
   note: string
 }
 
 const empty: SupplierFormData = {
   name: '', shortName: '', address: '', city: '', countryCode: '',
   postalCode: '', phoneNo: '', fax: '', email: '', contactPerson: '',
-  taxId: '', paymentTerms: '', currencyCode: '', note: '',
+  taxId: '', paymentTerms: '', currencyCode: '', defaultTradeTerms: '', note: '',
 }
 
 const COUNTRIES = [
@@ -35,6 +36,16 @@ const COUNTRIES = [
 ]
 
 const CURRENCIES = ['USD', 'CNY', 'TWD', 'EUR', 'JPY', 'HKD']
+
+const TRADE_TERMS = [
+  { value: 'FOB', label: 'FOB — 船上交貨（供應商自理到港口）' },
+  { value: 'FOR', label: 'FOR — 鐵路交貨（我方負擔運費到港口）' },
+  { value: 'EXW', label: 'EXW — 出廠交貨' },
+  { value: 'CIF', label: 'CIF — 含保險費在內的到岸價' },
+  { value: 'CFR', label: 'CFR — 含運費的目的港價' },
+  { value: 'FCA', label: 'FCA — 貨交承運人' },
+  { value: 'DDP', label: 'DDP — 完稅後交貨' },
+]
 
 const PAYMENT_TERMS = [
   'T/T 30 days', 'T/T 60 days', 'L/C at sight', 'L/C 30 days',
@@ -105,6 +116,12 @@ export default function SupplierForm({ initialData, supplierId }: Props) {
             <select value={form.paymentTerms} onChange={e => set('paymentTerms', e.target.value)} className={inp}>
               <option value="">請選擇</option>
               {PAYMENT_TERMS.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </Field>
+          <Field label="報價原則（Incoterms）">
+            <select value={form.defaultTradeTerms} onChange={e => set('defaultTradeTerms', e.target.value)} className={inp}>
+              <option value="">未設定</option>
+              {TRADE_TERMS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
           </Field>
           <Field label="統一編號 / Tax ID">

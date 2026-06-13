@@ -341,8 +341,8 @@ model SUP_Supplier {
 
   patiscoSupplierId String?  // 對應 Patisco 供應商 ID（未來開放時使用）
 
-  // 交易條件（Patisco Fix_Var TradingTerm code：13=FOB, 14=FOR, 2=CIF…）
-  defaultTradeTerms Int?
+  // 報價原則（Incoterms）：FOB / FOR / EXW / CIF / CFR…
+  defaultTradeTerms String?
 
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
@@ -356,6 +356,7 @@ model SUP_Supplier {
   contacts       SUP_Contact[]
   payables       FIN_Payable[]
   companyAliases SYS_CompanyAlias[]
+  fobAllocations SLS_FobCostAllocation[]
 
   @@index([name])
   @@map("SUP_Supplier")
@@ -443,8 +444,8 @@ model CUS_Customer {
 
   patiscoBuyerId String?   // 對應 Patisco BS_Company.ID（選填，人工關聯）
 
-  // 交易條件（Patisco Fix_Var TradingTerm code：13=FOB, 14=FOR, 2=CIF…）
-  defaultTradeTerms Int?
+  // 報價原則（Incoterms）：FOB / FOR / EXW / CIF / CFR…
+  defaultTradeTerms String?
 
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
@@ -523,6 +524,10 @@ model PO_Order {
   port          String?
   shipVia       String?
   note          String?
+
+  // 報價原則（Incoterms）：覆蓋供應商預設值；FOB = 供應商出廠到港口費用自理，FOR = 我方負擔運到港口費用
+  // null 時沿用 SUP_Supplier.defaultTradeTerms
+  tradeTerms    String?
 
   // 採購觸發來源
   // 0 = 主動補貨, 1 = 接單後採購（isMadeToOrder）, 2 = 安全庫存觸發
@@ -868,6 +873,7 @@ model SLS_Shipment {
   items          SLS_ShipmentItem[]
   stockMovements INV_Movement[]
   receivable     FIN_Receivable?
+  fobCostItems   SLS_FobCostItem[]
 
   @@index([customerId])
   @@map("SLS_Shipment")
@@ -1123,6 +1129,9 @@ model FIN_Payable {
   finalWireAmountTWD Decimal? // 最終匯款金額 = 實付 + 營業稅
   // ────────────────────────────────────────────────────────────────────────────
 
+  // FOB 費用平攤扣款（由 SLS_FobCostAllocation 計算後寫入，不可手動修改）
+  fobCostDeductionTWD Decimal @default(0)  // 累計扣款金額；實付 = amountTWD - fobCostDeductionTWD - 其他費用
+
   // 到期日（入庫日 + 供應商付款週期）
   dueDate     DateTime?
 
@@ -1134,6 +1143,8 @@ model FIN_Payable {
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  fobAllocations SLS_FobCostAllocation[]
 
   @@index([supplierId])
   @@index([dueDate])
@@ -1179,6 +1190,59 @@ model FIN_Receivable {
   @@index([customerId])
   @@index([dueDate])
   @@map("FIN_Receivable")
+}
+
+// =============================================================================
+// FOB 費用平攤 (SLS_FobCost*)
+// 當一批出貨中有 FOB 供應商時，港前運輸費用（拖車、報關等）須按毛重比例
+// 平攤給各 FOB 供應商，並從其應付帳款中扣除。
+// FOR 供應商：費用由供應商自理，不參與平攤。
+// =============================================================================
+
+// 每張出貨單的物流費用項目（手動輸入）
+model SLS_FobCostItem {
+  id          Int      @id @default(autoincrement())
+  shipmentId  Int
+  shipment    SLS_Shipment @relation(fields: [shipmentId], references: [id])
+
+  name        String   // 費用名目：拖車費、報關費、倉租費…
+  amountTWD   Decimal  // 費用金額（TWD）
+  note        String?
+
+  allocations SLS_FobCostAllocation[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([shipmentId])
+  @@map("SLS_FobCostItem")
+}
+
+// 費用平攤結果：每筆費用分配到各 FOB 供應商的明細
+model SLS_FobCostAllocation {
+  id          Int      @id @default(autoincrement())
+  costItemId  Int
+  costItem    SLS_FobCostItem @relation(fields: [costItemId], references: [id])
+
+  supplierId  Int
+  supplier    SUP_Supplier @relation(fields: [supplierId], references: [id])
+
+  poId        Int?     // 對應的 PO_Order（用於追蹤；可 null）
+
+  grossWeightKg Decimal  // 此供應商在本次出貨的毛重（kg）
+  weightPct     Decimal  // 佔所有 FOB 供應商總重的百分比（0-100）
+  allocatedTWD  Decimal  // 分攤金額 = costItem.amountTWD × weightPct / 100
+
+  // 扣款狀態：false=待套用, true=已寫入 FIN_Payable.fobCostDeductionTWD
+  applied     Boolean  @default(false)
+  payableId   Int?
+  payable     FIN_Payable? @relation(fields: [payableId], references: [id])
+
+  createdAt   DateTime @default(now())
+
+  @@index([costItemId])
+  @@index([supplierId])
+  @@map("SLS_FobCostAllocation")
 }
 
 // =============================================================================

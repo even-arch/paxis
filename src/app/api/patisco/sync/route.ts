@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { syncPatiscoPIs, syncPatiscoBuyers, syncPatiscoSupplierPOs, syncPatiscoDeliveryOrders, backfillShipmentPILinks } from '@/api/patisco/sync'
+import { syncPatiscoPIs, syncPatiscoBuyers, syncPatiscoSupplierPOs, syncPatiscoDeliveryOrders, backfillShipmentPILinks, seedDOQueue, processNextPendingDO } from '@/api/patisco/sync'
+import { patiscoLogin } from '@/api/patisco/client'
 
 /**
  * POST /api/patisco/sync
@@ -14,7 +15,7 @@ import { syncPatiscoPIs, syncPatiscoBuyers, syncPatiscoSupplierPOs, syncPatiscoD
  * prisma 在 route handler 層取得後傳入 sync 函式，
  * 避免深層 async 鏈裡 getServerSession 讀不到 session context。
  */
-export const maxDuration = 60  // Vercel Pro 最長 60s
+export const maxDuration = 300  // Vercel Pro 最長 300s（Patisco API 較慢需要緩衝）
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -30,18 +31,27 @@ export async function POST(req: NextRequest) {
   try {
     const result: Record<string, unknown> = {}
 
+    // 登入一次，避免每個 function 重複登入（每次 login 耗時 5-15s）
+    const creds = await patiscoLogin(prisma)
+
     if (type === 'buyers' || type === 'all') {
-      result.buyers = await syncPatiscoBuyers('manual', prisma)
+      result.buyers = await syncPatiscoBuyers('manual', prisma, creds ?? undefined)
     }
     if (type === 'pi' || type === 'all') {
-      result.pi = await syncPatiscoPIs('manual', prisma)
+      result.pi = await syncPatiscoPIs('manual', prisma, undefined, creds ?? undefined)
     }
     if (type === 'po' || type === 'all') {
-      result.po = await syncPatiscoSupplierPOs('manual', prisma)
+      result.po = await syncPatiscoSupplierPOs('manual', prisma, undefined, creds ?? undefined)
+    }
+    if (type === 'seed-do-queue') {
+      result.seed = await seedDOQueue(prisma, creds ?? undefined)
+    }
+    if (type === 'process-next-do') {
+      result.do = await processNextPendingDO('manual', prisma, undefined, creds ?? undefined)
     }
     if (type === 'deliveries' || type === 'all') {
-      const batchLimit = body.batchLimit as number | undefined
-      result.deliveries = await syncPatiscoDeliveryOrders('manual', prisma, undefined, undefined, batchLimit ?? 5)
+      // 向後相容：seed + process 1
+      result.deliveries = await syncPatiscoDeliveryOrders('manual', prisma)
     }
     if (type === 'backfill-shipment-pi') {
       result.backfill = await backfillShipmentPILinks('manual', prisma)
