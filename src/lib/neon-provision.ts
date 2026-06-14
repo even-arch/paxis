@@ -17,20 +17,24 @@ async function createNeonProject(slug: string): Promise<{ projectId: string; con
   const apiKey = process.env.NEON_API_KEY
   if (!apiKey) throw new Error('未設定 NEON_API_KEY')
 
+  const orgId = process.env.NEON_ORG_ID ?? 'org-restless-fire-71730690'
+  const reqBody = {
+    org_id: orgId,
+    project: {
+      name: `paxis-${slug}`,
+      region_id: 'aws-ap-southeast-1',
+      pg_version: 16,
+    },
+  }
+  console.log('[neon] creating project, org_id:', orgId, 'body:', JSON.stringify(reqBody))
+
   const res = await fetch(`${NEON_API}/projects`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      org_id: process.env.NEON_ORG_ID,
-      project: {
-        name: `paxis-${slug}`,
-        region_id: 'aws-ap-southeast-1',
-        pg_version: 16,
-      },
-    }),
+    body: JSON.stringify(reqBody),
   })
 
   if (!res.ok) {
