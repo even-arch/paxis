@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { requireAdminAuth } from '@/lib/admin-auth'
 import { masterPrisma } from '@/lib/master-db'
 import InviteForm from './InviteForm'
