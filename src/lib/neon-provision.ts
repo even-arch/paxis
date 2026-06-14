@@ -45,7 +45,7 @@ async function createNeonProject(slug: string): Promise<{ projectId: string; con
   const connectionString = data.connection_uris?.[0]?.connection_uri
   if (!connectionString) throw new Error('Neon 未回傳 connection URI')
 
-  return { projectId: project.id, connectionString }
+  return { projectId: data.project.id, connectionString }
 }
 
 async function runSchema(connectionString: string) {
