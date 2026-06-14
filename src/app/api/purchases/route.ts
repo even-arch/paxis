@@ -14,7 +14,10 @@ export async function GET(req: NextRequest) {
   const page = Math.max(1, Number(searchParams.get('page') ?? 1))
   const limit = 20
 
-  const where: Record<string, unknown> = {}
+  const showArchived = searchParams.get('archived') === 'true'
+  const where: Record<string, unknown> = {
+    archivedAt: showArchived ? { not: null } : null,
+  }
   if (status !== null && status !== '') where.status = Number(status)
   if (search) {
     where.OR = [

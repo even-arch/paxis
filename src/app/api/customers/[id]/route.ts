@@ -46,6 +46,7 @@ export async function PUT(req: NextRequest, {
       patiscoBuyerId: body.patiscoBuyerId ? String(body.patiscoBuyerId) : null,
       shippingMarkTemplate: body.shippingMarkTemplate || null,
       note: body.note || null,
+      chargeTemplateId: body.chargeTemplateId ? Number(body.chargeTemplateId) : null,
     },
   })
 

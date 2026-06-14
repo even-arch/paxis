@@ -345,18 +345,23 @@ model SUP_Supplier {
   defaultTradeTerms String?
 
   isActive      Boolean   @default(true)
+  archivedAt    DateTime? // 封存時間；非 null = 已封存，正常查詢排除
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   // 付款週期（天數，null 表示未設定）
   paymentCycleDays Int?
 
+  chargeTemplateId  Int?
+  chargeTemplate    PRN_ChargeTemplate? @relation(fields: [chargeTemplateId], references: [id])
+
   products       SUP_SupplierProduct[]
   purchaseOrders PO_Order[]
   contacts       SUP_Contact[]
   payables       FIN_Payable[]
   companyAliases SYS_CompanyAlias[]
-  fobAllocations SLS_FobCostAllocation[]
+  fobAllocations  SLS_FobCostAllocation[]
+  paymentVouchers FIN_PaymentVoucher[]
 
   @@index([name])
   @@map("SUP_Supplier")
@@ -448,12 +453,16 @@ model CUS_Customer {
   defaultTradeTerms String?
 
   isActive      Boolean   @default(true)
+  archivedAt    DateTime? // 封存時間；非 null = 已封存，正常查詢排除
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   // 收款週期（天數，null 表示未設定）
   collectionCycleDays Int?
   shippingMarkTemplate String?  // 麥頭範本，用 {orderNo} 代入訂單號碼
+
+  chargeTemplateId  Int?
+  chargeTemplate    PRN_ChargeTemplate? @relation(fields: [chargeTemplateId], references: [id])
 
   salesOrders       SLS_Order[]
   shipments         SLS_Shipment[]
@@ -462,6 +471,7 @@ model CUS_Customer {
   deliveryNotes     SLS_DeliveryNote[]
   customerProducts  CUS_CustomerProduct[]
   companyAliases    SYS_CompanyAlias[]
+  printDefaults     PRN_CustomerDefault[]
 
   @@index([name])
   @@map("CUS_Customer")
@@ -541,6 +551,7 @@ model PO_Order {
   creator       SYS_User  @relation(fields: [createdBy], references: [id])
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  archivedAt    DateTime? // 封存時間，非 null = 已封存，正常查詢自動排除
 
   items         PO_Item[]
   supplierPIs   PO_SupplierPI[]
@@ -549,6 +560,7 @@ model PO_Order {
   @@index([supplierId, status])
   @@index([poNo])
   @@index([salesOrderId])
+  @@index([archivedAt])
   @@map("PO_Order")
 }
 
@@ -722,6 +734,7 @@ model SLS_Order {
   creator     SYS_User  @relation("SLS_Order_creator", fields: [createdBy], references: [id])
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  archivedAt  DateTime? // 封存時間，非 null = 已封存，正常查詢自動排除
 
   items          SLS_Item[]
   pis            SLS_PI[]
@@ -731,6 +744,7 @@ model SLS_Order {
 
   @@index([customerId, status])
   @@index([orderNo])
+  @@index([archivedAt])
   @@map("SLS_Order")
 }
 
@@ -1145,6 +1159,7 @@ model FIN_Payable {
   updatedAt   DateTime @updatedAt
 
   fobAllocations SLS_FobCostAllocation[]
+  voucherItem    FIN_PaymentVoucherItem?
 
   @@index([supplierId])
   @@index([dueDate])
@@ -1465,4 +1480,151 @@ model SLS_DeliveryNoteItem {
 
   @@index([deliveryNoteId])
   @@map("SLS_DeliveryNoteItem")
+}
+
+// =============================================================================
+// FIN_PaymentVoucher — 付款通知單（PayUni）
+// 合併多張應付帳款，產生一份傳給供應商確認的付款文件
+// status: DRAFT → SENT → CONFIRMED → PAID
+// =============================================================================
+
+model FIN_PaymentVoucher {
+  id          Int      @id @default(autoincrement())
+  voucherNo   String   @unique  // 流水號，e.g. PV-20260613-0001
+
+  supplierId  Int
+  supplier    SUP_Supplier @relation(fields: [supplierId], references: [id])
+
+  status      String   @default("DRAFT")  // DRAFT | SENT | CONFIRMED | PAID
+
+  vatPct      Decimal  @default(5)         // 營業稅率（%）
+  note        String?
+
+  sentAt      DateTime?
+  confirmedAt DateTime?
+  paidAt      DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items       FIN_PaymentVoucherItem[]
+  adjustments FIN_PaymentVoucherAdjustment[]
+
+  @@index([supplierId])
+  @@index([status])
+  @@map("FIN_PaymentVoucher")
+}
+
+model FIN_PaymentVoucherItem {
+  id         Int      @id @default(autoincrement())
+
+  voucherId  Int
+  voucher    FIN_PaymentVoucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+
+  payableId  Int      @unique  // 一張 Payable 只能進一張 Voucher
+  payable    FIN_Payable @relation(fields: [payableId], references: [id])
+
+  amountTWD  Decimal  // 快照：建立時從 FIN_Payable 抄過來，避免事後改動影響
+
+  @@index([voucherId])
+  @@map("FIN_PaymentVoucherItem")
+}
+
+model FIN_PaymentVoucherAdjustment {
+  id         Int      @id @default(autoincrement())
+
+  voucherId  Int
+  voucher    FIN_PaymentVoucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+
+  name       String   // 拖車費、代墊印刷費、FOB 平攤…
+  amountTWD  Decimal  // 正數=加收，負數=扣款
+  category   String   @default("OTHER")  // LOGISTICS | PASSTHROUGH | FORMULA | TAX | OTHER
+  note       String?
+
+  @@index([voucherId])
+  @@map("FIN_PaymentVoucherAdjustment")
+}
+
+// =============================================================================
+// 列印模板 (PRN_)
+// 儲存各種單據的 HTML/CSS 列印模板
+// docType: "SLS_PI" | "PO_ORDER"
+// =============================================================================
+
+// 每個客戶每種單據的自由欄位預設值
+// docType: "SLS_PI" | "PO_ORDER"
+model PRN_CustomerDefault {
+  id         Int          @id @default(autoincrement())
+  customerId Int
+  customer   CUS_Customer @relation(fields: [customerId], references: [id])
+  docType    String
+  freeFields Json         // { portOfLoading, portOfDischarge, ... }
+  updatedAt  DateTime     @updatedAt
+
+  @@unique([customerId, docType])
+  @@index([customerId])
+  @@map("PRN_CustomerDefault")
+}
+
+model PRN_Template {
+  id          Int      @id @default(autoincrement())
+  name        String
+  docType     String              // SLS_PI | PO_ORDER
+  htmlBody    String   @db.Text  // HTML 模板本體，含 {{variable}} 佔位符
+  fieldMap    Json                // { "{{pi_no}}": "SLS_PI.piNo", ... }
+  freeFields  Json                // [{ key, label, defaultValue }]
+  isDefault      Boolean  @default(false)
+  isSystem       Boolean  @default(false)
+  sealPlacements Json     @default("[]")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([docType])
+  @@map("PRN_Template")
+}
+
+model SYS_Seal {
+  id          Int      @id @default(autoincrement())
+  name        String
+  imageBase64 String   @db.Text
+  createdAt   DateTime @default(now())
+  @@map("SYS_Seal")
+}
+
+// =============================================================================
+// 費用模板 (PRN_ChargeTemplate)
+// 可掛在客戶或供應商檔案上，列印時自動帶入附加費用計算
+// =============================================================================
+
+model PRN_ChargeTemplate {
+  id          Int      @id @default(autoincrement())
+  name        String                         // 模板名稱，如「Point Helmig 標準費用」
+  description String?
+  items       PRN_ChargeTemplateItem[]
+  customers   CUS_Customer[]
+  suppliers   SUP_Supplier[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("PRN_ChargeTemplate")
+}
+
+// calcType: PERCENT（百分比）| FLAT（固定金額）
+// calcBase: PRODUCT_SUBTOTAL（商品小計）| GRAND_TOTAL（含前項附加費後的合計）| FLAT（不依基準）
+// accountCategory: 對應未來會計科目分類
+//   SALES_REVENUE | SERVICE_FEE | TAX_OUTPUT | TAX_INPUT | HANDLING | FREIGHT | OTHER
+model PRN_ChargeTemplateItem {
+  id              Int                @id @default(autoincrement())
+  templateId      Int
+  template        PRN_ChargeTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  name            String             // 費用名稱，如「PLUS HANDLING CHARGE」
+  calcType        String             // PERCENT | FLAT
+  calcBase        String             // PRODUCT_SUBTOTAL | GRAND_TOTAL | FLAT
+  rate            Decimal            // 百分比時為 5.0（表示5%）；固定金額時為金額
+  currency        String?            // 固定金額時的幣別（PERCENT 時為 null）
+  accountCategory String             // 科目分類
+  sortOrder       Int    @default(0)
+
+  @@index([templateId])
+  @@map("PRN_ChargeTemplateItem")
 }

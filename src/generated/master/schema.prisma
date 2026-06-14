@@ -1,0 +1,39 @@
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../src/generated/master"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("MASTER_DATABASE_URL")
+}
+
+model ORG {
+  id          Int      @id @default(autoincrement())
+  slug        String   @unique // URL slug, e.g. "pointasia"
+  name        String // 公司顯示名稱
+  databaseUrl String   @db.Text // 該 org 的 Neon DATABASE_URL（加密儲存）
+  status      String   @default("pending") // pending | active | suspended
+  ownerEmail  String // 第一個管理員 email
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  invites ORG_Invite[]
+
+  @@map("ORG")
+}
+
+model ORG_Invite {
+  id        Int       @id @default(autoincrement())
+  orgId     Int? // null = 邀請還沒有對應 org（新用戶邀請）
+  email     String
+  token     String    @unique // 隨機 token，放在邀請信連結裡
+  expiresAt DateTime
+  usedAt    DateTime? // null = 尚未使用
+  createdAt DateTime  @default(now())
+
+  org ORG? @relation(fields: [orgId], references: [id])
+
+  @@map("ORG_Invite")
+}

@@ -963,6 +963,7 @@ export async function syncPatiscoSupplierPOs(source: SyncSource, db?: PrismaClie
             currencyCode,
             exchangeRate:   new Decimal(1),
             sourceType:     0,               // 0 = Patisco 匯入
+            orderDate:      patiscoCreatedAt, // PO 文件日期（從 CreatedDate 解析）
             patiscoOrderNo: docNo,
             patiscoOrderId: docId,
             patiscoStatus:  copy.Status ?? copy.status ?? null,

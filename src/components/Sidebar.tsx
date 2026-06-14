@@ -7,9 +7,10 @@ import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import NotificationBell from './NotificationBell'
 
-type NavItem  = { label: string; href: string; icon: string; exact?: boolean }
+type NavItem  = { label: string; href: string; icon: string; exact?: boolean; absolute?: boolean }
 type NavGroup = { section: string; items: NavItem[] }
 
+// href 是相對路徑（不含 orgSlug），由 Sidebar 動態加前綴
 // ── B2B 導覽（貿易 / Patisco 整合）────────────────────────────────
 const b2bGroups: NavGroup[] = [
   {
@@ -50,8 +51,9 @@ const b2bGroups: NavGroup[] = [
   {
     section: '財務',
     items: [
-      { label: '對帳 / 付款',   href: '/finance', icon: '💳' },
-      { label: '到岸成本試算',  href: '/cost',    icon: '🧮' },
+      { label: '對帳 / 付款',   href: '/finance',          icon: '💳' },
+      { label: '付款通知單',    href: '/finance/vouchers', icon: '📋' },
+      { label: '到岸成本試算',  href: '/cost',             icon: '🧮' },
     ],
   },
 ]
@@ -92,20 +94,21 @@ const settingsItems: NavItem[] = [
   { label: 'AI 功能',    href: '/settings/ai',        icon: '✨' },
   { label: 'Email 寄信', href: '/settings/email',     icon: '📧' },
   { label: 'Patisco 同步', href: '/settings/patisco', icon: '🔗' },
+  { label: '列印模板',   href: '/settings/templates', icon: '🖨' },
+  { label: '費用模板',   href: '/settings/charge-templates', icon: '💰' },
   { label: '個人設定',   href: '/settings/profile',   icon: '👤' },
   { label: '管理後台',   href: '/admin',              icon: '⚙️' },
 ]
 
-function isActive(pathname: string, item: NavItem): boolean {
-  if (item.exact) return pathname === item.href
-  if (pathname === item.href) return true
-  if (item.href === '/sales') {
-    return pathname.startsWith('/sales/')
-  }
-  return pathname.startsWith(item.href + '/')
+function isActive(pathname: string, item: NavItem, base: string): boolean {
+  const full = item.absolute ? item.href : base + item.href
+  if (item.exact) return pathname === full
+  if (pathname === full) return true
+  if (item.href === '/sales') return pathname.startsWith(base + '/sales/')
+  return pathname.startsWith(full + '/')
 }
 
-function NavLinks({ groups, pathname }: { groups: NavGroup[]; pathname: string }) {
+function NavLinks({ groups, pathname, base }: { groups: NavGroup[]; pathname: string; base: string }) {
   return (
     <>
       {groups.map(group => (
@@ -120,10 +123,10 @@ function NavLinks({ groups, pathname }: { groups: NavGroup[]; pathname: string }
           {group.items.map(item => (
             <Link
               key={item.href}
-              href={item.href}
+              href={base + item.href}
               className={cn(
                 'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
-                isActive(pathname, item)
+                isActive(pathname, item, base)
                   ? 'bg-blue-600 text-white'
                   : 'text-gray-300 hover:bg-gray-800',
               )}
@@ -140,9 +143,10 @@ function NavLinks({ groups, pathname }: { groups: NavGroup[]; pathname: string }
 
 type Mode = 'b2b' | 'b2c'
 
-export default function Sidebar({ companyName = 'PAXIS' }: { companyName?: string }) {
+export default function Sidebar({ companyName = 'PAXIS', orgSlug = '' }: { companyName?: string; orgSlug?: string }) {
   const pathname  = usePathname()
   const router    = useRouter()
+  const base      = orgSlug ? `/${orgSlug}` : ''
   const { data: session } = useSession()
 
   // 根據目前路徑自動判斷模式；否則從 localStorage 讀取；預設 b2b
@@ -155,12 +159,12 @@ export default function Sidebar({ companyName = 'PAXIS' }: { companyName?: strin
 
   // 初始化：路徑優先，其次 localStorage
   useEffect(() => {
-    if (pathname.startsWith('/marketplace')) {
+    if (pathname.startsWith(base + '/marketplace')) {
       setMode('b2c')
     } else {
       const saved = localStorage.getItem('paxis_mode') as Mode | null
-      if (saved === 'b2c' && !pathname.startsWith('/marketplace')) {
-        setMode('b2b')   // 若不在 /marketplace 路徑，還是顯示 b2b sidebar
+      if (saved === 'b2c' && !pathname.startsWith(base + '/marketplace')) {
+        setMode('b2b')
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -168,16 +172,16 @@ export default function Sidebar({ companyName = 'PAXIS' }: { companyName?: strin
 
   // 路徑變化時同步模式
   useEffect(() => {
-    if (pathname.startsWith('/marketplace')) {
+    if (pathname.startsWith(base + '/marketplace')) {
       setMode('b2c')
     }
-  }, [pathname])
+  }, [pathname, base])
 
   function switchMode(next: Mode) {
     setMode(next)
     localStorage.setItem('paxis_mode', next)
-    if (next === 'b2c') router.push('/marketplace')
-    else                router.push('/dashboard')
+    if (next === 'b2c') router.push(base + '/marketplace')
+    else                router.push(base + '/dashboard')
   }
 
   const isB2B = mode === 'b2b'
@@ -228,7 +232,7 @@ export default function Sidebar({ companyName = 'PAXIS' }: { companyName?: strin
       <nav className="flex-1 py-4 px-2 flex flex-col gap-0.5 overflow-y-auto">
         {isB2B ? (
           <>
-            <NavLinks groups={b2bGroups} pathname={pathname} />
+            <NavLinks groups={b2bGroups} pathname={pathname} base={base} />
             {/* B2B 模式才顯示系統設定 */}
             <div className="mt-4 mb-1 px-3">
               <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">設定</span>
@@ -236,10 +240,10 @@ export default function Sidebar({ companyName = 'PAXIS' }: { companyName?: strin
             {settingsItems.map(item => (
               <Link
                 key={item.href}
-                href={item.href}
+                href={item.absolute ? item.href : base + item.href}
                 className={cn(
                   'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
-                  isActive(pathname, item)
+                  isActive(pathname, item, base)
                     ? 'bg-blue-600 text-white'
                     : 'text-gray-300 hover:bg-gray-800',
                 )}
@@ -250,7 +254,7 @@ export default function Sidebar({ companyName = 'PAXIS' }: { companyName?: strin
             ))}
           </>
         ) : (
-          <NavLinks groups={b2cGroups} pathname={pathname} />
+          <NavLinks groups={b2cGroups} pathname={pathname} base={base} />
         )}
       </nav>
 
@@ -260,7 +264,7 @@ export default function Sidebar({ companyName = 'PAXIS' }: { companyName?: strin
           <p className="text-xs text-gray-500 truncate px-1">{session.user.email}</p>
         )}
         <button
-          onClick={() => signOut({ callbackUrl: '/login' })}
+          onClick={() => signOut({ callbackUrl: base + '/login' })}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-gray-300 hover:bg-gray-800"
         >
           <span>🚪</span>

@@ -1,20 +1,32 @@
 import { withAuth } from 'next-auth/middleware'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
-// 只保護 (main) 群組的登入狀態
-// admin 路徑的 email 權限檢查在 admin/layout.tsx（Server Component）處理，
-// 以避免 Vercel Edge Runtime 解密 JWT 的問題
-export default withAuth({
-  pages: {
-    signIn: '/login',
+// 保護 [orgSlug]/(main) 下的所有路由
+// login、invite、admin、api、靜態資源不受保護
+export default withAuth(
+  function middleware(_req: NextRequest) {
+    return NextResponse.next()
   },
-  callbacks: {
-    authorized: ({ token }) => !!token,
-  },
-})
+  {
+    pages: {
+      // 登入頁依 orgSlug 動態決定，由 layout redirect 處理
+      signIn: '/login',
+    },
+    callbacks: {
+      authorized: ({ token, req }) => {
+        const { pathname } = req.nextUrl
+        // /[orgSlug]/login 不需要 token
+        if (pathname.match(/^\/[^/]+\/login/)) return true
+        return !!token
+      },
+    },
+  }
+)
 
 export const config = {
   matcher: [
-    // 保護主系統路徑（排除登入頁、API、靜態資源）
-    '/((?!login|api|_next/static|_next/image|favicon\\.ico|admin).*)',
+    // 保護所有 orgSlug 下的路徑（排除 login、invite、admin、api、靜態資源）
+    '/:orgSlug((?!admin|invite|api|_next|favicon)[^/]+)/:path*',
   ],
 }

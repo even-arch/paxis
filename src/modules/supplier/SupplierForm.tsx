@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 export type SupplierFormData = {
@@ -19,12 +19,14 @@ export type SupplierFormData = {
   currencyCode: string
   defaultTradeTerms: string
   note: string
+  chargeTemplateId: string  // '' = 不套用
 }
 
 const empty: SupplierFormData = {
   name: '', shortName: '', address: '', city: '', countryCode: '',
   postalCode: '', phoneNo: '', fax: '', email: '', contactPerson: '',
   taxId: '', paymentTerms: '', currencyCode: '', defaultTradeTerms: '', note: '',
+  chargeTemplateId: '',
 }
 
 const COUNTRIES = [
@@ -62,6 +64,11 @@ export default function SupplierForm({ initialData, supplierId }: Props) {
   const [form, setForm] = useState<SupplierFormData>({ ...empty, ...initialData })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [chargeTemplates, setChargeTemplates] = useState<{ id: number; name: string }[]>([])
+
+  useEffect(() => {
+    fetch('/api/charge-templates').then(r => r.json()).then((list: { id: number; name: string }[]) => setChargeTemplates(list))
+  }, [])
 
   function set(field: keyof SupplierFormData, value: string) {
     setForm(prev => ({ ...prev, [field]: value }))
@@ -171,6 +178,20 @@ export default function SupplierForm({ initialData, supplierId }: Props) {
             <input type="text" value={form.postalCode} onChange={e => set('postalCode', e.target.value)} className={inp} />
           </Field>
         </div>
+      </section>
+
+      {/* 列印費用模板 */}
+      <section className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-base font-semibold text-gray-700 mb-3">列印費用模板</h2>
+        <p className="text-xs text-gray-400 mb-3">列印 PO 時自動帶入此費用模板的附加費用計算。可至「設定 → 費用模板」管理。</p>
+        <Field label="費用模板">
+          <select value={form.chargeTemplateId} onChange={e => set('chargeTemplateId', e.target.value)} className={inp}>
+            <option value="">不套用</option>
+            {chargeTemplates.map(t => (
+              <option key={t.id} value={String(t.id)}>{t.name}</option>
+            ))}
+          </select>
+        </Field>
       </section>
 
       {/* 備註 */}
