@@ -112,3 +112,51 @@ export async function PATCH(
 
   return NextResponse.json({ error: '未知操作' }, { status: 400 })
 }
+
+export async function DELETE(
+  _req: Request,
+  { params }: { params: { id: string } }
+) {
+  if (!(await assertAdmin())) {
+    return NextResponse.json({ error: '未授權' }, { status: 401 })
+  }
+
+  const orgId = Number(params.id)
+  const org = await masterPrisma.oRG.findUnique({ where: { id: orgId } })
+  if (!org) return NextResponse.json({ error: '找不到租戶' }, { status: 404 })
+
+  // 1. 刪除 Neon project（若已開通）
+  const databaseUrl = org.databaseUrl
+  if (databaseUrl && !databaseUrl.startsWith('__pending__')) {
+    try {
+      // 從 connection string 找 Neon project id
+      const apiKey = process.env.NEON_API_KEY
+      const orgNeonId = process.env.NEON_ORG_ID ?? 'org-restless-fire-71730690'
+      if (apiKey) {
+        const listRes = await fetch(
+          `https://console.neon.tech/api/v2/projects?org_id=${orgNeonId}&search=paxis-${org.slug}`,
+          { headers: { Authorization: `Bearer ${apiKey}` } }
+        )
+        if (listRes.ok) {
+          const { projects } = await listRes.json() as { projects: { id: string; name: string }[] }
+          const project = projects.find(p => p.name === `paxis-${org.slug}`)
+          if (project) {
+            await fetch(`https://console.neon.tech/api/v2/projects/${project.id}`, {
+              method: 'DELETE',
+              headers: { Authorization: `Bearer ${apiKey}` },
+            })
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[delete org] Neon deletion error:', e)
+      // 繼續刪 master DB，不因 Neon 失敗而 block
+    }
+  }
+
+  // 2. 刪 master DB（ORG_Invite + ORG）
+  await masterPrisma.oRG_Invite.deleteMany({ where: { orgId } })
+  await masterPrisma.oRG.delete({ where: { id: orgId } })
+
+  return NextResponse.json({ ok: true })
+}

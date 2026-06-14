@@ -30,8 +30,20 @@ export default function OrgActions({
     }
   }
 
+  async function handleDelete() {
+    if (!confirm('確定要永久刪除這個租戶？此操作將刪除 Neon DB 及所有資料，無法復原。')) return
+    setLoading(true)
+    const res = await fetch(`/api/admin/orgs/${orgId}`, { method: 'DELETE' })
+    setLoading(false)
+    if (res.ok) router.refresh()
+    else {
+      const data = await res.json()
+      alert(data.error ?? '刪除失敗')
+    }
+  }
+
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-2 items-center">
       {currentStatus === 'pending' && (
         <button
           onClick={() => patch('activate')}
@@ -60,6 +72,13 @@ export default function OrgActions({
           重新啟用
         </button>
       )}
+      <button
+        onClick={handleDelete}
+        disabled={loading}
+        className="text-xs text-gray-400 hover:text-red-600 hover:underline disabled:opacity-50"
+      >
+        刪除
+      </button>
     </div>
   )
 }
