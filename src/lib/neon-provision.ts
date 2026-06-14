@@ -10,7 +10,6 @@ const NEON_API = 'https://console.neon.tech/api/v2'
 
 interface NeonProject {
   id: string
-  connection_uris: { connection_uri: string }[]
 }
 
 async function createNeonProject(slug: string): Promise<{ projectId: string; connectionString: string }> {
@@ -42,9 +41,8 @@ async function createNeonProject(slug: string): Promise<{ projectId: string; con
     throw new Error(`Neon API 錯誤 ${res.status}: ${text}`)
   }
 
-  const data = await res.json() as { project: NeonProject }
-  const project = data.project
-  const connectionString = project.connection_uris[0]?.connection_uri
+  const data = await res.json() as { project: NeonProject; connection_uris: { connection_uri: string }[] }
+  const connectionString = data.connection_uris?.[0]?.connection_uri
   if (!connectionString) throw new Error('Neon 未回傳 connection URI')
 
   return { projectId: project.id, connectionString }
