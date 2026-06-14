@@ -1,7 +1,11 @@
 import { Suspense } from 'react'
 import LoginForm from './LoginForm'
 
+import { redirect } from 'next/navigation'
+
 export default function LoginPage({ params }: { params: { orgSlug: string } }) {
+  // PointAsia 的登入統一在 /login，不用 /pointasia/login
+  if (params.orgSlug === 'pointasia') redirect('/login')
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="bg-white p-8 rounded-xl shadow-md w-full max-w-sm">
