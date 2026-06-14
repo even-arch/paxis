@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 
 export async function GET(req: NextRequest) {
+  const prisma = await getRequestPrisma()
   const customerId = parseInt(req.nextUrl.searchParams.get('customerId') ?? '', 10)
   if (isNaN(customerId)) return NextResponse.json({ pis: [], orders: [] })
 

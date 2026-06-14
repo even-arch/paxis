@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 import { Decimal } from '@prisma/client/runtime/library'
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const prisma = await getRequestPrisma()
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -112,6 +113,7 @@ interface ShipItem {
 }
 
 export async function POST(req: NextRequest, { params }: Params) {
+  const prisma = await getRequestPrisma()
   try {
     const session = await getServerSession(authOptions)
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

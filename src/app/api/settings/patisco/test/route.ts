@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 import { patiscoLogin, listTools, listProformaInvoices } from '@/api/patisco/client'
 
 /** 測試 Patisco 連線（end-to-end smoke test）
@@ -9,6 +9,7 @@ import { patiscoLogin, listTools, listProformaInvoices } from '@/api/patisco/cli
  *  只有三層都通過，才算真正可用。
  */
 export async function POST(_req: NextRequest) {
+  const prisma = await getRequestPrisma()
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

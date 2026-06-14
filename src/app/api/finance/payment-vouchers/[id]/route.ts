@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 
 type Params = { params: { id: string } }
 
 // GET /api/finance/payment-vouchers/[id]
 export async function GET(_req: NextRequest, { params }: Params) {
+  const prisma = await getRequestPrisma()
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -41,6 +42,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 // PATCH /api/finance/payment-vouchers/[id]
 // 更新 status / 加 adjustment / 移除 item / 更新 note
 export async function PATCH(req: NextRequest, { params }: Params) {
+  const prisma = await getRequestPrisma()
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -126,6 +128,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
 // DELETE /api/finance/payment-vouchers/[id] — 僅 DRAFT 可刪，刪除後 Payable 解鎖
 export async function DELETE(_req: NextRequest, { params }: Params) {
+  const prisma = await getRequestPrisma()
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

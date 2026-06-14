@@ -1,12 +1,13 @@
 // GET /api/v1/products/[sku] — POS 系統查詢單一產品
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 import { verifyPosApiKey } from '@/lib/posAuth'
 
 type Params = { params: { sku: string } }
 
 export async function GET(req: NextRequest, {
   params }: Params) {
+  const prisma = await getRequestPrisma()
     if (!verifyPosApiKey(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

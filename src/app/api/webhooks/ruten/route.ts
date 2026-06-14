@@ -12,12 +12,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 import { verifyRutenSignature } from '@/lib/ruten/auth'
 
 const WEBHOOK_PATH = '/api/webhooks/ruten'
 
 export async function POST(req: NextRequest) {
+  const prisma = await getRequestPrisma()
   // 1. 讀取 raw body（簽章驗證需要原始字串）
   const rawBody = await req.text()
 
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
 
   if (!valid) {
     console.warn('[Ruten Webhook] Invalid signature for channel', channel.id)
-    await logSync(channel.id, 'webhook_received', 'error', undefined, '簽章驗證失敗')
+    await logSync(prisma, channel.id, 'webhook_received', 'error', undefined, '簽章驗證失敗')
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
@@ -61,25 +62,25 @@ export async function POST(req: NextRequest) {
   const { action_type, order_no } = payload
 
   // 5. 寫入 sync log
-  await logSync(channel.id, 'webhook_received', 'ok', order_no, `action: ${action_type}`)
+  await logSync(prisma, channel.id, 'webhook_received', 'ok', order_no, `action: ${action_type}`)
 
   // 6. 依事件類型處理
   try {
     switch (action_type) {
       case 'create_order':
-        await handleCreateOrder(channel.id, order_no, payload)
+        await handleCreateOrder(prisma, channel.id, order_no, payload)
         break
 
       case 'order_paid':
-        await handleOrderPaid(channel.id, order_no)
+        await handleOrderPaid(prisma, channel.id, order_no)
         break
 
       case 'buyer_cancel':
-        await handleOrderCancel(channel.id, order_no, 'buyer_cancel')
+        await handleOrderCancel(prisma, channel.id, order_no, 'buyer_cancel')
         break
 
       case 'order_cancel':
-        await handleOrderCancel(channel.id, order_no, 'order_cancel')
+        await handleOrderCancel(prisma, channel.id, order_no, 'order_cancel')
         break
 
       default:
@@ -88,7 +89,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error('[Ruten Webhook] Handler error:', msg)
-    await logSync(channel.id, 'webhook_received', 'error', order_no, msg)
+    await logSync(prisma, channel.id, 'webhook_received', 'error', order_no, msg)
     // 仍回 200，避免露天重複推送
   }
 
@@ -99,6 +100,7 @@ export async function POST(req: NextRequest) {
 // ─── 事件處理 ────────────────────────────────────────────────────────────────
 
 async function handleCreateOrder(
+  prisma: Awaited<ReturnType<typeof getRequestPrisma>>,
   channelId: number,
   orderNo: string,
   payload: RutenWebhookPayload,
@@ -119,7 +121,7 @@ async function handleCreateOrder(
   })
 }
 
-async function handleOrderPaid(channelId: number, orderNo: string) {
+async function handleOrderPaid(prisma: Awaited<ReturnType<typeof getRequestPrisma>>, channelId: number, orderNo: string) {
   await prisma.mKT_Order.updateMany({
     where: { channelId, platformOrderNo: orderNo },
     data: {
@@ -130,6 +132,7 @@ async function handleOrderPaid(channelId: number, orderNo: string) {
 }
 
 async function handleOrderCancel(
+  prisma: Awaited<ReturnType<typeof getRequestPrisma>>,
   channelId: number,
   orderNo: string,
   reason: string,
@@ -150,6 +153,7 @@ async function handleOrderCancel(
 // ─── 工具函式 ─────────────────────────────────────────────────────────────────
 
 async function logSync(
+  prisma: Awaited<ReturnType<typeof getRequestPrisma>>,
   channelId: number,
   action: string,
   status: string,

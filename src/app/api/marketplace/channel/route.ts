@@ -4,12 +4,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 import { encrypt, decrypt } from '@/lib/crypto'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
+  const prisma = await getRequestPrisma()
   const session = await getServerSession(authOptions)
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest) {
  * 回傳目前設定（遮罩金鑰，只顯示前 6 碼）
  */
 export async function GET() {
+  const prisma = await getRequestPrisma()
   const channels = await prisma.mKT_Channel.findMany({
     orderBy: { createdAt: 'asc' },
   })

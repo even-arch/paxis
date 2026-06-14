@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 import { decrypt } from '@/lib/crypto'
 import { callLLM, buildMessagesForFile, parseJsonResponse } from '@/lib/ai-llm'
 
@@ -15,6 +15,7 @@ type Params = { params: { id: string } }
  * 2. 傳 multipart（含 PO 文件）→ AI 解析 PO，比對 SKU，儲存 customerPoNo + customerSkuRef
  */
 export async function PATCH(req: NextRequest, { params }: Params) {
+  const prisma = await getRequestPrisma()
   try {
     const session = await getServerSession(authOptions)
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

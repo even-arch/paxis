@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 import { randomBytes } from 'crypto'
 import { sendPasswordResetEmail } from '@/lib/mailer'
 
 export async function POST(req: NextRequest) {
+  const prisma = await getRequestPrisma()
   const { email } = await req.json() as { email?: string }
 
   if (!email || !email.includes('@')) {

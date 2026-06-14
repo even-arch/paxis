@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 import { Decimal } from '@prisma/client/runtime/library'
 
 type Params = { params: { id: string } }
 
 // 更新付款狀態與費用明細
 export async function PATCH(req: NextRequest, { params }: Params) {
+  const prisma = await getRequestPrisma()
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

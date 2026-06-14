@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 import { getSystemSetting, setSystemSetting } from '@/lib/system-settings'
 import { getUpsAccessToken } from '@/lib/shipping/ups-auth'
 import { createUpsShipment } from '@/lib/shipping/ups-shipment'
@@ -31,6 +31,7 @@ interface CreateShipmentBody {
 }
 
 export async function POST(req: NextRequest) {
+  const prisma = await getRequestPrisma()
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

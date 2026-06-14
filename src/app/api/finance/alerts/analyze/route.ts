@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 import { decrypt } from '@/lib/crypto'
 import { callLLM } from '@/lib/ai-llm'
 import type { Alert } from '../route'
@@ -12,6 +12,7 @@ import type { Alert } from '../route'
  * 只在使用者主動點擊時呼叫，不自動觸發。
  */
 export async function POST(req: NextRequest) {
+  const prisma = await getRequestPrisma()
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

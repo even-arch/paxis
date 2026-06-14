@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 import { PRODUCT_COLUMNS } from '@/lib/productColumns'
 
 function parseBool(v: string): boolean {
@@ -20,6 +20,7 @@ function str(v: string): string | null {
 }
 
 export async function POST(req: NextRequest) {
+  const prisma = await getRequestPrisma()
     try {
     const session = await getServerSession(authOptions)
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

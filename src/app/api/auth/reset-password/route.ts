@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 import bcrypt from 'bcryptjs'
 
 export async function POST(req: NextRequest) {
+  const prisma = await getRequestPrisma()
   const { token, password } = await req.json() as { token?: string; password?: string }
 
   if (!token || !password || password.length < 8) {

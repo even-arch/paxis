@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 
 function fmtDate(d: Date | null | undefined) {
   if (!d) return ''
@@ -16,6 +16,7 @@ const COPIES = [
 ]
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const prisma = await getRequestPrisma()
   const id = parseInt(params.id, 10)
   if (isNaN(id)) return new NextResponse('Not found', { status: 404 })
 

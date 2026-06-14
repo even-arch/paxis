@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 
 /**
  * POST /api/finance/backfill
@@ -9,6 +9,7 @@ import { prisma } from '@/lib/db'
  * 冪等：只建立不存在的記錄，不修改已有的。
  */
 export async function POST() {
+  const prisma = await getRequestPrisma()
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

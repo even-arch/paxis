@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { syncPatiscoPIs, syncPatiscoBuyers, syncPatiscoSellers, syncPatiscoSupplierPOs, processNextPendingDO, seedDOQueue } from '@/api/patisco/sync'
 import { patiscoLogin } from '@/api/patisco/client'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 
 const DEFAULT_MCP_URL = process.env.PATISCO_MCP_URL ?? 'https://mcp.patisco.com'
 async function rawMcpCall(creds: { jwt: string; apiKey: string; _mcpUrl?: string }, tool: string, args: Record<string, unknown>) {
@@ -18,6 +18,7 @@ async function rawMcpCall(creds: { jwt: string; apiKey: string; _mcpUrl?: string
 export const maxDuration = 300
 
 export async function GET(req: NextRequest) {
+  const prisma = await getRequestPrisma()
   const authHeader = req.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
 

@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import LoginForm from './LoginForm'
 
-export default function LoginPage() {
+export default function LoginPage({ params }: { params: { orgSlug: string } }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="bg-white p-8 rounded-xl shadow-md w-full max-w-sm">
@@ -12,7 +12,7 @@ export default function LoginPage() {
           <h1 className="text-xl font-bold text-gray-800">PAXIS</h1>
         </div>
         <Suspense fallback={<div className="h-12" />}>
-          <LoginForm />
+          <LoginForm orgSlug={params.orgSlug} />
         </Suspense>
       </div>
     </div>

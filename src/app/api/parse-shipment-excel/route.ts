@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 import { decrypt } from '@/lib/crypto'
 import { callLLM, buildMessagesForFile, parseJsonResponse } from '@/lib/ai-llm'
 
@@ -382,6 +382,7 @@ const AI_SYSTEM_PROMPT = `你是專業的出口文件解析助理，負責從 Co
 // ── Route handler ─────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  const prisma = await getRequestPrisma()
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

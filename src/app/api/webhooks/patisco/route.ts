@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHmac } from 'crypto'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 import { syncPatiscoPIs } from '@/api/patisco/sync'
 import { decrypt } from '@/lib/crypto'
 
 export async function POST(req: NextRequest) {
+  const prisma = await getRequestPrisma()
   const body = await req.text()
   const sig  = req.headers.get('x-patisco-signature') ?? ''
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 import { syncPatiscoPIs, syncPatiscoBuyers, syncPatiscoSupplierPOs, syncPatiscoDeliveryOrders, backfillShipmentPILinks, seedDOQueue, processNextPendingDO } from '@/api/patisco/sync'
 import { patiscoLogin } from '@/api/patisco/client'
 
@@ -18,6 +18,7 @@ import { patiscoLogin } from '@/api/patisco/client'
 export const maxDuration = 300  // Vercel Pro 最長 300s（Patisco API 較慢需要緩衝）
 
 export async function POST(req: NextRequest) {
+  const prisma = await getRequestPrisma()
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

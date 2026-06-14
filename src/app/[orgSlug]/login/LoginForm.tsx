@@ -3,14 +3,14 @@ import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 
-export default function LoginForm() {
+export default function LoginForm({ orgSlug }: { orgSlug: string }) {
   const [loading, setLoading] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [credError, setCredError] = useState<string | null>(null)
   const searchParams = useSearchParams()
   const error = searchParams.get('error')
-  const callbackUrl = searchParams.get('callbackUrl') ?? '/dashboard'
+  const callbackUrl = searchParams.get('callbackUrl') ?? `/${orgSlug}/dashboard`
 
   const errorMessage = credError
     ?? (error ? '登入失敗，請再試一次。' : null)
@@ -22,6 +22,7 @@ export default function LoginForm() {
     const res = await signIn('credentials', {
       email,
       password,
+      orgSlug,
       callbackUrl,
       redirect: false,
     })

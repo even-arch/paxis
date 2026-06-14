@@ -1,10 +1,11 @@
 // GET /api/v1/products — POS 系統拉取產品目錄
 // 回傳所有開放 POS 販售的產品，含目前庫存水位
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 import { verifyPosApiKey } from '@/lib/posAuth'
 
 export async function GET(req: NextRequest) {
+  const prisma = await getRequestPrisma()
     if (!verifyPosApiKey(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

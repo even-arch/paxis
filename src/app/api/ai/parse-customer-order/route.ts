@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 import { decrypt } from '@/lib/crypto'
 import { callLLM, buildMessagesForFile, parseJsonResponse } from '@/lib/ai-llm'
 
@@ -131,6 +131,7 @@ const SYSTEM_PROMPT = `你是一個專業的貿易文件解析助理。
 若某欄位無法從文件中找到，填 null。items 至少要有一筆。`
 
 export async function POST(req: NextRequest) {
+  const prisma = await getRequestPrisma()
     try {
     const session = await getServerSession(authOptions)
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 import { patiscoLogin, listProformaInvoices, getOrderDetail, getOrderProducts, listDeliveryOrders, getDeliveryOrderDetail } from '@/api/patisco/client'
 import { neon } from '@neondatabase/serverless'
 
 export async function GET(req: NextRequest) {
+  const prisma = await getRequestPrisma()
   const { searchParams } = new URL(req.url)
   const action = searchParams.get('action') ?? 'listPIs'
 

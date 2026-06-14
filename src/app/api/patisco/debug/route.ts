@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 import {
   patiscoLogin,
   getPIs,
@@ -55,6 +55,7 @@ async function rawMcpCall(creds: { jwt: string; apiKey: string; _mcpUrl?: string
 }
 
 export async function GET(req: NextRequest) {
+  const prisma = await getRequestPrisma()
   const session = await getServerSession(authOptions)
   if (!session?.user) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

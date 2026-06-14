@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
+  const prisma = await getRequestPrisma()
   try {
     const session = await getServerSession(authOptions)
     const rawId = session?.user ? (session.user as unknown as { id?: number | string }).id : null

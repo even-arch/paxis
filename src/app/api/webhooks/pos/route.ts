@@ -1,7 +1,7 @@
 // POST /api/webhooks/pos — POS 系統推送銷售/退貨事件
 // 驗證通過後，扣減或回補庫存並寫入 INV_Movement
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 import { verifyPosSignature } from '@/lib/posAuth'
 
 interface PosEvent {
@@ -14,6 +14,7 @@ interface PosEvent {
 }
 
 export async function POST(req: NextRequest) {
+  const prisma = await getRequestPrisma()
     const rawBody = await req.text()
 
   if (!verifyPosSignature(req, rawBody)) {

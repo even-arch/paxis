@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/db'
+import { getRequestPrisma } from '@/lib/request-db'
 
 // GET /api/patisco/company-aliases
 // 回傳：
 //   1. 所有已儲存的 alias 清單
 //   2. 目前待確認（SYS_PatiscoSync status=needs_confirm）的公司名稱清單
 export async function GET() {
+  const prisma = await getRequestPrisma()
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -55,6 +56,7 @@ export async function GET() {
 // body: { alias: string; role: 'SELF'|'CUSTOMER'|'SUPPLIER'|'OTHER'; customerId?: number; supplierId?: number }
 // 儲存後，將 SYS_PatiscoSync 中含此公司名稱的 needs_confirm 記錄標記為 retry
 export async function POST(req: NextRequest) {
+  const prisma = await getRequestPrisma()
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -147,6 +149,7 @@ export async function POST(req: NextRequest) {
 
 // DELETE /api/patisco/company-aliases?alias=xxx
 export async function DELETE(req: NextRequest) {
+  const prisma = await getRequestPrisma()
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
