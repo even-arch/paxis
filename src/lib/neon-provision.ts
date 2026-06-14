@@ -24,11 +24,11 @@ async function createNeonProject(slug: string): Promise<{ projectId: string; con
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
+      org_id: process.env.NEON_ORG_ID,
       project: {
         name: `paxis-${slug}`,
         region_id: 'aws-ap-southeast-1',
         pg_version: 16,
-        org_id: process.env.NEON_ORG_ID,
       },
     }),
   })
