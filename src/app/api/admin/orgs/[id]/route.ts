@@ -94,11 +94,12 @@ export async function PATCH(
             <p style="color:#374151">
               您的 PAXIS 系統帳號已完成開通。請前往以下網址登入：
             </p>
-            <a href="${baseUrl}/${org.slug}/login"
+            <a href="${baseUrl}/login?org=${org.slug}"
                style="display:inline-block;margin:24px 0;padding:12px 24px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;font-weight:500">
               前往登入
             </a>
-            <p style="color:#6b7280;font-size:13px">登入網址：${baseUrl}/${org.slug}/login</p>
+            <p style="color:#6b7280;font-size:13px">登入網址：${baseUrl}/login?org=${org.slug}</p>
+            <p style="color:#6b7280;font-size:13px">公司代碼：<strong>${org.slug}</strong></p>
             <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
             <p style="color:#9ca3af;font-size:12px">PAXIS · 錫諾系統</p>
           </div>

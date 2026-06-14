@@ -16,40 +16,32 @@ export const authOptions: NextAuthOptions = {
       id: 'credentials',
       name: 'Email / 密碼',
       credentials: {
-        email:    { label: 'Email', type: 'email' },
-        password: { label: '密碼',  type: 'password' },
+        email:    { label: 'Email',    type: 'email' },
+        password: { label: '密碼',     type: 'password' },
+        orgSlug:  { label: '公司代碼', type: 'text' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null
+        if (!credentials?.email || !credentials?.password || !credentials?.orgSlug) return null
         try {
-          // 取得所有 active org，逐一查詢哪個 org 有這個 email
-          const orgs = await masterPrisma.oRG.findMany({
-            where: { status: 'active' },
-            select: { slug: true, databaseUrl: true },
+          const org = await masterPrisma.oRG.findUnique({
+            where: { slug: credentials.orgSlug },
+            select: { slug: true, databaseUrl: true, status: true },
           })
+          if (!org || org.status !== 'active' || !org.databaseUrl) return null
 
-          for (const org of orgs) {
-            if (!org.databaseUrl) continue
-            try {
-              const db = getOrgPrisma(org.databaseUrl, org.slug) as typeof prisma
-              const user = await db.sYS_User.findUnique({
-                where: { loginId: credentials.email.toLowerCase() },
-              })
-              if (!user || !user.isEnabled || !user.password) continue
-              const ok = await bcrypt.compare(credentials.password, user.password)
-              if (!ok) continue
-              return {
-                id:      user.id.toString(),
-                email:   user.loginId,
-                name:    user.name ?? user.loginId,
-                orgSlug: org.slug,
-              }
-            } catch {
-              // 這個 org DB 暫時無法連線，跳過
-              continue
-            }
+          const db = getOrgPrisma(org.databaseUrl, org.slug) as typeof prisma
+          const user = await db.sYS_User.findUnique({
+            where: { loginId: credentials.email.toLowerCase() },
+          })
+          if (!user || !user.isEnabled || !user.password) return null
+          const ok = await bcrypt.compare(credentials.password, user.password)
+          if (!ok) return null
+          return {
+            id:      user.id.toString(),
+            email:   user.loginId,
+            name:    user.name ?? user.loginId,
+            orgSlug: org.slug,
           }
-          return null
         } catch (e) {
           console.error('[auth] credentials error:', e)
           return null

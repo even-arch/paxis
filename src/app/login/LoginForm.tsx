@@ -11,6 +11,7 @@ export default function LoginForm() {
   const searchParams = useSearchParams()
   const error = searchParams.get('error')
   const callbackUrl = searchParams.get('callbackUrl') ?? '/dashboard'
+  const [orgSlug, setOrgSlug] = useState(searchParams.get('org') ?? '')
 
   const errorMessage = credError
     ?? (error ? '登入失敗，請再試一次。' : null)
@@ -22,6 +23,7 @@ export default function LoginForm() {
     const res = await signIn('credentials', {
       email,
       password,
+      orgSlug,
       callbackUrl,
       redirect: false,
     })
@@ -42,6 +44,17 @@ export default function LoginForm() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-3">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">公司代碼</label>
+          <input
+            type="text"
+            required
+            value={orgSlug}
+            onChange={e => setOrgSlug(e.target.value.toLowerCase().trim())}
+            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="例如：pointasia"
+          />
+        </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">Email</label>
           <input
