@@ -8,6 +8,9 @@ import { randomBytes } from 'crypto'
 async function assertAdmin() {
   const cookieStore = await cookies()
   const token = cookieStore.get(ADMIN_COOKIE)?.value
+  console.log('[admin/invite] cookie names:', cookieStore.getAll().map(c => c.name))
+  console.log('[admin/invite] paxis-admin token present:', !!token)
+  if (token) console.log('[admin/invite] token valid:', verifyAdminToken(token))
   if (!token || !verifyAdminToken(token)) return false
   return true
 }
