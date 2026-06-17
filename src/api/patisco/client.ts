@@ -75,6 +75,9 @@ export function clearMcpSessions() {
   _sessions.clear()
 }
 
+/** mcpCall 回傳此 error code 代表 JWT/session 已失效，上層應強制重新登入後重試 */
+export const MCP_AUTH_EXPIRED = 'MCP_AUTH_EXPIRED'
+
 // ─── 型別定義 ─────────────────────────────────────────────────────────────────
 
 export type PatiscoCredentials = {
@@ -312,6 +315,7 @@ export type PatiscoShipmentDetail = {
  */
 export async function patiscoLogin(
   tenantPrisma?: PrismaClient,
+  options?: { forceRefresh?: boolean },
 ): Promise<(PatiscoCredentials & { _mcpUrl: string }) | null> {
   try {
     const db = tenantPrisma ?? (await import('@/lib/db')).prisma
@@ -326,7 +330,8 @@ export async function patiscoLogin(
       const mcpUrl = config.mcpUrl
 
       // ── 模式 1：Token 模式（JWT + API Key 直接使用）──────────────────────
-      if (config.encryptedJwt && config.apiKey) {
+      // forceRefresh=true 時跳過 cache，直接重新登入
+      if (!options?.forceRefresh && config.encryptedJwt && config.apiKey) {
         // jwtExpiresAt 為 null 視為「不知道有效期，嘗試解析 JWT payload」
         const now = new Date()
         let isExpired = false
@@ -418,6 +423,28 @@ async function doLogin(mcpUrl: string, loginId: string, password: string): Promi
   }
 }
 
+/**
+ * 執行 Patisco API call，遇到 MCP_AUTH_EXPIRED 時自動強制重新登入並重試一次。
+ * 用法：
+ *   const creds = await patiscoLogin(prisma)
+ *   const result = await callWithAutoRelogin(prisma, creds, (c) => getPIs(c, ...))
+ */
+export async function callWithAutoRelogin<T>(
+  prisma: PrismaClient,
+  creds: (PatiscoCredentials & { _mcpUrl: string }) | null,
+  fn: (creds: PatiscoCredentials & { _mcpUrl: string }) => Promise<{ ok: boolean; data?: T; error?: string }>,
+): Promise<{ ok: boolean; data?: T; error?: string }> {
+  if (!creds) return { ok: false, error: 'Patisco 未設定' }
+  const result = await fn(creds)
+  if (result.ok || result.error !== MCP_AUTH_EXPIRED) return result
+
+  // JWT/session 過期 → 強制重新登入一次
+  console.warn('[patisco] 偵測到 session 過期，強制重新登入...')
+  const fresh = await patiscoLogin(prisma, { forceRefresh: true })
+  if (!fresh) return { ok: false, error: '重新登入失敗' }
+  return fn(fresh)
+}
+
 /** 解析 JWT exp 欄位，回傳到期時間 */
 function parseJwtExpiry(jwt: string): Date | null {
   try {
@@ -477,11 +504,13 @@ async function mcpCall<T>(
 
     if (json.error) {
       const err = json.error as Record<string, unknown>
-      // session 過期或無效 → 清除快取讓下次重新 initialize
-      if (typeof err.message === 'string' && /session/i.test(err.message)) {
+      const errMsg = (err.message as string) ?? JSON.stringify(err)
+      // session 過期或無效 → 清除快取，並回傳特殊 code 讓上層強制重新登入
+      if (typeof errMsg === 'string' && /session/i.test(errMsg)) {
         _sessions.delete(base)
+        return { ok: false, error: MCP_AUTH_EXPIRED }
       }
-      return { ok: false, error: (err.message as string) ?? JSON.stringify(err) }
+      return { ok: false, error: errMsg }
     }
 
     // MCP 回傳格式，依優先順序：

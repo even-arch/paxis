@@ -20,6 +20,7 @@ import { authOptions } from '@/lib/auth'
 import { getRequestPrisma } from '@/lib/request-db'
 import {
   patiscoLogin,
+  callWithAutoRelogin,
   getPIs,
   getBuyerProductDetail,
   getBuyerCatalogs,
@@ -162,11 +163,11 @@ export async function GET(req: NextRequest) {
       const status = searchParams.get('status') ?? undefined
       const type   = searchParams.get('type')   ?? undefined
       const first  = Number(searchParams.get('first') ?? '10')
-      result = await getPIs(creds, {
+      result = await callWithAutoRelogin(prisma, creds, (c) => getPIs(c, {
         filter: { ...(status ? { Status: status } : {}), ...(type ? { Type: type } : {}) },
         first,
         offset: 0,
-      })
+      }))
       break
     }
     case 'getBuyers': {

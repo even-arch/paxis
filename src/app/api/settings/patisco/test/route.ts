@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getRequestPrisma } from '@/lib/request-db'
-import { patiscoLogin, listTools, listProformaInvoices } from '@/api/patisco/client'
+import { patiscoLogin, callWithAutoRelogin, listTools, listProformaInvoices } from '@/api/patisco/client'
 
 /** 測試 Patisco 連線（end-to-end smoke test）
  *  三層驗證：登入 → tools/list → 實際資料查詢（拉 1 筆 PI）
@@ -39,10 +39,10 @@ export async function POST(_req: NextRequest) {
     // tools/list 失敗不中斷，繼續驗證實際資料查詢
   }
 
-  // 第三層：實際資料查詢（拉第 1 頁 PI，驗證資料 API 可用）
+  // 第三層：實際資料查詢（拉第 1 頁 PI，驗證資料 API 可用；session 過期自動重新登入）
   let piCount = 0
   try {
-    const piList = await listProformaInvoices(creds, 1)
+    const piList = await callWithAutoRelogin(prisma, creds, (c) => listProformaInvoices(c, 1))
     if (!piList.ok) return fail(`PI 資料查詢失敗：${piList.error}`)
     piCount = piList.data?.items?.length ?? 0
   } catch (e) {
