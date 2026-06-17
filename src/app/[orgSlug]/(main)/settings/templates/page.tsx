@@ -1,8 +1,9 @@
 export const dynamic = 'force-dynamic'
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
 import TemplatesClient from './TemplatesClient'
 
-export default async function TemplatesPage() {
+export default async function TemplatesPage({ params }: { params: { orgSlug: string } }) {
+  const prisma = await getPagePrisma(params.orgSlug)
   const [customerDefaults, templates] = await Promise.all([
     prisma.pRN_CustomerDefault.findMany({
       include: { customer: { select: { id: true, name: true, shortName: true } } },

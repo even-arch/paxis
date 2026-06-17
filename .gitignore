@@ -11,4 +11,5 @@ prisma/dev.db-journal
 .vercel
 .gstack/
 .env*
-\nsrc/generated/
+src/generated/
+*.tsbuildinfo

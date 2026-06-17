@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
+import { orgPath } from '@/lib/org-path'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import SalesPIPanel from './SalesPIPanel'
 import SalesShipmentPanel from './SalesShipmentPanel'
@@ -9,7 +10,7 @@ import CustomerPoPanel from './CustomerPoPanel'
 import { EditOrderHeaderButton, DeleteSalesItemButton, DeleteSalesOrderButton, SubmitSalesOrderButton } from './SalesOrderActions'
 import { EditItemButton, AddItemPanel } from '@/components/ItemTableActions'
 
-type Props = { params: { id: string } }
+type Props = { params: { orgSlug: string; id: string } }
 
 const STATUS_LABELS: Record<number, { label: string; color: string }> = {
   0: { label: '草稿',    color: 'bg-gray-100 text-gray-600' },
@@ -26,7 +27,8 @@ const SOURCE_LABELS: Record<string, string> = {
 
 export default async function SalesDetailPage({
   params }: Props) {
-    const order = await prisma.sLS_Order.findUnique({
+  const prisma = await getPagePrisma(params.orgSlug)
+  const order = await prisma.sLS_Order.findUnique({
     where: { id: Number(params.id) },
     include: {
       customer: true,
@@ -126,7 +128,7 @@ export default async function SalesDetailPage({
     <div className="max-w-4xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <Link href="/sales" className="text-sm text-gray-400 hover:text-gray-600">← 客戶訂單</Link>
+          <Link href={orgPath(params.orgSlug, '/sales')} className="text-sm text-gray-400 hover:text-gray-600">← 客戶訂單</Link>
           <div className="flex items-center gap-3 mt-1">
             <h1 className="text-2xl font-bold text-gray-800 font-mono">{order.orderNo}</h1>
             <span className={`px-2 py-0.5 rounded text-xs font-medium ${badge.color}`}>{badge.label}</span>
@@ -213,7 +215,7 @@ export default async function SalesDetailPage({
                 return (
                   <tr key={item.id}>
                     <td className="px-4 py-3">
-                      <Link href={`/products/${item.product.id}`} className="text-blue-600 hover:underline">
+                      <Link href={orgPath(params.orgSlug, `/products/${item.product.id}`)} className="text-blue-600 hover:underline">
                         {item.product.name}
                       </Link>
                       {item.product.sku && <span className="text-gray-400 text-xs ml-1">({item.product.sku})</span>}

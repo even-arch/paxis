@@ -1,13 +1,15 @@
 import { notFound } from 'next/navigation'
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
+import { orgPath } from '@/lib/org-path'
 import { formatDate } from '@/lib/utils'
 import DeleteCostButton from './DeleteCostButton'
 
-type Props = { params: { id: string } }
+type Props = { params: { orgSlug: string; id: string } }
 
 export default async function CostDetailPage({
   params }: Props) {
-    const sheet = await prisma.cOST_Sheet.findUnique({
+  const prisma = await getPagePrisma(params.orgSlug)
+  const sheet = await prisma.cOST_Sheet.findUnique({
     where: { id: Number(params.id) },
     include: {
       product: {
@@ -41,10 +43,10 @@ export default async function CostDetailPage({
       {/* 標題列 */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <a href="/cost" className="text-sm text-gray-400 hover:text-gray-600">← 成本計算</a>
+          <a href={orgPath(params.orgSlug, '/cost')} className="text-sm text-gray-400 hover:text-gray-600">← 成本計算</a>
           <h1 className="text-2xl font-bold text-gray-800 mt-1">{sheet.name}</h1>
           <p className="text-sm text-gray-500">
-            商品：<a href={`/products/${sheet.product.id}`} className="text-blue-600 hover:underline">{sheet.product.name}</a>
+            商品：<a href={orgPath(params.orgSlug, `/products/${sheet.product.id}`)} className="text-blue-600 hover:underline">{sheet.product.name}</a>
             {sheet.product.sku && <span className="text-gray-400 ml-1">({sheet.product.sku})</span>}
           </p>
         </div>
@@ -53,7 +55,7 @@ export default async function CostDetailPage({
             className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm hover:bg-gray-50 print:hidden">
             列印
           </button>
-          <a href={`/cost/${params.id}/edit`}
+          <a href={orgPath(params.orgSlug, `/cost/${params.id}/edit`)}
             className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm hover:bg-gray-50 print:hidden">
             編輯
           </a>

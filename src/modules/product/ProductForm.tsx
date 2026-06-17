@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useOrgPath } from '@/lib/use-org-path'
 import { ProductFormData, emptyProductForm, validateProduct } from './productSchema'
 
 type Props = {
@@ -22,6 +23,7 @@ const COUNTRIES = [
 
 export default function ProductForm({ initialData, productId }: Props) {
   const router = useRouter()
+  const toOrgPath = useOrgPath()
   const [form, setForm] = useState<ProductFormData>({ ...emptyProductForm, ...initialData })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -54,7 +56,7 @@ export default function ProductForm({ initialData, productId }: Props) {
     }
 
     const data = await res.json()
-    router.push(`/products/${data.id}`)
+    router.push(toOrgPath(`/products/${data.id}`))
     router.refresh()
   }
 

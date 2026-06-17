@@ -1,3 +1,5 @@
+'use client'
+
 /**
  * SalesChainPanel — 交易鏈視圖
  *
@@ -6,6 +8,8 @@
  */
 
 import Link from 'next/link'
+import { useParams } from 'next/navigation'
+import { orgPath } from '@/lib/org-path'
 import { formatCurrency } from '@/lib/utils'
 
 const PO_STATUS: Record<number, { label: string; color: string }> = {
@@ -57,6 +61,8 @@ export default function SalesChainPanel({
   slsItems,
   linkedPOs,
 }: Props) {
+  const params = useParams<{ orgSlug?: string }>()
+  const slug = typeof params?.orgSlug === 'string' ? params.orgSlug : ''
   if (linkedPOs.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow p-6">
@@ -98,7 +104,7 @@ export default function SalesChainPanel({
           {linkedPOs.map(po => {
             const st = PO_STATUS[po.status] ?? PO_STATUS[0]
             return (
-              <Link key={po.id} href={`/purchases/${po.id}`}
+              <Link key={po.id} href={slug ? orgPath(slug, `/purchases/${po.id}`) : `/purchases/${po.id}`}
                 className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm hover:border-blue-300 hover:bg-blue-50 transition-colors">
                 <span className="font-mono font-medium text-gray-800">{po.poNo}</span>
                 <span className="text-gray-400">·</span>

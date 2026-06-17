@@ -1,10 +1,11 @@
 export const dynamic = 'force-dynamic'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
+import { orgPath } from '@/lib/org-path'
 import { formatDate } from '@/lib/utils'
 
-type Props = { params: { id: string } }
+type Props = { params: { orgSlug: string; id: string } }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -16,6 +17,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 export default async function ShipmentDetailPage({ params }: Props) {
+  const prisma = await getPagePrisma(params.orgSlug)
   const id = parseInt(params.id, 10)
   if (isNaN(id)) notFound()
 
@@ -41,7 +43,7 @@ export default async function ShipmentDetailPage({ params }: Props) {
               product: { select: { sku: true, name: true } },
             },
           },
-          pi: { select: { id: true, piNo: true } },
+          pi: { select: { id: true, piNo: true, orderId: true } },
         },
         orderBy: [{ piId: 'asc' }, { id: 'asc' }],
       },
@@ -57,7 +59,7 @@ export default async function ShipmentDetailPage({ params }: Props) {
   return (
     <div className="max-w-4xl">
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/shipments" className="text-gray-400 hover:text-gray-600 text-sm">← 出貨單列表</Link>
+        <Link href={orgPath(params.orgSlug, '/shipments')} className="text-gray-400 hover:text-gray-600 text-sm">← 出貨單列表</Link>
         <span className="text-gray-300">/</span>
         <h1 className="text-xl font-bold text-gray-800 font-mono">{shipment.shipmentNo}</h1>
       </div>
@@ -68,7 +70,7 @@ export default async function ShipmentDetailPage({ params }: Props) {
           <Row label="出貨單號" value={<span className="font-mono">{shipment.shipmentNo}</span>} />
           <Row label="客戶" value={
             shipment.customer
-              ? <Link href={`/customers/${shipment.customer.id}`} className="text-teal-600 hover:underline">
+              ? <Link href={orgPath(params.orgSlug, `/customers/${shipment.customer.id}`)} className="text-teal-600 hover:underline">
                   {shipment.customer.name}
                 </Link>
               : '-'
@@ -97,26 +99,48 @@ export default async function ShipmentDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {shipment.pis.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-5 mb-6">
-          <h2 className="text-sm font-semibold text-gray-600 mb-3 uppercase tracking-wide">關聯 PI</h2>
-          <div className="flex flex-wrap gap-2">
-            {shipment.pis.map(sp => (
-              <div key={sp.piId} className="border border-gray-200 rounded px-3 py-2 text-sm">
-                <Link href={`/sales/${sp.pi.order?.id}`} className="font-mono text-teal-600 hover:underline">
-                  {sp.pi.piNo}
-                </Link>
-                {sp.pi.order && (
-                  <span className="text-gray-400 text-xs ml-2">(訂單 {sp.pi.order.orderNo})</span>
-                )}
-                {sp.pi.etd && (
-                  <span className="text-gray-400 text-xs ml-2">ETD: {formatDate(sp.pi.etd)}</span>
-                )}
-              </div>
-            ))}
+      {(() => {
+        // 優先用 SLS_ShipmentPI junction table；若空（舊資料或 UPS 流程漏建），
+        // 從 items.pi 推導唯一 PI 清單作為 fallback
+        type PiEntry = { piId: number; piNo: string; orderId?: number | null; orderNo?: string | null; etd?: Date | null }
+        let piList: PiEntry[] = shipment.pis.map(sp => ({
+          piId: sp.piId,
+          piNo: sp.pi.piNo,
+          orderId: sp.pi.order?.id,
+          orderNo: sp.pi.order?.orderNo,
+          etd: sp.pi.etd,
+        }))
+        if (piList.length === 0) {
+          const seen = new Set<number>()
+          for (const item of shipment.items) {
+            if (item.pi && !seen.has(item.pi.id)) {
+              seen.add(item.pi.id)
+              piList.push({ piId: item.pi.id, piNo: item.pi.piNo, orderId: item.pi.orderId })
+            }
+          }
+        }
+        if (piList.length === 0) return null
+        return (
+          <div className="bg-white rounded-lg shadow p-5 mb-6">
+            <h2 className="text-sm font-semibold text-gray-600 mb-3 uppercase tracking-wide">關聯 PI</h2>
+            <div className="flex flex-wrap gap-2">
+              {piList.map(pi => (
+                <div key={pi.piId} className="border border-gray-200 rounded px-3 py-2 text-sm">
+                  <Link href={orgPath(params.orgSlug, `/sales/${pi.orderId ?? ''}`)} className="font-mono text-teal-600 hover:underline">
+                    {pi.piNo}
+                  </Link>
+                  {pi.orderNo && (
+                    <span className="text-gray-400 text-xs ml-2">(訂單 {pi.orderNo})</span>
+                  )}
+                  {pi.etd && (
+                    <span className="text-gray-400 text-xs ml-2">ETD: {formatDate(pi.etd)}</span>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {shipment.items.length > 0 && (() => {
         // 以 PI 為單位分組（piId=null 的歸到 '未關聯' 群組）

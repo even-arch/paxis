@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic'
 import Link from 'next/link'
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
 import { formatDate } from '@/lib/utils'
 
 const STATUS_LABEL: Record<string, string> = { DRAFT: '草稿', DISPATCHED: '已出貨', RECEIVED: '已簽收' }
@@ -10,7 +10,8 @@ const STATUS_COLOR: Record<string, string> = {
   RECEIVED: 'bg-green-50 text-green-700',
 }
 
-export default async function DeliveryNotesPage() {
+export default async function DeliveryNotesPage({ params }: { params: { orgSlug: string } }) {
+  const prisma = await getPagePrisma(params.orgSlug)
   const notes = await prisma.sLS_DeliveryNote.findMany({
     include: {
       customer: { select: { id: true, name: true, shortName: true } },

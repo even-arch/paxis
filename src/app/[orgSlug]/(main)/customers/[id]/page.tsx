@@ -1,14 +1,16 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
+import { orgPath } from '@/lib/org-path'
 import { formatDate } from '@/lib/utils'
 import DeleteCustomerButton from './DeleteCustomerButton'
 
-type Props = { params: { id: string } }
+type Props = { params: { orgSlug: string; id: string } }
 
 export default async function CustomerDetailPage({
   params }: Props) {
-    const [customer, recentOrders, purchasedItems] = await Promise.all([
+  const prisma = await getPagePrisma(params.orgSlug)
+  const [customer, recentOrders, purchasedItems] = await Promise.all([
     prisma.cUS_Customer.findUnique({
       where: { id: Number(params.id) },
       include: {
@@ -45,12 +47,12 @@ export default async function CustomerDetailPage({
     <div className="max-w-3xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <Link href="/customers" className="text-sm text-gray-400 hover:text-gray-600">← 客戶</Link>
+          <Link href={orgPath(params.orgSlug, '/customers')} className="text-sm text-gray-400 hover:text-gray-600">← 客戶</Link>
           <h1 className="text-2xl font-bold text-gray-800 mt-1">{customer.name}</h1>
           {customer.shortName && <p className="text-sm text-gray-500">{customer.shortName}</p>}
         </div>
         <div className="flex gap-2">
-          <Link href={`/customers/${params.id}/edit`}
+          <Link href={orgPath(params.orgSlug, `/customers/${params.id}/edit`)}
             className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm hover:bg-gray-50">
             編輯
           </Link>
@@ -93,7 +95,7 @@ export default async function CustomerDetailPage({
                   <p className="text-xs text-gray-500 mt-0.5">{customer.chargeTemplate.description}</p>
                 )}
               </div>
-              <Link href={`/settings/charge-templates`} className="text-xs text-blue-500 hover:underline">
+              <Link href={orgPath(params.orgSlug, '/settings/charge-templates')} className="text-xs text-blue-500 hover:underline">
                 管理模板 →
               </Link>
             </div>
@@ -126,7 +128,7 @@ export default async function CustomerDetailPage({
                   return (
                     <tr key={o.id}>
                       <td className="py-2">
-                        <Link href={`/sales/${o.id}`} className="font-mono text-blue-600 hover:underline">
+                        <Link href={orgPath(params.orgSlug, `/sales/${o.id}`)} className="font-mono text-blue-600 hover:underline">
                           {o.orderNo}
                         </Link>
                       </td>
@@ -143,7 +145,7 @@ export default async function CustomerDetailPage({
             </table>
           )}
           {recentOrders.length >= 20 && (
-            <Link href={`/sales?customerId=${params.id}`} className="text-xs text-blue-600 hover:underline mt-2 block">
+            <Link href={orgPath(params.orgSlug, `/sales?customerId=${params.id}`)} className="text-xs text-blue-600 hover:underline mt-2 block">
               查看全部 →
             </Link>
           )}
@@ -163,7 +165,7 @@ export default async function CustomerDetailPage({
                       <span className="ml-2 text-xs font-mono text-gray-400">{item.product.sku}</span>
                     )}
                   </div>
-                  <Link href={`/products/${item.productId}`} className="text-xs text-blue-500 hover:underline">
+                  <Link href={orgPath(params.orgSlug, `/products/${item.productId}`)} className="text-xs text-blue-500 hover:underline">
                     查看商品 →
                   </Link>
                 </div>
@@ -171,7 +173,7 @@ export default async function CustomerDetailPage({
             </div>
           )}
           {purchasedItems.length > 0 && (
-            <Link href={`/sales?customerId=${params.id}`} className="text-xs text-blue-600 hover:underline mt-3 block">
+            <Link href={orgPath(params.orgSlug, `/sales?customerId=${params.id}`)} className="text-xs text-blue-600 hover:underline mt-3 block">
               查看此客戶所有訂單 →
             </Link>
           )}

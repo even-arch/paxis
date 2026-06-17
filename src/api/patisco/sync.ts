@@ -20,7 +20,6 @@
  */
 
 import { prisma as defaultPrisma } from '@/lib/db'
-import { neon } from '@neondatabase/serverless'
 import { Decimal } from '@prisma/client/runtime/library'
 import type { PrismaClient } from '@prisma/client'
 import {
@@ -74,20 +73,10 @@ export type BuyerSyncResult = {
 // prisma 由呼叫方（route handler）傳入，避免在深層 async 鏈裡 getServerSession 失效
 // 若未傳入則退回 getTenantDb()（cron 等無 session 情境用）
 
-// neon() 的 tagged template 會把所有參數送成 integer OID，導致 text 欄位查詢失敗。
-// 解法：把值直接嵌入 SQL 字串，用 zero-interpolation 送出（無參數化，無型別推斷）。
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 // Patisco Fix_Var TradingTerm code → Incoterms string
 const PATISCO_TRADE_TERMS_MAP: Record<number, string> = {
   2: 'CIF', 13: 'FOB', 14: 'FOR', 15: 'EXW', 16: 'CFR', 17: 'FCA', 18: 'DDP',
 }
-
-function execSQL(sql: any, query: string): Promise<Record<string, unknown>[]> {
-  const tmpl = Object.assign([query], { raw: [query] }) as unknown as TemplateStringsArray
-  return (sql as unknown as (t: TemplateStringsArray) => Promise<Record<string, unknown>[]>)(tmpl)
-}
-
-function esc(v: string | null | undefined) { return (v ?? '').replace(/'/g, "''") }
 
 // getOrderDetail 的產品可能在 data.products.items（新版）或 data.detail.items（舊版）
 function extractDetailProducts(data: import('./client').GetOrderDetailResult | undefined): import('./client').PatiscoOrderDetailItem[] {
@@ -99,10 +88,101 @@ function extractDetailProducts(data: import('./client').GetOrderDetailResult | u
     ?? []
 }
 
+type SyncMeta = {
+  archived?: boolean
+  createdDate?: string | null
+  externalStatus?: string | null
+  lastModifiedDate?: string | null
+  reason?: string | null
+}
+
+type SyncStoredResult = {
+  _meta?: SyncMeta
+  [key: string]: unknown
+}
+
+function getHeaderTimestamp(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+function getDocSyncToken(
+  headerOrLastModified: { createdDate?: unknown; lastModifiedDate?: unknown } | unknown,
+  createdDate?: unknown,
+): string | null {
+  if (headerOrLastModified && typeof headerOrLastModified === 'object') {
+    const header = headerOrLastModified as { createdDate?: unknown; lastModifiedDate?: unknown }
+    return getHeaderTimestamp(header.lastModifiedDate) ?? getHeaderTimestamp(header.createdDate)
+  }
+  return getHeaderTimestamp(headerOrLastModified) ?? getHeaderTimestamp(createdDate)
+}
+
+function withSyncMeta(result: unknown, meta: SyncMeta): SyncStoredResult {
+  if (result && typeof result === 'object' && !Array.isArray(result)) {
+    return { ...(result as Record<string, unknown>), _meta: meta }
+  }
+  if (Array.isArray(result)) {
+    return { items: result, _meta: meta }
+  }
+  return { value: result ?? null, _meta: meta }
+}
+
+function getStoredSyncToken(result: unknown): string | null {
+  if (!result || typeof result !== 'object' || Array.isArray(result)) return null
+  const meta = (result as SyncStoredResult)._meta
+  return getHeaderTimestamp(meta?.lastModifiedDate) ?? getHeaderTimestamp(meta?.createdDate)
+}
+
+function shouldSkipExistingSync(
+  existing: { status: string; result: unknown } | null | undefined,
+  currentToken: string | null,
+): boolean {
+  if (!existing) return false
+  if (!['ok', 'partial', 'skipped'].includes(existing.status)) return false
+  return !!currentToken && getStoredSyncToken(existing.result) === currentToken
+}
+
+async function hasArchivedSalesOrder(
+  prisma: PrismaClient,
+  docId: string,
+  docNo: string,
+): Promise<boolean> {
+  const archived = await prisma.sLS_Order.findFirst({
+    where: {
+      archivedAt: { not: null },
+      OR: [
+        { patiscoDocId: docId },
+        { patiscoDocNo: docNo },
+        { orderNo: docNo },
+      ],
+    },
+    select: { id: true },
+  })
+  return !!archived
+}
+
+async function hasArchivedPurchaseOrder(
+  prisma: PrismaClient,
+  docId: string,
+  docNo: string,
+): Promise<boolean> {
+  const archived = await prisma.pO_Order.findFirst({
+    where: {
+      archivedAt: { not: null },
+      OR: [
+        { patiscoOrderId: docId },
+        { patiscoOrderNo: docNo },
+        { poNo: docNo },
+      ],
+    },
+    select: { id: true },
+  })
+  return !!archived
+}
+
 export async function syncPatiscoPIs(source: SyncSource, db?: PrismaClient, dbUrl?: string, sharedCreds?: PatiscoCredentials & { _mcpUrl: string }): Promise<SyncResult> {
   const prisma = db ?? defaultPrisma
-  const resolvedDbUrl = dbUrl ?? process.env.DATABASE_URL!
-  const sql = neon(resolvedDbUrl)
   const result: SyncResult = { total: 0, skipped: 0, processed: 0, errors: 0, details: [] }
 
   // 1. 認證（優先用外部傳入的 sharedCreds，避免多次 login 互蓋 session）
@@ -176,9 +256,10 @@ export async function syncPatiscoPIs(source: SyncSource, db?: PrismaClient, dbUr
   result.total = pis.length
 
   // 5a. 一次撈完所有 PI 的 sync 紀錄（避免迴圈內每筆都打 DB）
-  const existingSyncRows = await execSQL(sql,
-    `SELECT "patiscoDocId", id, status FROM "SYS_PatiscoSync" WHERE "docType" = 'PI'`
-  ) as { patiscoDocId: string; id: number; status: string }[]
+  const existingSyncRows = await prisma.sYS_PatiscoSync.findMany({
+    where: { docType: 'PI' },
+    select: { patiscoDocId: true, id: true, status: true, result: true },
+  })
   const syncMap = new Map(existingSyncRows.map(r => [r.patiscoDocId, r]))
 
   // 25 秒預算：Vercel function 最多 30s，留 5s buffer 給回應
@@ -196,15 +277,29 @@ export async function syncPatiscoPIs(source: SyncSource, db?: PrismaClient, dbUr
     const docNo = pi.no
     const sellerName = pi.seller ?? ''
     const buyerName  = pi.buyer  ?? ''
+    const syncToken = getDocSyncToken(pi as { createdDate?: string; lastModifiedDate?: string })
+    const metaBase: SyncMeta = {
+      createdDate: getHeaderTimestamp(pi.createdDate),
+      externalStatus: String(pi.status ?? ''),
+      lastModifiedDate: getHeaderTimestamp((pi as { lastModifiedDate?: string }).lastModifiedDate),
+    }
+
+    if (await hasArchivedSalesOrder(prisma, docId, docNo) || await hasArchivedPurchaseOrder(prisma, docId, docNo)) {
+      await recordSync(prisma, 'PI', docId, docNo, source, 'skipped', withSyncMeta(null, {
+        ...metaBase,
+        archived: true,
+        reason: 'linked archived record',
+      }), 'Linked archived record, skip sync update')
+      result.skipped++
+      result.details.push({ patiscoDocNo: docNo, status: 'skipped', msg: 'Linked archived record, skip sync update' })
+      continue
+    }
 
     // 去重：成功 / 部分成功 → 跳過；失敗或 pending（補填用）→ 重試
     const existing = syncMap.get(docId) ?? null
-    if (existing?.status === 'ok' || existing?.status === 'partial') {
+    if (shouldSkipExistingSync(existing, syncToken)) {
       result.skipped++
       continue
-    }
-    if (existing?.status === 'error') {
-      await prisma.sYS_PatiscoSync.deleteMany({ where: { id: existing.id } })
     }
 
     try {
@@ -224,14 +319,17 @@ export async function syncPatiscoPIs(source: SyncSource, db?: PrismaClient, dbUr
         }
 
         if (!customer) {
-          await recordSync(sql, 'PI', docId, docNo, source, 'skipped', null, `Buyer 名稱為空`)
+          await recordSync(prisma, 'PI', docId, docNo, source, 'skipped', withSyncMeta(null, {
+            ...metaBase,
+            reason: 'buyer empty',
+          }), `Buyer 名稱為空`)
           result.skipped++
           result.details.push({ patiscoDocNo: docNo, status: 'skipped', msg: 'Buyer 名稱為空' })
         } else {
           // 副位 = 客戶 → 我方 PI 正本（customerId 可為 null：角色已確認但尚未關聯主檔）
           const r = await processOurPIToCustomer(prisma, creds, pi, customer.id, buyerName, systemUserId, source)
           const status = r.ok ? (r.partial ? 'partial' : 'ok') : 'error'
-          await recordSync(sql, 'PI', docId, docNo, source, status, r.items ?? null, r.error ?? null)
+          await recordSync(prisma, 'PI', docId, docNo, source, status, withSyncMeta({ items: r.items ?? [] }, metaBase), r.error ?? null)
           result.details.push({ patiscoDocNo: docNo, status, items: r.items, msg: r.error })
           r.ok ? result.processed++ : result.errors++
         }
@@ -251,14 +349,17 @@ export async function syncPatiscoPIs(source: SyncSource, db?: PrismaClient, dbUr
         }
 
         if (!supplier) {
-          await recordSync(sql, 'PI', docId, docNo, source, 'skipped', null, `Seller 名稱為空`)
+          await recordSync(prisma, 'PI', docId, docNo, source, 'skipped', withSyncMeta(null, {
+            ...metaBase,
+            reason: 'seller empty',
+          }), `Seller 名稱為空`)
           result.skipped++
           result.details.push({ patiscoDocNo: docNo, status: 'skipped', msg: 'Seller 名稱為空' })
         } else {
           // 主位 = 供應商 → 供應商 PI 副本：建 PO_SupplierPI（入倉由人工確認）
           const r = await processSupplierPI(prisma, creds, pi, supplier.id, systemUserId, source)
           const status = r.ok ? 'ok' : 'error'
-          await recordSync(sql, 'PI', docId, docNo, source, status, null, r.error ?? null)
+          await recordSync(prisma, 'PI', docId, docNo, source, status, withSyncMeta(null, metaBase), r.error ?? null)
           result.details.push({ patiscoDocNo: docNo, status, msg: r.error ?? `供應商 PI 副本已記錄，請至採購頁確認入倉` })
           r.ok ? result.processed++ : result.errors++
         }
@@ -266,7 +367,7 @@ export async function syncPatiscoPIs(source: SyncSource, db?: PrismaClient, dbUr
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       console.error(`[patisco-sync] 處理 PI ${docNo} 失敗`, err)
-      await recordSync(sql, 'PI', docId, docNo, source, 'error', null, msg)
+      await recordSync(prisma, 'PI', docId, docNo, source, 'error', withSyncMeta(null, metaBase), msg)
       result.errors++
       result.details.push({ patiscoDocNo: docNo, status: 'error', msg })
     }
@@ -452,6 +553,16 @@ async function processOurPIToCustomer(
       data: { patiscoCreatedAt: piPatiscoCreatedAt },
     })
     order = { ...order, patiscoCreatedAt: piPatiscoCreatedAt }
+  } else {
+    await prisma.sLS_Order.update({
+      where: { id: order.id },
+      data: {
+        ...(customerId != null ? { customerId } : {}),
+        patiscoBuyerName: buyerName || pi.buyer || null,
+        patiscoStatus: String(pi.status ?? ''),
+        ...(piPatiscoCreatedAt ? { patiscoCreatedAt: piPatiscoCreatedAt } : {}),
+      },
+    }).catch(() => {})
   }
 
   // ── 找或建 SLS_PI（去重：patiscoDocId 或 piNo 任一存在即跳過）────────────
@@ -459,10 +570,15 @@ async function processOurPIToCustomer(
     where: { OR: [{ patiscoDocId: piId }, { piNo: pi.no }] },
   })
   if (existingPI) {
-    // 補填缺漏欄位
-    if (!existingPI.etd && piEtd) {
-      await prisma.sLS_PI.update({ where: { id: existingPI.id }, data: { etd: piEtd } })
-    }
+    await prisma.sLS_PI.update({
+      where: { id: existingPI.id },
+      data: {
+        ...(piEtd ? { etd: piEtd } : {}),
+        patiscoStatus: String(pi.status ?? ''),
+        tradeTermsCode: isNaN(tradeTermsCode as number) ? null : tradeTermsCode,
+        extraCharges: extraCharges.length > 0 ? extraCharges : undefined,
+      },
+    }).catch(() => {})
     return { ok: true, items: [] }
   }
 
@@ -591,7 +707,21 @@ async function processSupplierPI(
   const existingSupPI = await prisma.pO_SupplierPI.findFirst({
     where: { patiscoDocId: piId },
   })
-  if (existingSupPI) return { ok: true }
+  if (existingSupPI) {
+    const detailRes = await getOrderDetail(creds, pi.id)
+    const orderDetail = detailRes.ok ? extractOrderDetail(detailRes.data) : null
+    const tradeTermsCode = orderDetail?.payment != null ? parseInt(String(orderDetail.payment), 10) : null
+    const extraCharges: PatiscoExtraCharge[] = orderDetail?.extraCharges ?? []
+    await prisma.pO_SupplierPI.update({
+      where: { id: existingSupPI.id },
+      data: {
+        patiscoStatus: String(pi.status ?? ''),
+        tradeTermsCode: isNaN(tradeTermsCode as number) ? null : tradeTermsCode,
+        extraCharges: extraCharges.length > 0 ? extraCharges : undefined,
+      },
+    }).catch(() => {})
+    return { ok: true }
+  }
 
   // 拉 PI 完整資料（header + products 一次取齊）
   const detailRes = await getOrderDetail(creds, pi.id)
@@ -768,8 +898,6 @@ export async function syncPatiscoBuyers(source: SyncSource, db?: PrismaClient, s
 
 export async function syncPatiscoSupplierPOs(source: SyncSource, db?: PrismaClient, dbUrl?: string, sharedCreds?: PatiscoCredentials & { _mcpUrl: string }): Promise<SyncResult> {
   const prisma = db ?? defaultPrisma
-  const resolvedDbUrl = dbUrl ?? process.env.DATABASE_URL!
-  const sql = neon(resolvedDbUrl)
   const result: SyncResult = { total: 0, skipped: 0, processed: 0, errors: 0, details: [] }
 
   // 優先用外部傳入的 sharedCreds，避免多次 login 互蓋 Patisco server-side session
@@ -837,9 +965,10 @@ export async function syncPatiscoSupplierPOs(source: SyncSource, db?: PrismaClie
   console.log(`[patisco-po-sync] 合計 ${copies.length} 筆（PI副本 ${allPICopies.length} + PO正本 ${allPOOrders.length}）`)
 
   // 一次撈完所有 PO sync 紀錄
-  const poSyncRows = await execSQL(sql,
-    `SELECT "patiscoDocId", id, status FROM "SYS_PatiscoSync" WHERE "docType" = 'PO'`
-  ) as { patiscoDocId: string; id: number; status: string }[]
+  const poSyncRows = await prisma.sYS_PatiscoSync.findMany({
+    where: { docType: 'PO' },
+    select: { patiscoDocId: true, id: true, status: true, result: true },
+  })
   const poSyncMap = new Map(poSyncRows.map(r => [r.patiscoDocId, r]))
 
   const PO_BUDGET_MS = 50_000
@@ -851,8 +980,21 @@ export async function syncPatiscoSupplierPOs(source: SyncSource, db?: PrismaClie
       break
     }
 
-    const docId: string = (copy.ID ?? copy.id ?? '').toString()
-    const docNo: string = (copy.No ?? copy.no ?? '').toString()
+    const copyLoose = copy as typeof copy & {
+      id?: string | number | null
+      no?: string | number | null
+      createdDate?: string | null
+      lastModifiedDate?: string | null
+      status?: string | number | null
+    }
+    const docId: string = (copy.ID ?? copyLoose.id ?? '').toString()
+    const docNo: string = (copy.No ?? copyLoose.no ?? '').toString()
+    const syncToken = getDocSyncToken(copy.LastModifiedDate ?? copyLoose.lastModifiedDate, copy.CreatedDate ?? copyLoose.createdDate)
+    const metaBase: SyncMeta = {
+      createdDate: copy.CreatedDate ?? copyLoose.createdDate ?? null,
+      externalStatus: copy.Status ?? copyLoose.status ?? null,
+      lastModifiedDate: copy.LastModifiedDate ?? copyLoose.lastModifiedDate ?? null,
+    }
 
     if (!docId) {
       console.warn('[patisco-po-sync] copy 缺少 id，略過：', JSON.stringify(copy).substring(0, 100))
@@ -862,12 +1004,19 @@ export async function syncPatiscoSupplierPOs(source: SyncSource, db?: PrismaClie
 
     // 去重（記憶體查找）
     const existing = poSyncMap.get(docId) ?? null
-    if (existing?.status === 'ok' || existing?.status === 'partial') {
+    if (await hasArchivedPurchaseOrder(prisma, docId, docNo)) {
+      await recordSync(prisma, 'PO', docId, docNo, source, 'skipped', withSyncMeta(existing?.result, {
+        ...metaBase,
+        archived: true,
+        reason: 'archived-po',
+      }), 'PO 已封存，跳過更新')
       result.skipped++
       continue
     }
-    if (existing?.status === 'error') {
-      await prisma.sYS_PatiscoSync.deleteMany({ where: { id: existing.id } })
+
+    if (shouldSkipExistingSync(existing, syncToken)) {
+      result.skipped++
+      continue
     }
 
     try {
@@ -894,7 +1043,10 @@ export async function syncPatiscoSupplierPOs(source: SyncSource, db?: PrismaClie
 
       // ── 供應商比對（別名表優先，找不到則自動建立）──────────────────────────
       if (!sellerName.trim()) {
-        await recordSync(sql, 'PO', docId, docNo, source, 'skipped', null, `Seller 名稱為空，略過`)
+        await recordSync(prisma, 'PO', docId, docNo, source, 'skipped', withSyncMeta(existing?.result, {
+          ...metaBase,
+          reason: 'missing-seller',
+        }), `Seller 名稱為空，略過`)
         result.skipped++
         continue
       }
@@ -915,7 +1067,10 @@ export async function syncPatiscoSupplierPOs(source: SyncSource, db?: PrismaClie
       }
 
       if (!supplierId) {
-        await recordSync(sql, 'PO', docId, docNo, source, 'skipped', null, `無法識別 Seller，略過`)
+        await recordSync(prisma, 'PO', docId, docNo, source, 'skipped', withSyncMeta(existing?.result, {
+          ...metaBase,
+          reason: 'supplier-not-matched',
+        }), `無法識別 Seller，略過`)
         result.skipped++
         continue
       }
@@ -923,7 +1078,7 @@ export async function syncPatiscoSupplierPOs(source: SyncSource, db?: PrismaClie
       // ── PO_Order 找或建 ────────────────────────────────────────────────────
       let poOrder = await prisma.pO_Order.findFirst({
         where: { OR: [{ patiscoOrderId: docId }, { poNo: docNo }] },
-        select: { id: true },
+        select: { id: true, archivedAt: true },
       })
 
       if (!poOrder) {
@@ -1003,8 +1158,24 @@ export async function syncPatiscoSupplierPOs(source: SyncSource, db?: PrismaClie
               }>,
             } : undefined,
           },
-          select: { id: true },
+          select: { id: true, archivedAt: true },
         })
+      } else if (!poOrder.archivedAt) {
+        await prisma.pO_Order.update({
+          where: { id: poOrder.id },
+          data: {
+            supplierId,
+            currencyCode,
+            patiscoOrderNo: docNo,
+            patiscoOrderId: docId,
+            patiscoStatus: copy.Status ?? copy.status ?? null,
+            ...(patiscoCreatedAt ? { orderDate: patiscoCreatedAt } : {}),
+          },
+        })
+      }
+
+      if (!poOrder) {
+        throw new Error(`PO 建立失敗：${docNo}`)
       }
 
       // ── PO_SupplierPI（只有 PI copy 才建立，PO order 本身不需要）──────────
@@ -1024,17 +1195,32 @@ export async function syncPatiscoSupplierPOs(source: SyncSource, db?: PrismaClie
               ...(patiscoCreatedAt ? { patiscoCreatedAt } : {}),
             },
           })
+        } else {
+          await prisma.pO_SupplierPI.update({
+            where: { id: existingSupPI.id },
+            data: {
+              orderId: poOrder.id,
+              piNo: docNo,
+              patiscoDocNo: docNo,
+              patiscoStatus: copy.Status ?? copy.status ?? null,
+              tradeTermsCode: tradeTermsCode != null && !isNaN(tradeTermsCode) ? tradeTermsCode : null,
+              ...(patiscoCreatedAt ? { patiscoCreatedAt } : {}),
+            },
+          })
         }
       }
 
-      await recordSync(sql, 'PO', docId, docNo, source, 'ok', { supplierId, itemsCount }, null)
+      await recordSync(prisma, 'PO', docId, docNo, source, 'ok', withSyncMeta({
+        supplierId,
+        itemsCount,
+      }, metaBase), null)
       result.processed++
       result.details.push({ patiscoDocNo: docNo, status: 'ok', msg: `供應商 ${sellerName}，${itemsCount} 項商品（明細待 Patisco 修復後補入）` })
 
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       console.error(`[patisco-po-sync] 處理 PO ${docNo} 失敗`, err)
-      await recordSync(sql, 'PO', docId, docNo, source, 'error', null, msg)
+      await recordSync(prisma, 'PO', docId, docNo, source, 'error', withSyncMeta(existing?.result, metaBase), msg)
       result.errors++
       result.details.push({ patiscoDocNo: docNo, status: 'error', msg })
     }
@@ -1213,9 +1399,8 @@ async function findProduct(
 
 // ─── Helper：寫同步紀錄 ───────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function recordSync(
-  sql: any,
+  prisma: PrismaClient,
   docType: string,
   patiscoDocId: string,
   patiscoDocNo: string,
@@ -1225,12 +1410,26 @@ async function recordSync(
   errorMsg: string | null,
 ) {
   try {
-    const resultJson = esc(JSON.stringify(result ?? {}))
-    const errVal = errorMsg ? `'${esc(errorMsg)}'` : 'NULL'
-    await execSQL(sql,
-      `INSERT INTO "SYS_PatiscoSync" ("docType","patiscoDocId","patiscoDocNo","source","status","result","errorMsg","syncedAt")
-       VALUES ('${esc(docType)}','${esc(patiscoDocId)}','${esc(patiscoDocNo)}','${esc(source)}','${esc(status)}','${resultJson}'::jsonb,${errVal},NOW())`
-    )
+    await prisma.sYS_PatiscoSync.upsert({
+      where: { docType_patiscoDocId: { docType, patiscoDocId } },
+      create: {
+        docType,
+        patiscoDocId,
+        patiscoDocNo,
+        source,
+        status,
+        result: (result ?? {}) as object,
+        errorMsg,
+      },
+      update: {
+        patiscoDocNo,
+        source,
+        status,
+        result: (result ?? {}) as object,
+        errorMsg,
+        syncedAt: new Date(),
+      },
+    })
   } catch (err) {
     console.warn('[patisco-sync] recordSync 寫入失敗', err)
   }
@@ -1362,12 +1561,10 @@ export async function seedDOQueue(
 export async function processNextPendingDO(
   source: SyncSource,
   db?: PrismaClient,
-  dbUrl?: string,
+  _dbUrl?: string,
   sharedCreds?: PatiscoCredentials & { _mcpUrl: string },
 ): Promise<{ processed: boolean; hasMore: boolean; docNo?: string; error?: string }> {
   const prisma = db ?? defaultPrisma
-  const resolvedDbUrl = dbUrl ?? process.env.DATABASE_URL!
-  const sql = neon(resolvedDbUrl)
 
   const pending = await prisma.sYS_PatiscoSync.findFirst({
     where: { docType: 'DO', status: 'pending' },
@@ -1400,7 +1597,7 @@ export async function processNextPendingDO(
   const systemUserId = systemUser?.id ?? 1
 
   try {
-    await _processDO({ docId, docNo, copyId, source, prisma, sql, creds, systemUserId })
+    await _processDO({ docId, docNo, copyId, source, prisma, creds, systemUserId })
     await prisma.sYS_PatiscoSync.update({
       where: { id: pending.id },
       data: { status: 'ok', syncedAt: new Date() },
@@ -1419,16 +1616,16 @@ export async function processNextPendingDO(
 
 // ─── 共用：處理單一 DO 的完整邏輯 ────────────────────────────────────────────
 async function _processDO({
-  docId, docNo, copyId, source, prisma, sql, creds, systemUserId,
+  docId, docNo, copyId, source, prisma, creds, systemUserId,
 }: {
   docId: string; docNo: string; copyId: string
   source: SyncSource
   prisma: PrismaClient
-  sql: ReturnType<typeof neon> | unknown
   creds: PatiscoCredentials & { _mcpUrl: string }
   systemUserId: number
 }) {
-  const lookupId = docId
+  // getDeliveryOrderDetail 的 shipmentId 可能需要 copyId 而非 docId
+  const lookupId = copyId || docId
 
   const [ciRes, plRes] = await Promise.all([
     getDeliveryOrderDetail(creds, lookupId, 'commercialInvoice'),
@@ -1554,6 +1751,7 @@ async function _processDO({
     const packingItems = (pl ?? ci)?.packings ?? []
     const linkedPiIds = new Set<number>()
 
+    // 從 detail.orders[] 配對
     const ordersList = detail.orders ?? []
     for (const ord of ordersList) {
       const piNo  = ord.no?.trim()
@@ -1719,13 +1917,11 @@ async function _processDO({
 export async function syncPatiscoDeliveryOrders(
   source: SyncSource,
   db?: PrismaClient,
-  dbUrl?: string,
+  _dbUrl?: string,
   sharedCreds?: PatiscoCredentials & { _mcpUrl: string },
   _batchLimit = 1,   // 每次處理幾筆（預設 1，防超時）
 ): Promise<SyncResult & { hasMore?: boolean }> {
   const prisma = db ?? defaultPrisma
-  const resolvedDbUrl = dbUrl ?? process.env.DATABASE_URL!
-  const sql = neon(resolvedDbUrl)
   const result: SyncResult & { hasMore?: boolean } = { total: 0, skipped: 0, processed: 0, errors: 0, details: [] }
 
   const creds = sharedCreds ?? await patiscoLogin(prisma)
@@ -1747,9 +1943,9 @@ export async function syncPatiscoDeliveryOrders(
   }
 
   const systemUser = await prisma.sYS_User.findFirst({ where: { isSystem: true }, select: { id: true } })
-  const systemUserId = systemUser?.id ?? 1
+  void systemUser
 
-  const next = await processNextPendingDO(source, prisma, resolvedDbUrl, creds)
+  const next = await processNextPendingDO(source, prisma, undefined, creds)
   if (next.processed) {
     if (next.error) {
       result.errors++
@@ -1779,16 +1975,24 @@ export async function backfillShipmentPILinks(
 
   const shipments = await prisma.sLS_Shipment.findMany({
     where: { pis: { none: {} }, patiscoDocId: { not: null }, source: 'PATISCO' },
-    select: { id: true, shipmentNo: true, patiscoDocId: true },
+    select: { id: true, shipmentNo: true, patiscoDocId: true, patiscoDocNo: true },
     orderBy: { id: 'asc' },
   })
 
   for (const s of shipments) {
     const docId = s.patiscoDocId!
+    // copyId 存在 SYS_PatiscoSync 的 result 欄位
+    const syncRow = await prisma.sYS_PatiscoSync.findFirst({
+      where: { docType: 'DO', patiscoDocId: docId },
+      select: { result: true },
+    })
+    const copyId = (syncRow?.result as { copyId?: string } | null)?.copyId ?? ''
+    const lookupId = copyId || docId
+
     try {
       const [ciRes, plRes] = await Promise.all([
-        getDeliveryOrderDetail(creds, docId, 'commercialInvoice'),
-        getDeliveryOrderDetail(creds, docId, 'packingList'),
+        getDeliveryOrderDetail(creds, lookupId, 'commercialInvoice'),
+        getDeliveryOrderDetail(creds, lookupId, 'packingList'),
       ])
       const extractDetail = (res: typeof ciRes) => {
         if (!res.ok || !res.data) return null

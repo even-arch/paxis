@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useOrgPath } from '@/lib/use-org-path'
 
 type Item = {
   id: number
@@ -37,6 +38,7 @@ interface ReceiveRow { qty: string; unitCost: string; currency: string }
 
 export default function PurchaseActions({ orderId, status, items, defaultCurrency, hasReceipts, supplierPIs }: Props) {
   const router = useRouter()
+  const toOrgPath = useOrgPath()
 
   // 入庫
   const [showReceive, setShowReceive] = useState(false)
@@ -86,7 +88,7 @@ export default function PurchaseActions({ orderId, status, items, defaultCurrenc
     setSubmitting(true)
     const res = await fetch(`/api/purchases/${orderId}`, { method: 'DELETE' })
     setSubmitting(false)
-    if (res.ok) { router.push('/purchases'); router.refresh() }
+    if (res.ok) { router.push(toOrgPath('/purchases')); router.refresh() }
     else { const err = await res.json() as { error?: string }; alert(err.error || '刪除失敗') }
   }
 
@@ -145,7 +147,7 @@ export default function PurchaseActions({ orderId, status, items, defaultCurrenc
       <div className="flex gap-2 flex-wrap justify-end">
         {isDraft && (
           <>
-            <Link href={`/purchases/${orderId}/edit`}
+            <Link href={toOrgPath(`/purchases/${orderId}/edit`)}
               className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm hover:bg-gray-50">
               編輯
             </Link>

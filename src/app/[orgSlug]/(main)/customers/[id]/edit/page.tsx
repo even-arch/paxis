@@ -1,12 +1,13 @@
 import { notFound } from 'next/navigation'
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
 import CustomerForm, { type CustomerFormData } from '@/modules/customer/CustomerForm'
 
-type Props = { params: { id: string } }
+type Props = { params: { orgSlug: string; id: string } }
 
 export default async function EditCustomerPage({
   params }: Props) {
-    const customer = await prisma.cUS_Customer.findUnique({
+  const prisma = await getPagePrisma(params.orgSlug)
+  const customer = await prisma.cUS_Customer.findUnique({
     where: { id: Number(params.id) },
   })
 

@@ -198,64 +198,27 @@ export default function Sidebar({ companyName = 'PAXIS', orgSlug = '' }: { compa
         <NotificationBell />
       </div>
 
-      {/* ── 模式切換器 ── */}
-      <div className="px-3 py-3 border-b border-gray-700">
-        <div className="flex rounded-lg bg-gray-800 p-0.5 text-xs font-medium">
-          <button
-            onClick={() => switchMode('b2b')}
-            className={cn(
-              'flex-1 py-1.5 rounded-md transition-colors text-center leading-tight',
-              isB2B
-                ? 'bg-blue-600 text-white shadow'
-                : 'text-gray-400 hover:text-gray-200',
-            )}
-          >
-            🏭 B2B<br/>
-            <span className="text-[10px] font-normal opacity-75">貿易</span>
-          </button>
-          <button
-            onClick={() => switchMode('b2c')}
-            className={cn(
-              'flex-1 py-1.5 rounded-md transition-colors text-center leading-tight',
-              !isB2B
-                ? 'bg-orange-500 text-white shadow'
-                : 'text-gray-400 hover:text-gray-200',
-            )}
-          >
-            🛍️ B2C<br/>
-            <span className="text-[10px] font-normal opacity-75">電商</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ── 導覽項目（依模式切換）── */}
+      {/* ── 導覽項目 ── */}
       <nav className="flex-1 py-4 px-2 flex flex-col gap-0.5 overflow-y-auto">
-        {isB2B ? (
-          <>
-            <NavLinks groups={b2bGroups} pathname={pathname} base={base} />
-            {/* B2B 模式才顯示系統設定 */}
-            <div className="mt-4 mb-1 px-3">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">設定</span>
-            </div>
-            {settingsItems.map(item => (
-              <Link
-                key={item.href}
-                href={item.absolute ? item.href : base + item.href}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
-                  isActive(pathname, item, base)
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-300 hover:bg-gray-800',
-                )}
-              >
-                <span>{item.icon}</span>
-                <span>{item.label}</span>
-              </Link>
-            ))}
-          </>
-        ) : (
-          <NavLinks groups={b2cGroups} pathname={pathname} base={base} />
-        )}
+        <NavLinks groups={b2bGroups} pathname={pathname} base={base} />
+        <div className="mt-4 mb-1 px-3">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">設定</span>
+        </div>
+        {settingsItems.map(item => (
+          <Link
+            key={item.href}
+            href={item.absolute ? item.href : base + item.href}
+            className={cn(
+              'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
+              isActive(pathname, item, base)
+                ? 'bg-blue-600 text-white'
+                : 'text-gray-300 hover:bg-gray-800',
+            )}
+          >
+            <span>{item.icon}</span>
+            <span>{item.label}</span>
+          </Link>
+        ))}
       </nav>
 
       {/* ── 底部登出 ── */}

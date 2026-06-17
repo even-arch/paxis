@@ -1,15 +1,17 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
+import { orgPath } from '@/lib/org-path'
 import { formatDate } from '@/lib/utils'
 import DeleteSupplierButton from './DeleteSupplierButton'
 import SupplierProductPanel from './SupplierProductPanel'
 
-type Props = { params: { id: string } }
+type Props = { params: { orgSlug: string; id: string } }
 
 export default async function SupplierDetailPage({
   params }: Props) {
-    const [supplier, recentOrders, allProducts, orderedItems] = await Promise.all([
+  const prisma = await getPagePrisma(params.orgSlug)
+  const [supplier, recentOrders, allProducts, orderedItems] = await Promise.all([
     prisma.sUP_Supplier.findUnique({
       where: { id: Number(params.id) },
       include: {
@@ -57,12 +59,12 @@ export default async function SupplierDetailPage({
     <div className="max-w-3xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <Link href="/suppliers" className="text-sm text-gray-400 hover:text-gray-600">← 供應商</Link>
+          <Link href={orgPath(params.orgSlug, '/suppliers')} className="text-sm text-gray-400 hover:text-gray-600">← 供應商</Link>
           <h1 className="text-2xl font-bold text-gray-800 mt-1">{supplier.name}</h1>
           {supplier.shortName && <p className="text-sm text-gray-500">{supplier.shortName}</p>}
         </div>
         <div className="flex gap-2">
-          <Link href={`/suppliers/${params.id}/edit`}
+          <Link href={orgPath(params.orgSlug, `/suppliers/${params.id}/edit`)}
             className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm hover:bg-gray-50">
             編輯
           </Link>
@@ -102,7 +104,7 @@ export default async function SupplierDetailPage({
                   <p className="text-xs text-gray-500 mt-0.5">{supplier.chargeTemplate.description}</p>
                 )}
               </div>
-              <Link href={`/settings/charge-templates`} className="text-xs text-blue-500 hover:underline">
+              <Link href={orgPath(params.orgSlug, '/settings/charge-templates')} className="text-xs text-blue-500 hover:underline">
                 管理模板 →
               </Link>
             </div>
@@ -136,7 +138,7 @@ export default async function SupplierDetailPage({
                   return (
                     <tr key={o.id}>
                       <td className="py-2">
-                        <Link href={`/purchases/${o.id}`} className="font-mono text-blue-600 hover:underline">
+                        <Link href={orgPath(params.orgSlug, `/purchases/${o.id}`)} className="font-mono text-blue-600 hover:underline">
                           {o.poNo}
                         </Link>
                       </td>
@@ -153,7 +155,7 @@ export default async function SupplierDetailPage({
             </table>
           )}
           {recentOrders.length >= 20 && (
-            <Link href={`/purchases?supplierId=${params.id}`} className="text-xs text-blue-600 hover:underline mt-2 block">
+            <Link href={orgPath(params.orgSlug, `/purchases?supplierId=${params.id}`)} className="text-xs text-blue-600 hover:underline mt-2 block">
               查看全部 →
             </Link>
           )}
@@ -173,7 +175,7 @@ export default async function SupplierDetailPage({
                       <span className="ml-2 text-xs font-mono text-gray-400">{item.product.sku}</span>
                     )}
                   </div>
-                  <Link href={`/products/${item.productId}`} className="text-xs text-blue-500 hover:underline">
+                  <Link href={orgPath(params.orgSlug, `/products/${item.productId}`)} className="text-xs text-blue-500 hover:underline">
                     查看商品 →
                   </Link>
                 </div>
@@ -181,7 +183,7 @@ export default async function SupplierDetailPage({
             </div>
           )}
           {orderedItems.length > 0 && (
-            <Link href={`/purchases?supplierId=${params.id}`} className="text-xs text-blue-600 hover:underline mt-3 block">
+            <Link href={orgPath(params.orgSlug, `/purchases?supplierId=${params.id}`)} className="text-xs text-blue-600 hover:underline mt-3 block">
               查看此供應商所有訂單 →
             </Link>
           )}
@@ -189,7 +191,7 @@ export default async function SupplierDetailPage({
 
         {/* 手動商品對應（維護 SUP_SupplierProduct 關係） */}
         <div className="flex items-center justify-end mb-1">
-          <Link href={`/products?supplierId=${params.id}`}
+          <Link href={orgPath(params.orgSlug, `/products?supplierId=${params.id}`)}
             className="text-xs text-blue-600 hover:underline">
             在商品管理中查看此供應商所有產品 →
           </Link>

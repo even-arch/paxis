@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useOrgPath } from '@/lib/use-org-path'
 
 export type CustomerFormData = {
   name: string
@@ -69,6 +70,7 @@ type Props = {
 
 export default function CustomerForm({ initialData, customerId }: Props) {
   const router = useRouter()
+  const toOrgPath = useOrgPath()
   const [form, setForm] = useState<CustomerFormData>({ ...empty, ...initialData })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -102,7 +104,7 @@ export default function CustomerForm({ initialData, customerId }: Props) {
     if (!res.ok) { setError('儲存失敗，請再試一次'); return }
 
     const data = await res.json()
-    router.push(`/customers/${data.id}`)
+    router.push(toOrgPath(`/customers/${data.id}`))
     router.refresh()
   }
 

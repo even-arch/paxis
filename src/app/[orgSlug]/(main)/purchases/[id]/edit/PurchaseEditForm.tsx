@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useOrgPath } from '@/lib/use-org-path'
 import { SHIP_VIA, CURRENCIES } from '@/modules/purchase/poUtils'
 
 type Supplier = { id: number; name: string; shortName: string | null; currencyCode: string | null }
@@ -13,6 +14,7 @@ type Order = {
 
 export default function PurchaseEditForm({ order, suppliers }: { order: Order; suppliers: Supplier[] }) {
   const router = useRouter()
+  const toOrgPath = useOrgPath()
   const [form, setForm] = useState({
     supplierId: String(order.supplierId),
     currencyCode: order.currencyCode,
@@ -39,7 +41,7 @@ export default function PurchaseEditForm({ order, suppliers }: { order: Order; s
     })
     setSaving(false)
     if (res.ok) {
-      router.push(`/purchases/${order.id}`)
+      router.push(toOrgPath(`/purchases/${order.id}`))
       router.refresh()
     }
   }

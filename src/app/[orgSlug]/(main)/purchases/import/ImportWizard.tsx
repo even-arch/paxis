@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { useOrgPath } from '@/lib/use-org-path'
 import { SHIP_VIA, CURRENCIES } from '@/modules/purchase/poUtils'
 import type { ParsedInvoice } from '@/app/api/ai/parse-invoice/route'
 import type { AppliedProduct } from '@/app/api/ai/apply-products/route'
@@ -47,6 +48,7 @@ export default function ImportWizard({
   products:  DbProduct[]
 }) {
   const router = useRouter()
+  const toOrgPath = useOrgPath()
   const [mode, setMode] = useState<Mode>('upload')
 
   // 解析結果（供 UI 用）
@@ -370,7 +372,7 @@ export default function ImportWizard({
         resetWizardState()
         processFile(fileQueue[nextIdx])
       } else {
-        router.push(`/purchases/${json.id}`)
+        router.push(toOrgPath(`/purchases/${json.id}`))
         router.refresh()
       }
     } catch (err) {

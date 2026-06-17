@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { useOrgPath } from '@/lib/use-org-path'
 import type { ParsedCustomerOrder } from '@/app/api/ai/parse-customer-order/route'
 import type { AppliedProduct } from '@/app/api/ai/apply-products/route'
 import type { AppliedCustomer } from '@/app/api/ai/apply-customer/route'
@@ -43,6 +44,7 @@ export default function SalesImportWizard({
   products: DbProduct[]
 }) {
   const router = useRouter()
+  const toOrgPath = useOrgPath()
   const [mode, setMode] = useState<Mode>('upload')
 
   const [productDrafts, setProductDrafts] = useState<ProductDraft[]>([])
@@ -822,7 +824,7 @@ export default function SalesImportWizard({
             <p className="text-xs text-gray-600">PI 號：<span className="font-mono font-bold">{createdPiNo}</span></p>
             <p className="text-xs text-gray-500">庫存已預留（reservedQty++）</p>
             <button type="button"
-              onClick={() => { router.push(`/sales/${createdOrderId}`); router.refresh() }}
+              onClick={() => { router.push(toOrgPath(`/sales/${createdOrderId}`)); router.refresh() }}
               className="mt-2 text-teal-700 text-sm underline">→ 前往訂單</button>
           </div>
         ) : !isPI ? (
@@ -838,7 +840,7 @@ export default function SalesImportWizard({
                 {creatingPi ? '建立中…' : '✓ 是，建立 PI'}
               </button>
               <button type="button"
-                onClick={() => { router.push(`/sales/${createdOrderId}`); router.refresh() }}
+                onClick={() => { router.push(toOrgPath(`/sales/${createdOrderId}`)); router.refresh() }}
                 className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-md text-sm hover:bg-gray-50">
                 稍後再建立，前往訂單
               </button>
@@ -846,7 +848,7 @@ export default function SalesImportWizard({
           </div>
         ) : (
           <button type="button"
-            onClick={() => { router.push(`/sales/${createdOrderId}`); router.refresh() }}
+            onClick={() => { router.push(toOrgPath(`/sales/${createdOrderId}`)); router.refresh() }}
             className="w-full border border-gray-300 text-gray-700 py-2 rounded-md text-sm hover:bg-gray-50">
             → 前往訂單查看
           </button>

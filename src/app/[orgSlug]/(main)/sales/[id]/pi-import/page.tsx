@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import { useOrgPath } from '@/lib/use-org-path'
 
 interface ParsedItem {
   sku: string | null
@@ -43,6 +44,7 @@ export default function PIImportPage() {
   const params = useParams()
   const orderId = Number(params.id)
   const router = useRouter()
+  const toOrgPath = useOrgPath()
 
   const fileRef = useRef<HTMLInputElement>(null)
   const [parsing, setParsing] = useState(false)
@@ -139,7 +141,7 @@ export default function PIImportPage() {
       })
       const json = await res.json() as { piNo?: string; error?: string }
       if (!res.ok) throw new Error(json.error ?? '建立失敗')
-      router.push(`/sales/${orderId}`)
+      router.push(toOrgPath(`/sales/${orderId}`))
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -152,14 +154,14 @@ export default function PIImportPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <Link href={`/sales/${orderId}`}
+          <Link href={toOrgPath(`/sales/${orderId}`)}
             className="text-sm text-gray-500 hover:text-gray-700 mb-1 inline-block">
             ← 客戶訂單
           </Link>
           <h1 className="text-xl font-semibold text-gray-900">匯入 PI 文件</h1>
           <p className="text-sm text-gray-500 mt-0.5">上傳已發出的 PI PDF，AI 解析後確認品項對應，建立 PI 紀錄並預留庫存</p>
         </div>
-        <Link href={`/sales/${orderId}`}
+        <Link href={toOrgPath(`/sales/${orderId}`)}
           className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50">
           改用手動建立
         </Link>
@@ -343,7 +345,7 @@ export default function PIImportPage() {
               {saving ? '建立中…' : '✓ 確認建立 PI，預留庫存'}
             </button>
             <Link
-              href={`/sales/${orderId}`}
+              href={toOrgPath(`/sales/${orderId}`)}
               className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50"
             >
               取消

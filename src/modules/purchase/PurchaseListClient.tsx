@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useOrgPath } from '@/lib/use-org-path'
 import { formatDate } from '@/lib/utils'
 import { statusBadge } from '@/modules/purchase/poUtils'
 
@@ -24,6 +25,7 @@ type Props = {
 
 export default function PurchaseListClient({ orders, isArchived }: Props) {
   const router = useRouter()
+  const toOrgPath = useOrgPath()
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [pending, startTransition] = useTransition()
 
@@ -106,7 +108,7 @@ export default function PurchaseListClient({ orders, isArchived }: Props) {
                     <input type="checkbox" checked={isSelected} onChange={() => toggle(o.id)} className="rounded" />
                   </td>
                   <td className="px-4 py-3">
-                    <Link href={`/purchases/${o.id}`} className="font-medium text-blue-600 hover:underline font-mono">
+                    <Link href={toOrgPath(`/purchases/${o.id}`)} className="font-medium text-blue-600 hover:underline font-mono">
                       {o.poNo}
                     </Link>
                   </td>

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useOrgPath } from '@/lib/use-org-path'
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'TWD', 'HKD']
 
@@ -22,6 +23,7 @@ type Props = {
 
 export default function SalesOrderForm({ customers, products }: Props) {
   const router = useRouter()
+  const toOrgPath = useOrgPath()
   const [customerId, setCustomerId]       = useState('')
   const [currencyCode, setCurrencyCode]   = useState('USD')
   const [exchangeRate, setExchangeRate]   = useState('')
@@ -78,7 +80,7 @@ export default function SalesOrderForm({ customers, products }: Props) {
       })
       const json = await res.json() as { id?: number; error?: string }
       if (!res.ok) throw new Error(json.error ?? '建立失敗')
-      router.push(`/sales/${json.id}`)
+      router.push(toOrgPath(`/sales/${json.id}`))
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))

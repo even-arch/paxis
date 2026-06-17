@@ -1,12 +1,14 @@
 export const dynamic = 'force-dynamic'
 import Link from 'next/link'
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
+import { orgPath } from '@/lib/org-path'
 import PurchaseListClient from '@/modules/purchase/PurchaseListClient'
 
 const VALID_SORTS = ['poNo', 'patiscoOrderNo', 'status', 'expectedDate', 'orderDate'] as const
 type SortField = typeof VALID_SORTS[number]
 
 type Props = {
+  params: { orgSlug: string }
   searchParams: {
     search?: string; sku?: string; status?: string
     supplierId?: string; page?: string; sort?: string; dir?: string
@@ -14,7 +16,8 @@ type Props = {
   }
 }
 
-export default async function PurchasesPage({ searchParams }: Props) {
+export default async function PurchasesPage({ params, searchParams }: Props) {
+  const prisma = await getPagePrisma(params.orgSlug)
   const search = searchParams.search ?? ''
   const sku = searchParams.sku ?? ''
   const statusFilter = searchParams.status ?? ''
@@ -79,7 +82,7 @@ export default async function PurchasesPage({ searchParams }: Props) {
     if (showArchived) p.set('archived', 'true')
     p.set('sort', newSort)
     p.set('dir', newDir)
-    return `/purchases?${p.toString()}`
+    return orgPath(params.orgSlug, `/purchases?${p.toString()}`)
   }
 
   const archiveToggleUrl = (() => {
@@ -89,7 +92,7 @@ export default async function PurchasesPage({ searchParams }: Props) {
     if (statusFilter) p.set('status', statusFilter)
     if (supplierId) p.set('supplierId', String(supplierId))
     if (!showArchived) p.set('archived', 'true')
-    return `/purchases?${p.toString()}`
+    return orgPath(params.orgSlug, `/purchases?${p.toString()}`)
   })()
 
   return (
@@ -108,11 +111,11 @@ export default async function PurchasesPage({ searchParams }: Props) {
           </Link>
           {!showArchived && (
             <>
-              <Link href="/purchases/import"
+              <Link href={orgPath(params.orgSlug, '/purchases/import')}
                 className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700">
                 ✨ AI 匯入
               </Link>
-              <Link href="/purchases/new"
+              <Link href={orgPath(params.orgSlug, '/purchases/new')}
                 className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50">
                 + 手動建立
               </Link>
@@ -144,7 +147,7 @@ export default async function PurchasesPage({ searchParams }: Props) {
         </select>
         <button type="submit" className="bg-gray-100 border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-200">搜尋</button>
         {hasFilter && (
-          <Link href={showArchived ? '/purchases?archived=true' : '/purchases'}
+          <Link href={showArchived ? orgPath(params.orgSlug, '/purchases?archived=true') : orgPath(params.orgSlug, '/purchases')}
             className="border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-50 text-gray-500">清除</Link>
         )}
       </form>
@@ -164,7 +167,7 @@ export default async function PurchasesPage({ searchParams }: Props) {
               if (showArchived) pp.set('archived', 'true')
               pp.set('sort', sort); pp.set('dir', dir); pp.set('page', String(p))
               return (
-                <Link key={p} href={`/purchases?${pp.toString()}`}
+                <Link key={p} href={orgPath(params.orgSlug, `/purchases?${pp.toString()}`)}
                   className={`px-3 py-1 rounded-md ${p === page ? 'bg-blue-600 text-white' : 'border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
                   {p}
                 </Link>

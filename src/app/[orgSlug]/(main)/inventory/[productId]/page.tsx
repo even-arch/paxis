@@ -1,9 +1,9 @@
 import { notFound } from 'next/navigation'
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
 import { formatDate } from '@/lib/utils'
 import InventoryControls from './InventoryControls'
 
-type Props = { params: { productId: string } }
+type Props = { params: { orgSlug: string; productId: string } }
 
 const MOVEMENT_TYPE: Record<number, { label: string; color: string }> = {
   1: { label: '進貨入庫', color: 'text-green-600' },
@@ -16,7 +16,8 @@ const MOVEMENT_TYPE: Record<number, { label: string; color: string }> = {
 
 export default async function InventoryDetailPage({
   params }: Props) {
-    const productId = Number(params.productId)
+  const prisma = await getPagePrisma(params.orgSlug)
+  const productId = Number(params.productId)
 
   const [stock, movements, product] = await Promise.all([
     prisma.iNV_Stock.findUnique({

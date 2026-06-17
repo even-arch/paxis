@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
+import { orgPath } from '@/lib/org-path'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { statusBadge } from '@/modules/purchase/poUtils'
 import PurchaseActions from './PurchaseActions'
@@ -8,11 +9,12 @@ import LinkSalesOrderButton from './LinkSalesOrderButton'
 import DeletePoItemButton from './DeletePoItemButton'
 import { EditItemButton, AddItemPanel } from '@/components/ItemTableActions'
 
-type Props = { params: { id: string } }
+type Props = { params: { orgSlug: string; id: string } }
 
 export default async function PurchaseDetailPage({
   params }: Props) {
-    const order = await prisma.pO_Order.findUnique({
+  const prisma = await getPagePrisma(params.orgSlug)
+  const order = await prisma.pO_Order.findUnique({
     where: { id: Number(params.id) },
     include: {
       supplier: true,
@@ -87,7 +89,7 @@ export default async function PurchaseDetailPage({
     <div className="max-w-4xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <Link href="/purchases" className="text-sm text-gray-400 hover:text-gray-600">← 採購訂單</Link>
+          <Link href={orgPath(params.orgSlug, '/purchases')} className="text-sm text-gray-400 hover:text-gray-600">← 採購訂單</Link>
           <div className="flex items-center gap-3 mt-1">
             <h1 className="text-2xl font-bold text-gray-800 font-mono">{order.poNo}</h1>
             <span className={`px-2 py-0.5 rounded text-xs font-medium ${badge.color}`}>{badge.label}</span>
@@ -100,7 +102,7 @@ export default async function PurchaseDetailPage({
         </div>
         <div className="flex items-center gap-2">
           <a
-            href={`/print/po/${order.id}`}
+            href={orgPath(params.orgSlug, `/print/po/${order.id}`)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm bg-gray-100 text-gray-700 border border-gray-300 px-3 py-1.5 rounded hover:bg-gray-200"
@@ -172,7 +174,7 @@ export default async function PurchaseDetailPage({
             />
           </div>
           {linkedSalesOrder ? (
-            <Link href={`/sales/${linkedSalesOrder.id}`}
+            <Link href={orgPath(params.orgSlug, `/sales/${linkedSalesOrder.id}`)}
               className="inline-flex items-center gap-3 bg-white border border-blue-200 rounded-lg px-4 py-2.5 mt-2 hover:border-blue-400 transition-colors">
               <span className="font-mono font-medium text-blue-700 text-sm">{linkedSalesOrder.orderNo}</span>
               {(linkedSalesOrder.customer?.name || linkedSalesOrder.patiscoBuyerName) && (
@@ -213,7 +215,7 @@ export default async function PurchaseDetailPage({
                 return (
                   <tr key={item.id}>
                     <td className="px-4 py-3">
-                      <Link href={`/products/${item.product.id}`} className="text-blue-600 hover:underline">
+                      <Link href={orgPath(params.orgSlug, `/products/${item.product.id}`)} className="text-blue-600 hover:underline">
                         {item.product.name}
                       </Link>
                       {item.product.sku && <span className="text-gray-400 text-xs ml-1">({item.product.sku})</span>}
@@ -309,7 +311,7 @@ export default async function PurchaseDetailPage({
                           return (
                             <tr key={ri.id} className="border-b border-gray-50 last:border-0">
                               <td className="py-2">
-                                <Link href={`/products/${ri.poItem.product.id}`} className="text-blue-600 hover:underline">
+                                <Link href={orgPath(params.orgSlug, `/products/${ri.poItem.product.id}`)} className="text-blue-600 hover:underline">
                                   {ri.poItem.product.name}
                                 </Link>
                                 {ri.poItem.product.sku && (
@@ -363,4 +365,3 @@ function Row({ label, value }: { label: string; value?: string | null }) {
     </div>
   )
 }
-

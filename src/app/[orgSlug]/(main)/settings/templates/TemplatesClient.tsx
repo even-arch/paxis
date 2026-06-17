@@ -3,6 +3,7 @@
 import { useState, useTransition, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useOrgPath } from '@/lib/use-org-path'
 
 type CustomerDefault = {
   id: number
@@ -51,6 +52,7 @@ export default function TemplatesClient({
   templates: TemplateRow[]
 }) {
   const router = useRouter()
+  const go = useOrgPath()
   const [tab, setTab] = useState<'templates' | 'defaults'>('templates')
   const [pending, startTransition] = useTransition()
 
@@ -393,7 +395,7 @@ export default function TemplatesClient({
                       <>
                         <tr key={row.id} className="hover:bg-gray-50">
                           <td className="px-5 py-3">
-                            <Link href={`/customers/${row.customerId}`} className="font-medium text-blue-600 hover:underline">
+                            <Link href={go(`/customers/${row.customerId}`)} className="font-medium text-blue-600 hover:underline">
                               {row.customerName}
                             </Link>
                             {row.customerShortName && (

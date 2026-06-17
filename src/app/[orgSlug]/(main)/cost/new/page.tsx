@@ -1,8 +1,9 @@
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
 import CostForm from '@/modules/cost/CostForm'
 
-export default async function NewCostPage() {
-    const products = await prisma.pRD_Product.findMany({
+export default async function NewCostPage({ params }: { params: { orgSlug: string } }) {
+  const prisma = await getPagePrisma(params.orgSlug)
+  const products = await prisma.pRD_Product.findMany({
     where: { isActive: true },
     select: {
       id: true, name: true, sku: true, modelNo: true, unit: true,

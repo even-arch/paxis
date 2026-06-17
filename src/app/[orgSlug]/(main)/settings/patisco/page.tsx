@@ -1,9 +1,10 @@
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
 import { formatDate } from '@/lib/utils'
 import PatiscoConfigForm from './PatiscoConfigForm'
 
-export default async function PatiscoSyncPage() {
-    const config = await prisma.sYS_PatiscoConfig.findFirst({
+export default async function PatiscoSyncPage({ params }: { params: { orgSlug: string } }) {
+  const prisma = await getPagePrisma(params.orgSlug)
+  const config = await prisma.sYS_PatiscoConfig.findFirst({
     where: { isActive: true },
     orderBy: { id: 'desc' },
   })

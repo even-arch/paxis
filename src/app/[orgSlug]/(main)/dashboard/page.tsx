@@ -1,10 +1,12 @@
 export const dynamic = 'force-dynamic'
 import Link from 'next/link'
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
+import { orgPath } from '@/lib/org-path'
 import { formatDate } from '@/lib/utils'
 
-export default async function DashboardPage() {
-    const today = new Date()
+export default async function DashboardPage({ params }: { params: { orgSlug: string } }) {
+  const prisma = await getPagePrisma(params.orgSlug)
+  const today = new Date()
   const in14Days = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000)
   const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1)
 
@@ -142,24 +144,24 @@ export default async function DashboardPage() {
             <span className="text-xs text-gray-400">尚無同步紀錄</span>
           )}
         </div>
-        <Link href="/settings" className="text-xs text-blue-600 hover:underline">手動同步</Link>
+        <Link href={orgPath(params.orgSlug, '/settings')} className="text-xs text-blue-600 hover:underline">手動同步</Link>
       </div>
 
       {/* 數字摘要 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <Link href="/products" className="bg-white rounded-lg shadow p-5 hover:shadow-md">
+        <Link href={orgPath(params.orgSlug, '/products')} className="bg-white rounded-lg shadow p-5 hover:shadow-md">
           <p className="text-xs text-gray-500">商品</p>
           <p className="text-2xl font-semibold text-gray-800 mt-1">{productCount}</p>
         </Link>
-        <Link href="/suppliers" className="bg-white rounded-lg shadow p-5 hover:shadow-md">
+        <Link href={orgPath(params.orgSlug, '/suppliers')} className="bg-white rounded-lg shadow p-5 hover:shadow-md">
           <p className="text-xs text-gray-500">供應商</p>
           <p className="text-2xl font-semibold text-gray-800 mt-1">{supplierCount}</p>
         </Link>
-        <Link href="/customers" className="bg-white rounded-lg shadow p-5 hover:shadow-md">
+        <Link href={orgPath(params.orgSlug, '/customers')} className="bg-white rounded-lg shadow p-5 hover:shadow-md">
           <p className="text-xs text-gray-500">客戶</p>
           <p className="text-2xl font-semibold text-gray-800 mt-1">{customerCount}</p>
         </Link>
-        <Link href="/inventory?filter=low"
+        <Link href={orgPath(params.orgSlug, '/inventory?filter=low')}
           className={`bg-white rounded-lg shadow p-5 hover:shadow-md ${lowStockItems.length > 0 ? 'border-l-4 border-red-400' : ''}`}>
           <p className="text-xs text-gray-500">低庫存警示</p>
           <p className={`text-2xl font-semibold mt-1 ${lowStockItems.length > 0 ? 'text-red-600' : 'text-green-600'}`}>
@@ -170,19 +172,19 @@ export default async function DashboardPage() {
 
       {/* 財務快覽 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Link href="/finance?tab=payable" className="bg-white rounded-lg shadow p-5 hover:shadow-md">
+        <Link href={orgPath(params.orgSlug, '/finance?tab=payable')} className="bg-white rounded-lg shadow p-5 hover:shadow-md">
           <p className="text-xs text-gray-500">待付帳款（{pendingPayables._count} 筆）</p>
           <p className="text-xl font-semibold text-gray-800 mt-1">
             {pendingPayTWD.toLocaleString('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 })}
           </p>
         </Link>
-        <Link href="/finance?tab=receivable" className="bg-white rounded-lg shadow p-5 hover:shadow-md">
+        <Link href={orgPath(params.orgSlug, '/finance?tab=receivable')} className="bg-white rounded-lg shadow p-5 hover:shadow-md">
           <p className="text-xs text-gray-500">待收帳款（{pendingReceivables._count} 筆）</p>
           <p className="text-xl font-semibold text-gray-800 mt-1">
             {pendingRecTWD.toLocaleString('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 })}
           </p>
         </Link>
-        <Link href="/finance" className="bg-white rounded-lg shadow p-5 hover:shadow-md">
+        <Link href={orgPath(params.orgSlug, '/finance')} className="bg-white rounded-lg shadow p-5 hover:shadow-md">
           <p className="text-xs text-gray-500">本月匯差</p>
           <p className={`text-xl font-semibold mt-1 ${fxGainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
             {fxGainLoss >= 0 ? '+' : ''}{fxGainLoss.toLocaleString('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 })}
@@ -192,7 +194,7 @@ export default async function DashboardPage() {
 
       {/* 三條輸入管道 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Link href="/purchases/import"
+        <Link href={orgPath(params.orgSlug, '/purchases/import')}
           className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg p-4 hover:border-purple-400 hover:shadow-md transition-all">
           <div className="flex items-center gap-3">
             <span className="text-xl">📄</span>
@@ -203,7 +205,7 @@ export default async function DashboardPage() {
             <span className="text-gray-400">→</span>
           </div>
         </Link>
-        <Link href="/sales/import"
+        <Link href={orgPath(params.orgSlug, '/sales/import')}
           className="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-lg p-4 hover:border-teal-400 hover:shadow-md transition-all">
           <div className="flex items-center gap-3">
             <span className="text-xl">📋</span>
@@ -214,7 +216,7 @@ export default async function DashboardPage() {
             <span className="text-gray-400">→</span>
           </div>
         </Link>
-        <Link href="/settings"
+        <Link href={orgPath(params.orgSlug, '/settings')}
           className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-4 hover:border-orange-400 hover:shadow-md transition-all">
           <div className="flex items-center gap-3">
             <span className="text-xl">🔄</span>
@@ -233,14 +235,14 @@ export default async function DashboardPage() {
         <Section
           title="客戶訂單待發 PI"
           count={ordersNeedingPI.length}
-          href="/sales?status=1"
+          href={orgPath(params.orgSlug, '/sales?status=1')}
           accentColor="text-blue-600"
           emptyText="目前沒有待發 PI 的訂單"
         >
           {ordersNeedingPI.map(o => (
             <ActionRow
               key={o.id}
-              href={`/sales/${o.id}`}
+              href={orgPath(params.orgSlug, `/sales/${o.id}`)}
               primary={o.orderNo}
               secondary={o.customer?.name ?? o.patiscoBuyerName ?? '未知客戶'}
               tag={o.customerRequestedShipDate
@@ -259,7 +261,7 @@ export default async function DashboardPage() {
         <Section
           title="PI 預計出貨（14天內）"
           count={upcomingShipments.length}
-          href="/sales"
+          href={orgPath(params.orgSlug, '/sales')}
           accentColor="text-purple-600"
           emptyText="近 14 天內沒有預計出貨的 PI"
         >
@@ -272,7 +274,7 @@ export default async function DashboardPage() {
             return (
               <ActionRow
                 key={pi.id}
-                href={`/sales/${pi.orderId}`}
+                href={orgPath(params.orgSlug, `/sales/${pi.orderId}`)}
                 primary={pi.piNo}
                 secondary={pi.order.customer?.name ?? pi.order.patiscoBuyerName ?? '未知客戶'}
                 tag={daysLeft === null ? '' : isOverdue ? `逾期 ${-daysLeft} 天` : daysLeft === 0 ? '今天出貨' : `${daysLeft} 天後`}
@@ -286,14 +288,14 @@ export default async function DashboardPage() {
         <Section
           title="採購在途"
           count={pendingPOs.length}
-          href="/purchases"
+          href={orgPath(params.orgSlug, '/purchases')}
           accentColor="text-teal-600"
           emptyText="目前沒有在途供應商訂單"
         >
           {pendingPOs.map(po => (
             <ActionRow
               key={po.id}
-              href={`/purchases/${po.id}`}
+              href={orgPath(params.orgSlug, `/purchases/${po.id}`)}
               primary={po.poNo}
               secondary={po.supplier.name}
               tag={po.expectedDate ? `預計到貨：${formatDate(po.expectedDate)}` : poStatusLabel(po.status)}
@@ -309,7 +311,7 @@ export default async function DashboardPage() {
         <Section
           title="近 7 天入庫"
           count={recentReceipts.length}
-          href="/purchases"
+          href={orgPath(params.orgSlug, '/purchases')}
           accentColor="text-green-600"
           emptyText="近 7 天無入庫紀錄"
         >
@@ -319,7 +321,7 @@ export default async function DashboardPage() {
             return (
               <ActionRow
                 key={r.id}
-                href={`/purchases/${r.orderId}`}
+                href={orgPath(params.orgSlug, `/purchases/${r.orderId}`)}
                 primary={r.receiptNo}
                 secondary={r.order.supplier.name}
                 tag={productNames + more}
@@ -336,7 +338,7 @@ export default async function DashboardPage() {
         <div className="mt-6 bg-white rounded-lg shadow overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <h2 className="text-base font-semibold text-gray-700">低庫存警示</h2>
-            <Link href="/inventory?filter=low" className="text-xs text-blue-600 hover:underline">查看全部</Link>
+            <Link href={orgPath(params.orgSlug, '/inventory?filter=low')} className="text-xs text-blue-600 hover:underline">查看全部</Link>
           </div>
           <div className="divide-y divide-gray-50">
             {lowStockItems.slice(0, 6).map(s => {
@@ -344,7 +346,7 @@ export default async function DashboardPage() {
               return (
                 <div key={s.productId} className="px-6 py-3 flex items-center justify-between">
                   <div>
-                    <Link href={`/inventory/${s.productId}`} className="text-sm font-medium text-blue-600 hover:underline">
+                    <Link href={orgPath(params.orgSlug, `/inventory/${s.productId}`)} className="text-sm font-medium text-blue-600 hover:underline">
                       {s.product.name}
                     </Link>
                     {s.product.sku && <span className="text-xs text-gray-400 ml-1.5 font-mono">{s.product.sku}</span>}

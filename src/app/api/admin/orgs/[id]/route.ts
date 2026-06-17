@@ -21,7 +21,21 @@ export async function PATCH(
   }
 
   const orgId = Number(params.id)
-  const { action } = await req.json()
+  const body = await req.json() as { action: string; oldEmail?: string; newEmail?: string }
+  const { action } = body
+
+  // 修正租戶 DB 裡特定用戶的 loginId
+  if (action === 'fix-user-email') {
+    const { oldEmail, newEmail } = body
+    if (!oldEmail || !newEmail) return NextResponse.json({ error: 'oldEmail 和 newEmail 都必填' }, { status: 400 })
+    const org = await masterPrisma.oRG.findUnique({ where: { id: orgId }, select: { databaseUrl: true, slug: true } })
+    if (!org?.databaseUrl) return NextResponse.json({ error: '找不到租戶 DB' }, { status: 404 })
+    const db = getOrgPrisma(org.databaseUrl, org.slug)
+    const user = await db.sYS_User.findUnique({ where: { loginId: oldEmail.toLowerCase() } })
+    if (!user) return NextResponse.json({ error: `找不到 loginId=${oldEmail} 的用戶` }, { status: 404 })
+    await db.sYS_User.update({ where: { id: user.id }, data: { loginId: newEmail.toLowerCase() } })
+    return NextResponse.json({ ok: true, updated: newEmail.toLowerCase() })
+  }
 
   if (action === 'suspend') {
     await masterPrisma.oRG.update({

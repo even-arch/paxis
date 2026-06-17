@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import {
   PLATFORM_LABELS,
@@ -37,7 +37,8 @@ function deliveryLabel(type: 'home' | '711' | 'family') {
   return '宅配'
 }
 
-export default async function CommerceOrdersPage() {
+export default async function CommerceOrdersPage({ params }: { params: { orgSlug: string } }) {
+  const prisma = await getPagePrisma(params.orgSlug)
   const products = await prisma.pRD_Product.findMany({
     where: { isActive: true },
     orderBy: [{ isAvailableForPos: 'desc' }, { createdAt: 'desc' }],

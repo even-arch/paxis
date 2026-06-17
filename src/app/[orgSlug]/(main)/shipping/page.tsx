@@ -829,7 +829,7 @@ export default function ShippingPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          piId: pi.id,
+          piIds: [pi.id],
           actualShipDate: paxisActualShipDate,
           packingListNo: paxisPackingListNo || null,
           commercialInvNo: paxisCommercialInvNo || null,

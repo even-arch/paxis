@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { useOrgPath } from '@/lib/use-org-path'
 
 type BreakdownItem = { productName: string; sku: string | null; qty: number; unitPrice: number; value: number }
 type SupplierBreakdown = {
@@ -66,6 +67,7 @@ const SHIP_VIA = ['SEA', 'AIR', 'COURIER', 'TRUCK', 'EXPRESS']
 
 export default function SalesShipmentPanel({ orderId, orderStatus, items, activePIs, shipments }: Props) {
   const router = useRouter()
+  const toOrgPath = useOrgPath()
   const [showForm, setShowForm] = useState(false)
   const [actualShipDate, setActualShipDate] = useState(new Date().toISOString().slice(0, 10))
   const [selectedPiId, setSelectedPiId] = useState<string>(activePIs[0]?.id ? String(activePIs[0].id) : '')
@@ -420,7 +422,7 @@ export default function SalesShipmentPanel({ orderId, orderStatus, items, active
                 </div>
                 <div className="flex items-start gap-2 ml-4 shrink-0">
                   <a
-                    href={`/print/pl/${s.id}`}
+                    href={toOrgPath(`/print/pl/${s.id}`)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs bg-gray-100 text-gray-700 border border-gray-300 px-2 py-0.5 rounded hover:bg-gray-200 whitespace-nowrap"
@@ -428,7 +430,7 @@ export default function SalesShipmentPanel({ orderId, orderStatus, items, active
                     🖨 裝箱單
                   </a>
                   <a
-                    href={`/print/ci/${s.id}`}
+                    href={toOrgPath(`/print/ci/${s.id}`)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs bg-gray-100 text-gray-700 border border-gray-300 px-2 py-0.5 rounded hover:bg-gray-200 whitespace-nowrap"
@@ -452,7 +454,7 @@ export default function SalesShipmentPanel({ orderId, orderStatus, items, active
                     </span>
                   ) : (
                     <a
-                      href={`/shipping?slsShipmentId=${s.id}`}
+                      href={toOrgPath(`/shipping?slsShipmentId=${s.id}`)}
                       className="text-xs bg-amber-500 text-white px-2 py-0.5 rounded hover:bg-amber-600 whitespace-nowrap">
                       📦 UPS 出貨
                     </a>

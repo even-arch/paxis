@@ -30,6 +30,23 @@ export default function OrgActions({
     }
   }
 
+  async function handleFixEmail() {
+    const oldEmail = prompt('請輸入目前錯誤的 Email（loginId）：')
+    if (!oldEmail) return
+    const newEmail = prompt('請輸入正確的新 Email：')
+    if (!newEmail) return
+    setLoading(true)
+    const res = await fetch(`/api/admin/orgs/${orgId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'fix-user-email', oldEmail, newEmail }),
+    })
+    setLoading(false)
+    const data = await res.json()
+    if (res.ok) alert(`✅ 已更新為 ${data.updated}，請重新登入`)
+    else alert(data.error ?? '更新失敗')
+  }
+
   async function handleDelete() {
     if (!confirm('確定要永久刪除這個租戶？此操作將刪除 Neon DB 及所有資料，無法復原。')) return
     setLoading(true)
@@ -72,6 +89,13 @@ export default function OrgActions({
           重新啟用
         </button>
       )}
+      <button
+        onClick={handleFixEmail}
+        disabled={loading}
+        className="text-xs text-blue-500 hover:underline disabled:opacity-50"
+      >
+        修正 Email
+      </button>
       <button
         onClick={handleDelete}
         disabled={loading}

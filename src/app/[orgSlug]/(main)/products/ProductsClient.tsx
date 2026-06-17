@@ -3,6 +3,7 @@ import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import SortableHeader from '@/components/SortableHeader'
+import { useOrgPath } from '@/lib/use-org-path'
 
 export type ProductRow = {
   id: number
@@ -40,6 +41,7 @@ export default function ProductsClient({
   sort = 'sku', dir = 'asc',
 }: Props) {
   const router = useRouter()
+  const toOrgPath = useOrgPath()
   const fileRef = useRef<HTMLInputElement>(null)
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [working, setWorking] = useState(false)
@@ -81,7 +83,7 @@ export default function ProductsClient({
     const d = (overrides.dir as string | undefined) ?? dir
     params.set('sort', s)
     params.set('dir', d)
-    return `/products?${params.toString()}`
+    return toOrgPath(`/products?${params.toString()}`)
   }
 
   function buildSortUrl(newSort: string, newDir: 'asc' | 'desc') {
@@ -192,7 +194,7 @@ export default function ProductsClient({
         <h1 className="text-2xl font-bold text-gray-800">商品管理</h1>
         <div className="flex gap-2 flex-wrap">
           {/* 封存/現有切換 */}
-          <a href={archived ? '/products' : '/products?archived=true'}
+          <a href={archived ? toOrgPath('/products') : toOrgPath('/products?archived=true')}
             className={`px-3 py-2 rounded-md text-sm font-medium border ${archived
               ? 'bg-amber-100 border-amber-300 text-amber-800'
               : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
@@ -215,7 +217,7 @@ export default function ProductsClient({
           <input ref={fileRef} type="file" className="hidden"
             accept=".xlsx,.xls" onChange={handleExcelImport} />
           {!archived && (
-            <a href="/products/new"
+            <a href={toOrgPath('/products/new')}
               className="bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
               + 新增商品
             </a>
@@ -358,7 +360,7 @@ export default function ProductsClient({
                     className="rounded border-gray-300" />
                 </td>
                 <td className="px-4 py-3">
-                  <Link href={`/products/${p.id}`} className="font-medium text-blue-600 hover:underline">
+                  <Link href={toOrgPath(`/products/${p.id}`)} className="font-medium text-blue-600 hover:underline">
                     {p.name}
                   </Link>
                 </td>
@@ -368,7 +370,7 @@ export default function ProductsClient({
                 <td className="px-4 py-3 text-right">{p.stock}</td>
                 <td className="px-4 py-3 text-gray-400 text-xs">{p.createdAt}</td>
                 <td className="px-4 py-3 text-right">
-                  <Link href={`/products/${p.id}/edit`} className="text-gray-400 hover:text-blue-600 text-xs">編輯</Link>
+                  <Link href={toOrgPath(`/products/${p.id}/edit`)} className="text-gray-400 hover:text-blue-600 text-xs">編輯</Link>
                 </td>
               </tr>
             ))}

@@ -1,12 +1,13 @@
 import { notFound } from 'next/navigation'
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
 import SupplierForm, { type SupplierFormData } from '@/modules/supplier/SupplierForm'
 
-type Props = { params: { id: string } }
+type Props = { params: { orgSlug: string; id: string } }
 
 export default async function EditSupplierPage({
   params }: Props) {
-    const supplier = await prisma.sUP_Supplier.findUnique({
+  const prisma = await getPagePrisma(params.orgSlug)
+  const supplier = await prisma.sUP_Supplier.findUnique({
     where: { id: Number(params.id) },
   })
 

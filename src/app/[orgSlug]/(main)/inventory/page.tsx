@@ -1,16 +1,22 @@
 export const dynamic = 'force-dynamic'
 import Link from 'next/link'
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
 import SortableHeader from '@/components/SortableHeader'
 
 const VALID_SORTS = ['name', 'sku', 'availableQty', 'quantity', 'reservedQty', 'pendingQty', 'safetyStock'] as const
 type SortField = typeof VALID_SORTS[number]
 
-type Props = { searchParams: { search?: string; filter?: string; sort?: string; dir?: string } }
+type Props = {
+  params: { orgSlug: string }
+  searchParams: { search?: string; filter?: string; sort?: string; dir?: string }
+}
 
 export default async function InventoryPage({
-  searchParams }: Props) {
-    const search = searchParams.search ?? ''
+  params,
+  searchParams,
+}: Props) {
+  const prisma = await getPagePrisma(params.orgSlug)
+  const search = searchParams.search ?? ''
   const filter = searchParams.filter ?? ''
   const sort: SortField = VALID_SORTS.includes(searchParams.sort as SortField) ? searchParams.sort as SortField : 'name'
   const dir = searchParams.dir === 'desc' ? 'desc' : 'asc'

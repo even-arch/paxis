@@ -1,8 +1,9 @@
 export const dynamic = 'force-dynamic'
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
 import DeliveryNoteForm from './DeliveryNoteForm'
 
-export default async function NewDeliveryNotePage() {
+export default async function NewDeliveryNotePage({ params }: { params: { orgSlug: string } }) {
+  const prisma = await getPagePrisma(params.orgSlug)
   const [customers, products] = await Promise.all([
     prisma.cUS_Customer.findMany({
       where: { isActive: true },

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useOrgPath } from '@/lib/use-org-path'
 import { SHIP_VIA, CURRENCIES } from '@/modules/purchase/poUtils'
 import ProductPicker from '@/components/ProductPicker'
 
@@ -22,6 +23,7 @@ export default function PurchaseForm({
   salesOrders: SalesOrder[]
 }) {
   const router = useRouter()
+  const toOrgPath = useOrgPath()
 
   const [supplierId,    setSupplierId]    = useState('')
   const [sourceType,    setSourceType]    = useState('0')
@@ -100,7 +102,7 @@ export default function PurchaseForm({
     setSaving(false)
     if (!res.ok) { setError('儲存失敗，請再試一次'); return }
     const d = await res.json()
-    router.push(`/purchases/${d.id}`)
+    router.push(toOrgPath(`/purchases/${d.id}`))
     router.refresh()
   }
 

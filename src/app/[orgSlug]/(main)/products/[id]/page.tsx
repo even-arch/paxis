@@ -1,13 +1,15 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
+import { orgPath } from '@/lib/org-path'
 import { formatDate } from '@/lib/utils'
 import DeleteProductButton from './DeleteProductButton'
 
-type Props = { params: { id: string } }
+type Props = { params: { orgSlug: string; id: string } }
 
 export default async function ProductDetailPage({
   params }: Props) {
+    const prisma = await getPagePrisma(params.orgSlug)
     const product = await prisma.pRD_Product.findUnique({
     where: { id: Number(params.id) },
     include: {
@@ -31,11 +33,11 @@ export default async function ProductDetailPage({
     <div className="max-w-3xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <Link href="/products" className="text-sm text-gray-400 hover:text-gray-600">← 商品管理</Link>
+          <Link href={orgPath(params.orgSlug, '/products')} className="text-sm text-gray-400 hover:text-gray-600">← 商品管理</Link>
           <h1 className="text-2xl font-bold text-gray-800 mt-1">{product.name}</h1>
         </div>
         <div className="flex gap-2">
-          <Link href={`/products/${params.id}/edit`} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm hover:bg-gray-50">
+          <Link href={orgPath(params.orgSlug, `/products/${params.id}/edit`)} className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm hover:bg-gray-50">
             編輯
           </Link>
           <DeleteProductButton productId={params.id} />
@@ -105,7 +107,7 @@ export default async function ProductDetailPage({
                 {product.supplierProducts.map((sp: typeof product.supplierProducts[0]) => (
                   <tr key={sp.id.toString()}>
                     <td className="py-2">
-                      <Link href={`/suppliers/${sp.supplier.id}`} className="text-blue-600 hover:underline">
+                      <Link href={orgPath(params.orgSlug, `/suppliers/${sp.supplier.id}`)} className="text-blue-600 hover:underline">
                         {sp.supplier.shortName ?? sp.supplier.name}
                       </Link>
                     </td>
@@ -155,7 +157,7 @@ export default async function ProductDetailPage({
                       </td>
                       <td className="py-2">
                         {h.poOrderId
-                          ? <Link href={`/purchases/${h.poOrderId}`} className="text-blue-600 hover:underline">{h.poOrderNo ?? h.poOrderId}</Link>
+                          ? <Link href={orgPath(params.orgSlug, `/purchases/${h.poOrderId}`)} className="text-blue-600 hover:underline">{h.poOrderNo ?? h.poOrderId}</Link>
                           : <span className="text-gray-400">-</span>
                         }
                       </td>

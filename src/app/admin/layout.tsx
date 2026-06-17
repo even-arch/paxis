@@ -23,6 +23,7 @@ async function AdminLayoutInner({ children }: { children: React.ReactNode }) {
         <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-4">
           <span className="font-bold text-gray-800 text-sm">PAXIS 管理後台</span>
           <nav className="flex gap-3 text-sm text-gray-600">
+            <Link href="/admin" className="hover:text-blue-600">系統設定</Link>
             <Link href="/admin/tenants" className="hover:text-blue-600">租戶管理</Link>
           </nav>
           <div className="ml-auto flex items-center gap-3">

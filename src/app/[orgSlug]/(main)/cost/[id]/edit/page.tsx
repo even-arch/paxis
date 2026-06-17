@@ -1,12 +1,13 @@
 import { notFound } from 'next/navigation'
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
 import CostForm from '@/modules/cost/CostForm'
 
-type Props = { params: { id: string } }
+type Props = { params: { orgSlug: string; id: string } }
 
 export default async function EditCostPage({
   params }: Props) {
-    const [sheet, products] = await Promise.all([
+  const prisma = await getPagePrisma(params.orgSlug)
+  const [sheet, products] = await Promise.all([
     prisma.cOST_Sheet.findUnique({ where: { id: Number(params.id) } }),
     prisma.pRD_Product.findMany({
       where: { isActive: true },

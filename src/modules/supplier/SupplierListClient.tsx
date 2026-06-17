@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useOrgPath } from '@/lib/use-org-path'
 
 type Supplier = {
   id: number
@@ -18,6 +19,7 @@ type Props = { suppliers: Supplier[]; isArchived: boolean }
 
 export default function SupplierListClient({ suppliers, isArchived }: Props) {
   const router = useRouter()
+  const toOrgPath = useOrgPath()
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [pending, startTransition] = useTransition()
 
@@ -78,18 +80,18 @@ export default function SupplierListClient({ suppliers, isArchived }: Props) {
               return (
                 <tr key={s.id} className={`hover:bg-gray-50 ${sel ? 'bg-blue-50' : ''}`}>
                   <td className="px-4 py-3"><input type="checkbox" checked={sel} onChange={() => toggle(s.id)} className="rounded" /></td>
-                  <td className="px-4 py-3"><Link href={`/suppliers/${s.id}`} className="font-medium text-blue-600 hover:underline">{s.name}</Link></td>
+                  <td className="px-4 py-3"><Link href={toOrgPath(`/suppliers/${s.id}`)} className="font-medium text-blue-600 hover:underline">{s.name}</Link></td>
                   <td className="px-4 py-3 text-gray-500">{s.shortName ?? '-'}</td>
                   <td className="px-4 py-3 text-gray-500">{s.countryCode ?? '-'}</td>
                   <td className="px-4 py-3 text-gray-500">{s.paymentTerms ?? '-'}</td>
                   <td className="px-4 py-3 text-gray-500">{s.currencyCode ?? '-'}</td>
                   <td className="px-4 py-3 text-right">
                     {s._count.products > 0
-                      ? <Link href={`/products?supplierId=${s.id}`} className="text-blue-600 hover:underline">{s._count.products} 項</Link>
+                      ? <Link href={toOrgPath(`/products?supplierId=${s.id}`)} className="text-blue-600 hover:underline">{s._count.products} 項</Link>
                       : <span className="text-gray-400">0</span>}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Link href={`/suppliers/${s.id}/edit`} className="text-gray-400 hover:text-blue-600 text-xs">編輯</Link>
+                    <Link href={toOrgPath(`/suppliers/${s.id}/edit`)} className="text-gray-400 hover:text-blue-600 text-xs">編輯</Link>
                   </td>
                 </tr>
               )

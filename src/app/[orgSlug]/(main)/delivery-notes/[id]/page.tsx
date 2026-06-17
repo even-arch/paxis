@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
 import { formatDate } from '@/lib/utils'
 
 const STATUS_LABEL: Record<string, string> = { DRAFT: '草稿', DISPATCHED: '已出貨', RECEIVED: '已簽收' }
@@ -20,7 +20,8 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
-export default async function DeliveryNoteDetailPage({ params }: { params: { id: string } }) {
+export default async function DeliveryNoteDetailPage({ params }: { params: { orgSlug: string; id: string } }) {
+  const prisma = await getPagePrisma(params.orgSlug)
   const id = parseInt(params.id, 10)
   if (isNaN(id)) notFound()
 

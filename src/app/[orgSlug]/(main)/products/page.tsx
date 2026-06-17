@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
 import { formatDate } from '@/lib/utils'
 import ProductsClient from './ProductsClient'
 
@@ -8,13 +8,15 @@ const VALID_SORTS = ['name', 'sku', 'modelNo', 'unit', 'createdAt', 'stock'] as 
 type SortField = typeof VALID_SORTS[number]
 
 type Props = {
+  params: { orgSlug: string }
   searchParams: {
     search?: string; page?: string; supplierId?: string; customerId?: string
     archived?: string; sort?: string; dir?: string
   }
 }
 
-export default async function ProductsPage({ searchParams }: Props) {
+export default async function ProductsPage({ params, searchParams }: Props) {
+  const prisma = await getPagePrisma(params.orgSlug)
   const search = searchParams.search ?? ''
   const page = Math.max(1, Number(searchParams.page ?? 1))
   const supplierId = searchParams.supplierId ? Number(searchParams.supplierId) : null

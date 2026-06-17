@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useOrgPath } from '@/lib/use-org-path'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
 const STATUS_LABELS: Record<number, { label: string; color: string }> = {
@@ -38,6 +39,7 @@ type Props = {
 
 export default function SalesListClient({ orders, isArchived }: Props) {
   const router = useRouter()
+  const toOrgPath = useOrgPath()
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [pending, startTransition] = useTransition()
 
@@ -122,7 +124,7 @@ export default function SalesListClient({ orders, isArchived }: Props) {
                     <input type="checkbox" checked={isSelected} onChange={() => toggle(o.id)} className="rounded" />
                   </td>
                   <td className="px-4 py-3">
-                    <Link href={`/sales/${o.id}`} className="font-mono font-medium text-teal-600 hover:underline">
+                    <Link href={toOrgPath(`/sales/${o.id}`)} className="font-mono font-medium text-teal-600 hover:underline">
                       {o.orderNo}
                     </Link>
                   </td>

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useOrgPath } from '@/lib/use-org-path'
 
 type OrderItem = {
   id: number
@@ -30,6 +31,7 @@ type Props = {
 
 export default function SalesPIPanel({ orderId, orderStatus, items, pis }: Props) {
   const router = useRouter()
+  const toOrgPath = useOrgPath()
   const [showForm, setShowForm] = useState(false)
   const [estimatedShipDate, setEstimatedShipDate] = useState('')
   const [piItems, setPiItems] = useState<{ slsItemId: number; quantity: string }[]>(
@@ -98,7 +100,7 @@ export default function SalesPIPanel({ orderId, orderStatus, items, pis }: Props
         </div>
         {canIssuePi && !showForm && (
           <div className="flex gap-2">
-            <Link href={`/sales/${orderId}/pi-import`}
+            <Link href={toOrgPath(`/sales/${orderId}/pi-import`)}
               className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700">
               ✨ 匯入 PI 文件
             </Link>
@@ -200,7 +202,7 @@ export default function SalesPIPanel({ orderId, orderStatus, items, pis }: Props
                 <div className="flex items-center gap-3">
                   {/* 列印 PI */}
                   <a
-                    href={`/print/pi/${pi.id}`}
+                    href={toOrgPath(`/print/pi/${pi.id}`)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs bg-gray-100 text-gray-700 border border-gray-300 px-2 py-0.5 rounded hover:bg-gray-200 whitespace-nowrap">
@@ -209,7 +211,7 @@ export default function SalesPIPanel({ orderId, orderStatus, items, pis }: Props
                   {/* UPS 出貨：從 PI 直接帶入資料 */}
                   {pi.status === 0 && (
                     <a
-                      href={`/shipping?piId=${pi.id}`}
+                      href={toOrgPath(`/shipping?piId=${pi.id}`)}
                       className="text-xs bg-amber-500 text-white px-2 py-0.5 rounded hover:bg-amber-600 whitespace-nowrap">
                       📦 UPS 出貨
                     </a>

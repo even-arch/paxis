@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useOrgPath } from '@/lib/use-org-path'
 
 type Props = {
   orderId: string
@@ -12,13 +13,14 @@ type Props = {
 
 export default function CommerceImportButton({ orderId, canImport, importedOrderId }: Props) {
   const router = useRouter()
+  const go = useOrgPath()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   if (importedOrderId) {
     return (
       <Link
-        href={`/sales/${importedOrderId}`}
+        href={go(`/sales/${importedOrderId}`)}
         className="inline-flex items-center justify-center rounded-md border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-100"
       >
         查看 Paxis 訂單
@@ -41,7 +43,7 @@ export default function CommerceImportButton({ orderId, canImport, importedOrder
         throw new Error(data.error ?? '匯入失敗')
       }
 
-      router.push(`/sales/${data.orderId}`)
+      router.push(go(`/sales/${data.orderId}`))
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : '匯入失敗')

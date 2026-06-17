@@ -1,16 +1,11 @@
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { redirect } from 'next/navigation'
+import { requireAdminAuth } from '@/lib/admin-auth'
 import { getSystemSetting } from '@/lib/system-settings'
 import UpsForm from './settings/ups/UpsForm'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminPage() {
-  const session = await getServerSession(authOptions)
-  if (!session) {
-    redirect('/login?callbackUrl=%2Fadmin')
-  }
+  await requireAdminAuth()
 
   const [dbAccountNo, dbMultiplier] = await Promise.all([
     getSystemSetting('ups_xinosys_account_no'),

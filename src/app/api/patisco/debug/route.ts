@@ -33,6 +33,7 @@ import {
   getOrderProducts,
   listProformaInvoices,
   listProformaInvoiceCopies,
+  getDeliveryOrderDetail,
 } from '@/api/patisco/client'
 
 const DEFAULT_MCP_URL = process.env.PATISCO_MCP_URL ?? 'https://mcp.patisco.com'
@@ -281,6 +282,32 @@ export async function GET(req: NextRequest) {
     case 'listProformaInvoiceCopies': {
       const page = Number(searchParams.get('page') ?? '1')
       result = await listProformaInvoiceCopies(creds, page)
+      break
+    }
+    // ── DO detail + PI matching debug ─────────────────────────────────────
+    case 'doDetail': {
+      const shipmentId = searchParams.get('shipmentId') ?? ''
+      if (!shipmentId) { result = { error: '需要 shipmentId 參數（Patisco DO ID，非 shipmentNo）' }; break }
+      const [ci, pl] = await Promise.all([
+        getDeliveryOrderDetail(creds, shipmentId, 'commercialInvoice'),
+        getDeliveryOrderDetail(creds, shipmentId, 'packingList'),
+      ])
+      const detail = ci.ok ? ci.data : (pl.ok ? pl.data : null)
+      const orders = (detail as Record<string,unknown> | null)?.orders ?? []
+      const packings = (detail as Record<string,unknown> | null)?.packings ?? []
+      result = { ci: ci.ok ? { orders: (ci.data as Record<string,unknown>)?.orders, no: (ci.data as Record<string,unknown>)?.no } : { error: ci }, pl: pl.ok ? { orders: (pl.data as Record<string,unknown>)?.orders } : { error: pl }, ordersCount: (orders as unknown[]).length, packingsCount: (packings as unknown[]).length }
+      break
+    }
+    // ── 列出所有 DO 的 patiscoDocId（從 SLS_Shipment）────────────────────
+    case 'shipmentDocIds': {
+      const prisma2 = await import('@/lib/request-db').then(m => m.getRequestPrisma())
+      const rows = await prisma2.sLS_Shipment.findMany({
+        select: { id: true, shipmentNo: true, patiscoDocId: true, patiscoDocNo: true },
+        where: { source: 'PATISCO' },
+        orderBy: { id: 'desc' },
+        take: 20,
+      })
+      result = rows
       break
     }
     default:

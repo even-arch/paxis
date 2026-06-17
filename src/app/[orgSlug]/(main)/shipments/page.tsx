@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 import Link from 'next/link'
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
+import { orgPath } from '@/lib/org-path'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import SortableHeader from '@/components/SortableHeader'
 
@@ -14,9 +15,13 @@ const SOURCE_LABELS: Record<string, string> = {
 const VALID_SORTS = ['shipmentNo', 'actualShipDate', 'currencyCode', 'source', 'performedAt'] as const
 type SortField = typeof VALID_SORTS[number]
 
-type Props = { searchParams: { search?: string; page?: string; sort?: string; dir?: string } }
+type Props = {
+  params: { orgSlug: string }
+  searchParams: { search?: string; page?: string; sort?: string; dir?: string }
+}
 
-export default async function ShipmentsPage({ searchParams }: Props) {
+export default async function ShipmentsPage({ params, searchParams }: Props) {
+  const prisma = await getPagePrisma(params.orgSlug)
   const search = searchParams.search ?? ''
   const page = Math.max(1, Number(searchParams.page ?? 1))
   const sort: SortField = VALID_SORTS.includes(searchParams.sort as SortField) ? searchParams.sort as SortField : 'actualShipDate'
@@ -68,7 +73,7 @@ export default async function ShipmentsPage({ searchParams }: Props) {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">出貨單</h1>
-        <Link href="/shipments/import"
+        <Link href={orgPath(params.orgSlug, '/shipments/import')}
           className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium px-4 py-2 rounded-md transition-colors">
           <span>📥</span>
           <span>AI 匯入出貨文件</span>
@@ -83,7 +88,7 @@ export default async function ShipmentsPage({ searchParams }: Props) {
           className="border border-gray-300 rounded-md px-3 py-2 text-sm w-80 focus:outline-none focus:ring-2 focus:ring-blue-500" />
         <button type="submit" className="bg-gray-100 border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-200">搜尋</button>
         {search && (
-          <Link href="/shipments" className="border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-50 text-gray-500">清除</Link>
+          <Link href={orgPath(params.orgSlug, '/shipments')} className="border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-50 text-gray-500">清除</Link>
         )}
       </form>
 
@@ -113,7 +118,7 @@ export default async function ShipmentsPage({ searchParams }: Props) {
               return (
                 <tr key={s.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
-                    <Link href={`/shipments/${s.id}`} className="font-mono font-medium text-teal-600 hover:underline">
+                    <Link href={orgPath(params.orgSlug, `/shipments/${s.id}`)} className="font-mono font-medium text-teal-600 hover:underline">
                       {s.shipmentNo}
                     </Link>
                   </td>
@@ -139,7 +144,7 @@ export default async function ShipmentsPage({ searchParams }: Props) {
           <span className="text-gray-500">共 {total} 筆</span>
           <div className="flex gap-1 ml-auto">
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-              <Link key={p} href={`/shipments?search=${search}&sort=${sort}&dir=${dir}&page=${p}`}
+              <Link key={p} href={orgPath(params.orgSlug, `/shipments?search=${search}&sort=${sort}&dir=${dir}&page=${p}`)}
                 className={`px-3 py-1 rounded-md ${p === page ? 'bg-teal-600 text-white' : 'border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
                 {p}
               </Link>

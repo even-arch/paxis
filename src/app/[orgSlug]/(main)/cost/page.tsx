@@ -1,12 +1,19 @@
 export const dynamic = 'force-dynamic'
-import { prisma } from '@/lib/db'
+import { getPagePrisma } from '@/lib/page-db'
+import { orgPath } from '@/lib/org-path'
 import { formatDate } from '@/lib/utils'
 
-type Props = { searchParams: { search?: string; page?: string } }
+type Props = {
+  params: { orgSlug: string }
+  searchParams: { search?: string; page?: string }
+}
 
 export default async function CostPage({
-  searchParams }: Props) {
-    const search = searchParams.search ?? ''
+  params,
+  searchParams,
+}: Props) {
+  const prisma = await getPagePrisma(params.orgSlug)
+  const search = searchParams.search ?? ''
   const page = Math.max(1, Number(searchParams.page ?? 1))
   const limit = 20
 
@@ -89,7 +96,7 @@ export default async function CostPage({
               return (
                 <tr key={s.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
-                    <a href={`/cost/${s.id}`} className="font-medium text-blue-600 hover:underline">{s.name}</a>
+                    <a href={orgPath(params.orgSlug, `/cost/${s.id}`)} className="font-medium text-blue-600 hover:underline">{s.name}</a>
                   </td>
                   <td className="px-4 py-3 text-gray-600">
                     {s.product.name}
@@ -109,7 +116,7 @@ export default async function CostPage({
                   </td>
                   <td className="px-4 py-3 text-gray-400 text-xs">{formatDate(s.updatedAt)}</td>
                   <td className="px-4 py-3 text-right">
-                    <a href={`/cost/${s.id}/edit`} className="text-gray-400 hover:text-blue-600 text-xs">編輯</a>
+                    <a href={orgPath(params.orgSlug, `/cost/${s.id}/edit`)} className="text-gray-400 hover:text-blue-600 text-xs">編輯</a>
                   </td>
                 </tr>
               )
@@ -121,7 +128,7 @@ export default async function CostPage({
       {totalPages > 1 && (
         <div className="flex gap-1 mt-4 ml-auto w-fit">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-            <a key={p} href={`/cost?search=${search}&page=${p}`}
+            <a key={p} href={orgPath(params.orgSlug, `/cost?search=${search}&page=${p}`)}
               className={`px-3 py-1 rounded-md text-sm ${p === page ? 'bg-blue-600 text-white' : 'border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
               {p}
             </a>

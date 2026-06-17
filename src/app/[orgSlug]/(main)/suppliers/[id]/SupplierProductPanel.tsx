@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useOrgPath } from '@/lib/use-org-path'
 
 type SupplierProduct = {
   id: number
@@ -27,6 +28,7 @@ const CURRENCIES = ['USD', 'CNY', 'TWD', 'EUR']
 
 export default function SupplierProductPanel({ supplierId, supplierProducts, allProducts }: Props) {
   const router = useRouter()
+  const go = useOrgPath()
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
@@ -145,7 +147,7 @@ export default function SupplierProductPanel({ supplierId, supplierProducts, all
             {supplierProducts.map((sp: SupplierProduct) => (
               <tr key={sp.id} className={sp.isPreferred ? 'bg-blue-50' : ''}>
                 <td className="py-2">
-                  <Link href={`/products/${sp.product.id}`} className="text-blue-600 hover:underline">
+                  <Link href={go(`/products/${sp.product.id}`)} className="text-blue-600 hover:underline">
                     {sp.product.name}
                   </Link>
                   {sp.product.sku && <span className="text-gray-400 text-xs ml-1">({sp.product.sku})</span>}
