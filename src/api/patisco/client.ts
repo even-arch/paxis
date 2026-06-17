@@ -486,6 +486,11 @@ async function mcpCall<T>(
     })
 
     if (!res.ok) {
+      // HTTP 401 = JWT 過期或無效 → 觸發自動重新登入
+      if (res.status === 401) {
+        _sessions.delete(base)
+        return { ok: false, error: MCP_AUTH_EXPIRED }
+      }
       return { ok: false, error: `HTTP ${res.status}` }
     }
 
