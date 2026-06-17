@@ -1752,24 +1752,14 @@ async function _processDO({
     const linkedPiIds = new Set<number>()
 
     // 從 detail.orders[] 配對
+    // 注意：orders[].id 屬於不同 ID 空間，不可用於查 patiscoDocId（Patisco 文件明確說明）
+    // 只能用 orders[].no（PI 號碼）比對 SLS_PI.piNo
     const ordersList = detail.orders ?? []
     for (const ord of ordersList) {
-      const piNo  = ord.no?.trim()
-      const srcId = ord.id?.trim()
-      if (!piNo && !srcId) continue
+      const piNo = ord.no?.trim()
+      if (!piNo) continue
       const pi = await prisma.sLS_PI.findFirst({
-        where: piNo
-          ? { OR: [{ piNo }, ...(srcId ? [{ patiscoDocId: srcId }] : [])] }
-          : { patiscoDocId: srcId! },
-        select: { id: true },
-      })
-      if (pi) linkedPiIds.add(pi.id)
-    }
-    for (const p of packingItems) {
-      const sid = (p as { sourceOrderID?: string }).sourceOrderID
-      if (!sid) continue
-      const pi = await prisma.sLS_PI.findFirst({
-        where: { patiscoDocId: sid },
+        where: { piNo },
         select: { id: true },
       })
       if (pi) linkedPiIds.add(pi.id)
@@ -2009,29 +1999,17 @@ export async function backfillShipmentPILinks(
         continue
       }
 
-      const ordersList = (detail.orders ?? []) as Array<{ no?: string; id?: string }>
-      const packingItems = ((pl ?? ci)?.packings ?? []) as Array<{ sourceOrderID?: string }>
+      // orders[].id 屬於不同 ID 空間，不可用於查 patiscoDocId（Patisco 文件明確說明）
+      // 只能用 orders[].no（PI 號碼）比對 SLS_PI.piNo
+      const ordersList = (detail.orders ?? []) as Array<{ no?: string }>
 
       const linkedPiIds = new Set<number>()
 
       for (const ord of ordersList) {
         const piNo = ord.no?.trim()
-        const srcId = ord.id?.trim()
-        if (!piNo && !srcId) continue
+        if (!piNo) continue
         const pi = await prisma.sLS_PI.findFirst({
-          where: piNo
-            ? { OR: [{ piNo }, ...(srcId ? [{ patiscoDocId: srcId }] : [])] }
-            : { patiscoDocId: srcId! },
-          select: { id: true },
-        })
-        if (pi) linkedPiIds.add(pi.id)
-      }
-
-      for (const p of packingItems) {
-        const sid = (p as Record<string, unknown>).sourceOrderID as string | undefined
-        if (!sid) continue
-        const pi = await prisma.sLS_PI.findFirst({
-          where: { patiscoDocId: sid },
+          where: { piNo },
           select: { id: true },
         })
         if (pi) linkedPiIds.add(pi.id)
