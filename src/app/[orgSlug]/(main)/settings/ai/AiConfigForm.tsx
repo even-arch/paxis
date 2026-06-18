@@ -114,22 +114,36 @@ export default function AiConfigForm() {
         <div className="space-y-3">
           <Feature
             icon="📄"
-            title="供應商訂單自動解析"
-            desc="上傳供應商寄來的 PDF、圖片或 Excel，AI 自動讀取品名、料號、數量、單價、供應商名稱，一鍵填入採購表單，省去手動輸入。"
+            title="採購單自動解析"
+            desc="上傳供應商寄來的 PDF、圖片或 Excel，AI 自動讀取品名、料號、數量、單價、供應商名稱，一鍵填入採購表單。"
+            tag="現已上線"
+            tagColor="green"
+          />
+          <Feature
+            icon="🧾"
+            title="客戶訂單自動解析"
+            desc="上傳客戶 PO 文件，AI 解析訂單內容並自動建立客戶訂單，支援 PDF 與 Excel 格式。"
+            tag="現已上線"
+            tagColor="green"
+          />
+          <Feature
+            icon="🚢"
+            title="出貨文件批次匯入"
+            desc="上傳 Commercial Invoice 與 Packing List Excel，AI 解析出貨明細並建立出貨記錄，自動對應品項與 PI。"
             tag="現已上線"
             tagColor="green"
           />
           <Feature
             icon="🏭"
-            title="自動建立供應商與商品"
-            desc="解析結果中的供應商和品項，系統會自動比對現有資料，找不到的直接新建，不需要手動維護。"
+            title="自動建立供應商、客戶與商品"
+            desc="解析結果中的公司與品項，系統自動比對現有資料，找不到的直接新建，不需要手動維護。"
             tag="現已上線"
             tagColor="green"
           />
           <Feature
             icon="🔢"
             title="HTS Code 自動分類"
-            desc="輸入商品描述，AI 建議最符合的 HS Code 及關稅稅率，用於成本計算。"
+            desc="輸入商品描述，AI 建議最符合的 HS Code 及關稅稅率，用於到岸成本計算。"
             tag="規劃中"
             tagColor="gray"
           />
