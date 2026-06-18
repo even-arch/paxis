@@ -42,23 +42,56 @@ model SYS_PatiscoConfig {
   @@map("SYS_PatiscoConfig")
 }
 
-// Patisco 同步紀錄（去重 + 稽核）
-// source: 'webhook' | 'cron'
-// status: 'ok' | 'partial' | 'skipped' | 'error'
+// Patisco 同步作業（每次 full sync 一筆，追蹤進度與回滾）
+// status: pending | running | completed | cancelled | error
+model SYS_SyncJob {
+  id          Int      @id @default(autoincrement())
+  status      String   @default("pending")
+  trigger     String   // manual | cron | webhook
+
+  // Phase 1 進度
+  phase1Total Int      @default(0)   // 預計拉取文件總數
+  phase1Done  Int      @default(0)   // 已完成文件數
+
+  // Phase 2 進度（紀錄目前執行到哪個 step，供出錯後 resume）
+  phase2Step  String?  // customers | suppliers | products | sls_orders | po_orders | po_supplier_pis | sls_pis | sls_shipments | done
+
+  startedAt   DateTime @default(now())
+  completedAt DateTime?
+  cancelledAt DateTime?
+  errorAt     DateTime?
+  errorMsg    String?
+  result      Json?    // 完成後統計 { created:{}, updated:{}, skipped:{} }
+
+  performedBy Int?
+  performer   SYS_User? @relation(fields: [performedBy], references: [id])
+
+  @@index([status, startedAt])
+  @@map("SYS_SyncJob")
+}
+
+// Patisco 同步紀錄（去重 + 稽核，Phase 1 raw JSON 存這裡）
+// docType: PI | PO | PI_COPY | PO_COPY | DO
+// status: ok | error
 model SYS_PatiscoSync {
-  id           Int      @id @default(autoincrement())
-  docType      String   @default("PI")  // PI | SHIPMENT
-  patiscoDocId String
-  patiscoDocNo String
-  syncedAt     DateTime @default(now())
-  source       String   // webhook | cron | manual
-  status       String   // ok | partial | skipped | error
-  result         Json?
-  analyzedResult Json?
-  errorMsg       String?
+  id                Int      @id @default(autoincrement())
+  docType           String   // PI | PO | PI_COPY | PO_COPY | DO
+  patiscoDocId      String
+  patiscoDocNo      String
+  syncedAt          DateTime @default(now())
+  source            String   // webhook | cron | manual
+  status            String   // ok | error
+  result            Json?    // Phase 1 raw JSON { header, products } or { packingList, commercialInvoice }
+  analyzedResult    Json?    // Phase 2 解析結果（PAXIS 建立的 record IDs）
+  errorMsg          String?
+
+  syncJobId         Int?     // 所屬 sync job ID
+  patiscoModifiedAt DateTime? // Patisco 最後異動時間（工程師補上 lastModifiedDate 後可用）
 
   @@unique([docType, patiscoDocId])
   @@index([syncedAt])
+  @@index([syncJobId])
+  @@index([docType, status])
   @@map("SYS_PatiscoSync")
 }
 
@@ -77,6 +110,7 @@ model SYS_User {
   aiParseModel    String?
 
   // Relations
+  syncJobs         SYS_SyncJob[]
   purchaseOrders   PO_Order[]
   receipts         PO_Receipt[]
   supplierPIs      PO_SupplierPI[]
@@ -246,6 +280,7 @@ model PRD_Product {
 
   isActive      Boolean   @default(true)
   isArchived    Boolean   @default(false)
+  syncJobId     Int?      // Patisco sync job ID，用於回滾
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -347,6 +382,7 @@ model SUP_Supplier {
 
   isActive      Boolean   @default(true)
   archivedAt    DateTime? // 封存時間；非 null = 已封存，正常查詢排除
+  syncJobId     Int?      // Patisco sync job ID，用於回滾
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -455,6 +491,7 @@ model CUS_Customer {
 
   isActive      Boolean   @default(true)
   archivedAt    DateTime? // 封存時間；非 null = 已封存，正常查詢排除
+  syncJobId     Int?      // Patisco sync job ID，用於回滾
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -548,6 +585,7 @@ model PO_Order {
   patiscoOrderId    String?
   patiscoStatus     String?   // Patisco 文件狀態：'0'=Editing, '1'=Confirmed
 
+  syncJobId     Int?      // Patisco sync job ID，用於回滾
   createdBy     Int
   creator       SYS_User  @relation(fields: [createdBy], references: [id])
   createdAt     DateTime  @default(now())
@@ -618,6 +656,7 @@ model PO_SupplierPI {
   patiscoDocNo     String?
   patiscoCreatedAt DateTime? // Patisco 原始建立時間（createdDate YYYYMMDDHHmmss）
   patiscoStatus    String?   // Patisco 文件狀態：'0'=Editing, '1'=Confirmed
+  syncJobId        Int?      // Patisco sync job ID，用於回滾
 
   items       PO_SupplierPIItem[]
 
@@ -730,6 +769,7 @@ model SLS_Order {
   patiscoDocNo     String?
   patiscoCreatedAt DateTime? // Patisco 原始建立時間（createdDate YYYYMMDDHHmmss）
   patiscoStatus    String?   // Patisco 文件狀態：'0'=Editing, '1'=Confirmed
+  syncJobId        Int?      // Patisco sync job ID，用於回滾
 
   createdBy   Int
   creator     SYS_User  @relation("SLS_Order_creator", fields: [createdBy], references: [id])
@@ -811,6 +851,7 @@ model SLS_PI {
   patiscoDocNo     String?
   patiscoCreatedAt DateTime? // Patisco 原始建立時間（createdDate YYYYMMDDHHmmss）
   patiscoStatus    String?   // Patisco 文件狀態：'0'=Editing, '1'=Confirmed
+  syncJobId        Int?      // Patisco sync job ID，用於回滾
 
   items          SLS_PIItem[]
   shipmentPIs    SLS_ShipmentPI[]
@@ -872,6 +913,7 @@ model SLS_Shipment {
 
   patiscoDocId  String?
   patiscoDocNo  String?
+  syncJobId     Int?    // Patisco sync job ID，用於回滾
 
   // 出貨文件號（Packing List / Commercial Invoice 上的編號，供核對用）
   packingListNo     String?
