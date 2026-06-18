@@ -114,26 +114,11 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
     setSyncing(true); setSyncResult(null); setMsg(null); setSyncElapsed(0)
     const startTime = Date.now()
     const timer = setInterval(() => setSyncElapsed(Math.floor((Date.now() - startTime) / 1000)), 500)
-    const combined: Record<string, unknown> = {}
     try {
-      for (const type of ['buyers', 'pi', 'po'] as const) {
-        const data = await callSync({ type })
-        if (data.buyers) combined.buyers = data.buyers
-        if (data.pi)     combined.pi     = data.pi
-        if (data.po)     combined.po     = data.po
-      }
-      let dProc = 0, dErr = 0
-      while (true) {
-        const data = await callSync({ type: 'process-next-do' })
-        const d = data.do ?? {}
-        if (!d.processed) break
-        if (d.error) dErr++; else dProc++
-        if (!d.hasMore) break
-      }
-      combined.deliveries = { processed: dProc, errors: dErr, total: dProc + dErr }
+      const data = await callSync({ type: 'all' })
       clearInterval(timer)
       setSyncing(false)
-      setSyncResult({ ...combined, durationMs: Date.now() - startTime })
+      setSyncResult({ ...data, durationMs: Date.now() - startTime })
       router.refresh()
     } catch (err) {
       clearInterval(timer)
