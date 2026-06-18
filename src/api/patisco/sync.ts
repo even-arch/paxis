@@ -1767,19 +1767,35 @@ async function _processDO({
     const packingItems = (pl ?? ci)?.packings ?? []
     const linkedPiIds = new Set<number>()
 
-    // 從 detail.orders[] 配對
-    // 注意：orders[].id 屬於不同 ID 空間，不可用於查 patiscoDocId（Patisco 文件明確說明）
-    // 只能用 orders[].no（PI 號碼）比對 SLS_PI.piNo
+    // 路徑 A：從 detail.orders[] 配對
+    // orders[].id 屬於不同 ID 空間，只能用 orders[].no（PI 號碼）比對 SLS_PI.piNo
     const ordersList = detail.orders ?? []
+    const missingPiNos: string[] = []
     for (const ord of ordersList) {
       const piNo = ord.no?.trim()
       if (!piNo) continue
-      const pi = await prisma.sLS_PI.findFirst({
-        where: { piNo },
-        select: { id: true },
-      })
+      const pi = await prisma.sLS_PI.findFirst({ where: { piNo }, select: { id: true } })
       if (pi) linkedPiIds.add(pi.id)
+      else missingPiNos.push(piNo)
     }
+
+    // 路徑 B：從 packings[].sourceOrderNo 補齊（當 orders[] 為空或有漏時）
+    // sourceOrderID 屬於 Patisco 內部 ID 空間，不可用於查 patiscoDocId，只用 sourceOrderNo
+    const packingPiNos = new Set<string>()
+    for (const p of packingItems) {
+      const no = (p as { sourceOrderNo?: string }).sourceOrderNo?.trim()
+      if (no) packingPiNos.add(no)
+    }
+    for (const piNo of Array.from(packingPiNos)) {
+      const pi = await prisma.sLS_PI.findFirst({ where: { piNo }, select: { id: true } })
+      if (pi) linkedPiIds.add(pi.id)
+      else if (!missingPiNos.includes(piNo)) missingPiNos.push(piNo)
+    }
+
+    if (missingPiNos.length > 0) {
+      console.warn(`[do-process] DO ${docNo} 找不到 PI：${missingPiNos.join(', ')}（PI 尚未同步或號碼不符）`)
+    }
+
     for (const piId of Array.from(linkedPiIds)) {
       await prisma.sLS_ShipmentPI.upsert({
         where: { shipmentId_piId: { shipmentId: shipment.id, piId } },
@@ -1787,7 +1803,7 @@ async function _processDO({
         update: {},
       })
     }
-    console.log(`[do-process] DO ${docNo} PI=${linkedPiIds.size} packings=${packingItems.length}`)
+    console.log(`[do-process] DO ${docNo} PI=${linkedPiIds.size}（orders路徑+packings路徑）packings=${packingItems.length} missingPIs=${missingPiNos.length}`)
 
     // 7. 重建 SLS_ShipmentItem
     const isNewShipment = !existingShipment
@@ -1811,13 +1827,11 @@ async function _processDO({
         const qty = parseInt(String((packing as { quantity?: string }).quantity ?? '0'), 10) || 0
         if (qty === 0) continue
 
-        const srcOrderId = (packing as { sourceOrderID?: string }).sourceOrderID?.trim()
+        // sourceOrderID 屬於 Patisco 內部 ID 空間，不可用於查 SLS_PI（會找到錯誤資料）
+        // 只用 sourceOrderNo（PI 號碼）比對 SLS_PI.piNo
         const srcOrderNo = (packing as { sourceOrderNo?: string }).sourceOrderNo?.trim()
-        const piConditions: Array<Record<string, string>> = []
-        if (srcOrderId) { piConditions.push({ patiscoDocId: srcOrderId }); piConditions.push({ piNo: srcOrderId }) }
-        if (srcOrderNo) { piConditions.push({ piNo: srcOrderNo });          piConditions.push({ patiscoDocId: srcOrderNo }) }
-        const srcPI = piConditions.length > 0
-          ? await prisma.sLS_PI.findFirst({ where: { OR: piConditions }, select: { id: true, orderId: true } })
+        const srcPI = srcOrderNo
+          ? await prisma.sLS_PI.findFirst({ where: { piNo: srcOrderNo }, select: { id: true, orderId: true } })
           : null
 
         const slsItem = srcPI && product
