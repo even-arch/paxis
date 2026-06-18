@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { useOrgPath } from '@/lib/use-org-path'
 
 type Payable = {
   id: number
@@ -87,6 +88,7 @@ type EstimateRow = {
 }
 
 export default function FinancePage() {
+  const toOrgPath = useOrgPath()
   const [tab, setTab] = useState<'pay' | 'rec' | 'est'>('pay')
   const [payFilter, setPayFilter] = useState('')
   const [recFilter, setRecFilter] = useState('')
@@ -344,12 +346,12 @@ export default function FinancePage() {
                   return (
                     <tr key={p.id} className={overdue ? 'bg-red-50' : ''}>
                       <td className="px-4 py-3">
-                        <Link href={`/suppliers/${p.supplier.id}`} className="font-medium text-gray-800 hover:underline">
+                        <Link href={toOrgPath(`/suppliers/${p.supplier.id}`)} className="font-medium text-gray-800 hover:underline">
                           {p.supplier.shortName ?? p.supplier.name}
                         </Link>
                       </td>
                       <td className="px-4 py-3">
-                        <Link href={`/purchases/${p.receipt.order.id}`} className="font-mono text-blue-600 hover:underline text-xs">
+                        <Link href={toOrgPath(`/purchases/${p.receipt.order.id}`)} className="font-mono text-blue-600 hover:underline text-xs">
                           {p.receipt.order.poNo}
                         </Link>
                       </td>
@@ -415,14 +417,14 @@ export default function FinancePage() {
                     <tr key={r.id} className={overdue ? 'bg-red-50' : ''}>
                       <td className="px-4 py-3">
                         {r.customer ? (
-                          <Link href={`/customers/${r.customer.id}`} className="font-medium text-gray-800 hover:underline">{custName}</Link>
+                          <Link href={toOrgPath(`/customers/${r.customer.id}`)} className="font-medium text-gray-800 hover:underline">{custName}</Link>
                         ) : <span className="text-gray-600">{custName}</span>}
                       </td>
                       <td className="px-4 py-3">
                         {r.shipment.pis.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {r.shipment.pis.map(sp => (
-                              <Link key={sp.pi.id} href={`/sales/${sp.pi.order.id}`}
+                              <Link key={sp.pi.id} href={toOrgPath(`/sales/${sp.pi.order.id}`)}
                                 className="font-mono text-blue-600 hover:underline text-xs">
                                 {sp.pi.piNo}
                               </Link>
@@ -812,13 +814,13 @@ function EstimatesTab({
                     <td className="px-4 py-3 font-mono text-xs text-blue-600">
                       <span className="flex items-center gap-1">
                         <span className="text-gray-400 text-xs">{isExpanded ? '▼' : '▶'}</span>
-                        <Link href={`/shipments/${r.shipmentId}`} className="hover:underline" onClick={e => e.stopPropagation()}>{r.shipmentNo}</Link>
+                        <Link href={toOrgPath(`/shipments/${r.shipmentId}`)} className="hover:underline" onClick={e => e.stopPropagation()}>{r.shipmentNo}</Link>
                         {hasWarning && <span title={r.warnings.join('\n')} className="text-amber-500">⚠️</span>}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-gray-700 text-xs">
                       {r.customer.id
-                        ? <Link href={`/customers/${r.customer.id}`} className="hover:underline">{r.customer.name}</Link>
+                        ? <Link href={toOrgPath(`/customers/${r.customer.id}`)} className="hover:underline">{r.customer.name}</Link>
                         : <span className="text-gray-400">{r.customer.name}</span>}
                     </td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(r.actualShipDate)}</td>
