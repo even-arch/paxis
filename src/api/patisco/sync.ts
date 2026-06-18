@@ -22,6 +22,7 @@
 import { prisma as defaultPrisma } from '@/lib/db'
 import { Decimal } from '@prisma/client/runtime/library'
 import type { PrismaClient } from '@prisma/client'
+import { callLLM, parseJsonResponse } from '@/lib/ai-llm'
 import {
   patiscoLogin,
   listProformaInvoices,
@@ -1513,6 +1514,9 @@ export async function seedDOQueue(
     const existing = existingMap.get(docId)
     if (!existing) { toCreate.push(doHeader); continue }
 
+    // 已在佇列中或 raw data 已存好等待 AI 分析，不打擾
+    if (['pending', 'fetched', 'processing'].includes(existing.status)) { skipped++; continue }
+
     if (existing.status === 'ok') {
       const stored = existing.result as { copyId?: string; piCount?: number } | null
       const storedCopyId = stored?.copyId ?? ''
@@ -1521,6 +1525,8 @@ export async function seedDOQueue(
       const missingPILink = (stored?.piCount ?? -1) === 0
       if (!copyIdChanged && !isRecent && !missingPILink) { skipped++; continue }
     }
+
+    // partial / error → requeue
     toRequeue.push(doHeader)
   }
 
@@ -1566,29 +1572,149 @@ export async function seedDOQueue(
   return { seeded, total: allDOs.length }
 }
 
-// ─── Phase 2: 取 1 筆 pending DO，完整處理（10-20s，絕不超時）─────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// DO 兩階段同步
+//
+// Phase 1（pending → fetched）：純撈取 Patisco API，存 raw JSON，不寫業務表
+// Phase 2（fetched → ok/partial）：AI 分析 raw JSON，確定性寫入業務表
+//
+// 好處：任一階段 timeout/失敗都有完整資訊可重試，PI 關聯由 AI 找，不靠脆弱的欄位路徑
+// ─────────────────────────────────────────────────────────────────────────────
+
+// AI 從 raw DO JSON 提取的標準化結果
+interface DOAnalysis {
+  piNos: string[]
+  buyer: {
+    name: string
+    patiscoBuyerId: string | null
+    address?: string | null
+    city?: string | null
+    countryCode?: string | null
+  }
+  shipDate: string           // YYYYMMDD 或空字串
+  currencyCode: string       // USD / EUR / TWD …
+  exchangeRate: number | null
+  portOfLoading: string | null
+  portOfDischarge: string | null
+  commercialInvNo: string | null
+  packingListNo: string | null
+  items: Array<{
+    sku: string
+    productName: string | null
+    quantity: number
+    unit: string
+    unitPrice: number | null
+    piNo: string | null        // 此品項所屬 PI 號碼
+    cartonNoFrom: string | null
+    cartonNoTo: string | null
+    cartons: number | null
+    grossWeightKg: number | null
+    netWeightKg: number | null
+    cubicFt: number | null
+  }>
+}
+
+async function _aiAnalyzeDO(
+  ci: unknown,
+  pl: unknown,
+  docNo: string,
+  prisma: PrismaClient,
+): Promise<DOAnalysis | null> {
+  const user = await prisma.sYS_User.findFirst({
+    orderBy: { id: 'asc' },
+    select: { aiProvider: true, encryptedAiKey: true, aiParseModel: true },
+  })
+  if (!user?.aiProvider || !user?.encryptedAiKey) return null
+
+  try {
+    const { decrypt } = await import('@/lib/crypto')
+    const apiKey = decrypt(user.encryptedAiKey)
+    const model = user.aiParseModel
+      || (user.aiProvider === 'anthropic' ? 'claude-haiku-4-5-20251001' : 'gpt-4o-mini')
+
+    const ciStr = JSON.stringify(ci ?? {}).slice(0, 30000)
+    const plStr = JSON.stringify(pl ?? {}).slice(0, 30000)
+
+    const systemPrompt = `You extract structured data from Patisco delivery order API responses. Return ONLY valid JSON, no markdown.`
+
+    const userPrompt = `Extract data from Patisco delivery order ${docNo}.
+
+CRITICAL - Find ALL PI numbers (most important task):
+1. detail.orders[].no — these are PI document numbers
+2. packings[].sourceOrderNo — each packing item's PI number
+Collect ALL unique PI numbers from both sources.
+
+For EACH item in packings[], record its sourceOrderNo as piNo.
+
+Currency: numeric codes: 1=USD, 2=EUR, 3=TWD, 4=GBP, 5=JPY, 6=AUD, 7=CAD, 8=SGD, 9=HKD, 10=CNY.
+Exchange rate: ci.exchangeRate.value (numeric).
+Ship date: shipDate or createdDate field in YYYYMMDD format.
+
+CI data: ${ciStr}
+PL data: ${plStr}
+
+Return exactly this JSON:
+{
+  "piNos": [],
+  "buyer": { "name": "", "patiscoBuyerId": null, "address": null, "city": null, "countryCode": null },
+  "shipDate": "",
+  "currencyCode": "USD",
+  "exchangeRate": null,
+  "portOfLoading": null,
+  "portOfDischarge": null,
+  "commercialInvNo": null,
+  "packingListNo": null,
+  "items": [{
+    "sku": "",
+    "productName": null,
+    "quantity": 0,
+    "unit": "pcs",
+    "unitPrice": null,
+    "piNo": null,
+    "cartonNoFrom": null,
+    "cartonNoTo": null,
+    "cartons": null,
+    "grossWeightKg": null,
+    "netWeightKg": null,
+    "cubicFt": null
+  }]
+}`
+
+    const raw = await callLLM(user.aiProvider, apiKey, model, [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ], 4096)
+    return parseJsonResponse<DOAnalysis>(raw)
+  } catch (err) {
+    console.warn(`[do-analyze] AI 分析 DO ${docNo} 失敗，將使用確定性 fallback:`, err)
+    return null
+  }
+}
+
 export async function processNextPendingDO(
   source: SyncSource,
   db?: PrismaClient,
   _dbUrl?: string,
   sharedCreds?: PatiscoCredentials & { _mcpUrl: string },
-): Promise<{ processed: boolean; hasMore: boolean; docNo?: string; error?: string }> {
+): Promise<{ processed: boolean; hasMore: boolean; docNo?: string; error?: string; phase?: string }> {
   const prisma = db ?? defaultPrisma
 
+  // 同時處理 pending（待撈取）和 fetched（已撈取，待 AI 分析）
   const pending = await prisma.sYS_PatiscoSync.findFirst({
-    where: { docType: 'DO', status: 'pending' },
+    where: { docType: 'DO', status: { in: ['pending', 'fetched'] } },
     orderBy: { syncedAt: 'asc' },
-    select: { id: true, patiscoDocId: true, patiscoDocNo: true, result: true },
+    select: { id: true, patiscoDocId: true, patiscoDocNo: true, status: true, result: true },
   })
   if (!pending) return { processed: false, hasMore: false }
 
   const hasMorePending = await prisma.sYS_PatiscoSync.count({
-    where: { docType: 'DO', status: 'pending' },
+    where: { docType: 'DO', status: { in: ['pending', 'fetched'] } },
   }) > 1
 
   const docId = pending.patiscoDocId
   const docNo = pending.patiscoDocNo
-  const copyId = (pending.result as { copyId?: string } | null)?.copyId ?? ''
+  const storedResult = pending.result as { copyId?: string; ci?: unknown; pl?: unknown } | null
+  const copyId = storedResult?.copyId ?? ''
 
   // 立刻標為 processing（防止 cron 重複取同一筆）
   await prisma.sYS_PatiscoSync.update({
@@ -1596,31 +1722,94 @@ export async function processNextPendingDO(
     data: { status: 'processing' },
   })
 
-  const creds = sharedCreds ?? await patiscoLogin(prisma)
-  if (!creds) {
+  // ── Phase 1：撈取 raw data ────────────────────────────────────────────────
+  if (pending.status === 'pending') {
+    const creds = sharedCreds ?? await patiscoLogin(prisma)
+    if (!creds) {
+      await prisma.sYS_PatiscoSync.update({ where: { id: pending.id }, data: { status: 'pending' } })
+      return { processed: false, hasMore: hasMorePending, error: '無法取得 Patisco 憑證' }
+    }
+
+    try {
+      const lookupId = copyId || docId
+      const [ciRes, plRes] = await Promise.all([
+        getDeliveryOrderDetail(creds, lookupId, 'commercialInvoice'),
+        getDeliveryOrderDetail(creds, lookupId, 'packingList'),
+      ])
+
+      const extractDetail = (res: typeof ciRes) => {
+        if (!res.ok || !res.data) return null
+        const d = res.data
+        return d.detail ?? d.item ?? (d.id ? d : null)
+      }
+
+      const ci = extractDetail(ciRes)
+      const pl = extractDetail(plRes)
+
+      if (!ci && !pl) throw new Error('getDeliveryOrderDetail 兩種文件都失敗')
+
+      await prisma.sYS_PatiscoSync.update({
+        where: { id: pending.id },
+        data: {
+          status: 'fetched',
+          syncedAt: new Date(),
+          result: { copyId, ci, pl },
+        },
+      })
+      console.log(`[do-fetch] DO ${docNo} raw data 已儲存 (ci=${!!ci} pl=${!!pl})`)
+      return { processed: true, hasMore: hasMorePending, docNo, phase: 'fetched' }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error(`[do-fetch] DO ${docNo} 撈取失敗`, err)
+      await prisma.sYS_PatiscoSync.update({
+        where: { id: pending.id },
+        data: { status: 'error', errorMsg: msg },
+      })
+      return { processed: true, hasMore: hasMorePending, docNo, error: msg }
+    }
+  }
+
+  // ── Phase 2：AI 分析 + 寫入業務表 ─────────────────────────────────────────
+  const ciRaw = storedResult?.ci ?? null
+  const plRaw = storedResult?.pl ?? null
+
+  if (!ciRaw && !plRaw) {
+    // raw data 遺失，重設為 pending 重新撈取
     await prisma.sYS_PatiscoSync.update({ where: { id: pending.id }, data: { status: 'pending' } })
-    return { processed: false, hasMore: hasMorePending, error: '無法取得 Patisco 憑證' }
+    return { processed: false, hasMore: hasMorePending, error: 'raw data 遺失，已重設為 pending' }
   }
 
   const systemUser = await prisma.sYS_User.findFirst({ where: { isSystem: true }, select: { id: true } })
   const systemUserId = systemUser?.id ?? 1
 
   try {
-    const { piCount, unlinkedItemCount } = await _processDO({ docId, docNo, copyId, source, prisma, creds, systemUserId })
-    // header 層（SLS_ShipmentPI）或 item 層（SLS_ShipmentItem.piId）任一不完整 → partial
+    // AI 分析（失敗時 fallback 到確定性提取）
+    const analysis = await _aiAnalyzeDO(ciRaw, plRaw, docNo, prisma)
+
+    if (analysis) {
+      await prisma.sYS_PatiscoSync.update({
+        where: { id: pending.id },
+        data: { analyzedResult: analysis as unknown as import('@prisma/client').Prisma.InputJsonValue },
+      })
+    }
+
+    const { piCount, unlinkedItemCount } = await _processDO({
+      docId, docNo, copyId,
+      source, prisma, systemUserId,
+      preloadedCi: ciRaw,
+      preloadedPl: plRaw,
+      analysis: analysis ?? undefined,
+    })
+
     const finalStatus = (piCount > 0 && unlinkedItemCount === 0) ? 'ok' : 'partial'
     await prisma.sYS_PatiscoSync.update({
       where: { id: pending.id },
-      data: {
-        status: finalStatus,
-        syncedAt: new Date(),
-        result: { copyId, piCount, unlinkedItemCount },
-      },
+      data: { status: finalStatus, syncedAt: new Date(), result: { copyId, piCount, unlinkedItemCount } },
     })
-    return { processed: true, hasMore: hasMorePending, docNo }
+    return { processed: true, hasMore: hasMorePending, docNo, phase: 'written' }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    console.error(`[do-process] 處理 DO ${docNo} 失敗`, err)
+    console.error(`[do-write] DO ${docNo} 寫入失敗`, err)
     await prisma.sYS_PatiscoSync.update({
       where: { id: pending.id },
       data: { status: 'error', errorMsg: msg },
@@ -1631,30 +1820,46 @@ export async function processNextPendingDO(
 
 // ─── 共用：處理單一 DO 的完整邏輯 ────────────────────────────────────────────
 async function _processDO({
-  docId, docNo, copyId, source, prisma, creds, systemUserId,
+  docId, docNo, copyId, source, prisma, creds, systemUserId, preloadedCi, preloadedPl, analysis,
 }: {
   docId: string; docNo: string; copyId: string
   source: SyncSource
   prisma: PrismaClient
-  creds: PatiscoCredentials & { _mcpUrl: string }
+  creds?: PatiscoCredentials & { _mcpUrl: string }
   systemUserId: number
+  preloadedCi?: unknown    // Phase 2：已存的 raw CI JSON
+  preloadedPl?: unknown    // Phase 2：已存的 raw PL JSON
+  analysis?: DOAnalysis    // AI 分析結果（有則優先用）
 }): Promise<{ piCount: number; unlinkedItemCount: number }> {
-  // getDeliveryOrderDetail 的 shipmentId 可能需要 copyId 而非 docId
-  const lookupId = copyId || docId
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let ci: Record<string, any> | null = null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let pl: Record<string, any> | null = null
 
-  const [ciRes, plRes] = await Promise.all([
-    getDeliveryOrderDetail(creds, lookupId, 'commercialInvoice'),
-    getDeliveryOrderDetail(creds, lookupId, 'packingList'),
-  ])
-
-  const extractDetail = (res: typeof ciRes) => {
-    if (!res.ok || !res.data) return null
-    const d = res.data
-    return d.detail ?? d.item ?? (d.id ? d : null)
+  if (preloadedCi !== undefined || preloadedPl !== undefined) {
+    // Phase 2：直接用已存的 raw data
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ci = (preloadedCi as Record<string, any>) ?? null
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    pl = (preloadedPl as Record<string, any>) ?? null
+    console.log(`[do-process] DO ${docNo} 使用已存 raw data (ci=${!!ci} pl=${!!pl} analysis=${!!analysis})`)
+  } else {
+    // 傳統路徑（backfill 等舊呼叫點）
+    if (!creds) throw new Error('_processDO: creds 必填（非 Phase 2 路徑）')
+    const lookupId = copyId || docId
+    const [ciRes, plRes] = await Promise.all([
+      getDeliveryOrderDetail(creds, lookupId, 'commercialInvoice'),
+      getDeliveryOrderDetail(creds, lookupId, 'packingList'),
+    ])
+    const extractDetail = (res: typeof ciRes) => {
+      if (!res.ok || !res.data) return null
+      const d = res.data
+      return d.detail ?? d.item ?? (d.id ? d : null)
+    }
+    ci = extractDetail(ciRes)
+    pl = extractDetail(plRes)
+    console.log(`[do-process] DO ${docNo} ciOk=${ciRes.ok} plOk=${plRes.ok}`)
   }
-  const ci = extractDetail(ciRes)
-  const pl = extractDetail(plRes)
-  console.log(`[do-process] DO ${docNo} ciOk=${ciRes.ok} plOk=${plRes.ok}`)
 
   const detail = ci ?? pl
   if (!detail) throw new Error('getDeliveryOrderDetail 兩種文件都失敗')
@@ -1765,30 +1970,39 @@ async function _processDO({
     // 6. SLS_ShipmentPI 關聯
     const packingItems = (pl ?? ci)?.packings ?? []
     const linkedPiIds = new Set<number>()
-
-    // 路徑 A：從 detail.orders[] 配對
-    // orders[].id 屬於不同 ID 空間，只能用 orders[].no（PI 號碼）比對 SLS_PI.piNo
-    const ordersList = detail.orders ?? []
     const missingPiNos: string[] = []
-    for (const ord of ordersList) {
-      const piNo = ord.no?.trim()
-      if (!piNo) continue
-      const pi = await prisma.sLS_PI.findFirst({ where: { piNo }, select: { id: true } })
-      if (pi) linkedPiIds.add(pi.id)
-      else missingPiNos.push(piNo)
-    }
 
-    // 路徑 B：從 packings[].sourceOrderNo 補齊（當 orders[] 為空或有漏時）
-    // sourceOrderID 屬於 Patisco 內部 ID 空間，不可用於查 patiscoDocId，只用 sourceOrderNo
-    const packingPiNos = new Set<string>()
-    for (const p of packingItems) {
-      const no = (p as { sourceOrderNo?: string }).sourceOrderNo?.trim()
-      if (no) packingPiNos.add(no)
-    }
-    for (const piNo of Array.from(packingPiNos)) {
-      const pi = await prisma.sLS_PI.findFirst({ where: { piNo }, select: { id: true } })
-      if (pi) linkedPiIds.add(pi.id)
-      else if (!missingPiNos.includes(piNo)) missingPiNos.push(piNo)
+    if (analysis?.piNos?.length) {
+      // 路徑 0（AI）：最可靠，直接用 AI 找到的所有 PI 號碼
+      for (const piNo of analysis.piNos) {
+        const pi = await prisma.sLS_PI.findFirst({ where: { piNo }, select: { id: true } })
+        if (pi) linkedPiIds.add(pi.id)
+        else missingPiNos.push(piNo)
+      }
+    } else {
+      // Fallback：確定性兩路徑提取
+
+      // 路徑 A：從 detail.orders[] 配對
+      const ordersList = detail.orders ?? []
+      for (const ord of ordersList) {
+        const piNo = (ord as { no?: string }).no?.trim()
+        if (!piNo) continue
+        const pi = await prisma.sLS_PI.findFirst({ where: { piNo }, select: { id: true } })
+        if (pi) linkedPiIds.add(pi.id)
+        else missingPiNos.push(piNo)
+      }
+
+      // 路徑 B：從 packings[].sourceOrderNo 補齊（當 orders[] 為空或有漏時）
+      const packingPiNos = new Set<string>()
+      for (const p of packingItems) {
+        const no = (p as { sourceOrderNo?: string }).sourceOrderNo?.trim()
+        if (no) packingPiNos.add(no)
+      }
+      for (const piNo of Array.from(packingPiNos)) {
+        const pi = await prisma.sLS_PI.findFirst({ where: { piNo }, select: { id: true } })
+        if (pi) linkedPiIds.add(pi.id)
+        else if (!missingPiNos.includes(piNo)) missingPiNos.push(piNo)
+      }
     }
 
     if (missingPiNos.length > 0) {
@@ -1826,9 +2040,10 @@ async function _processDO({
         const qty = parseInt(String((packing as { quantity?: string }).quantity ?? '0'), 10) || 0
         if (qty === 0) continue
 
-        // sourceOrderID 屬於 Patisco 內部 ID 空間，不可用於查 SLS_PI（會找到錯誤資料）
-        // 只用 sourceOrderNo（PI 號碼）比對 SLS_PI.piNo
-        const srcOrderNo = (packing as { sourceOrderNo?: string }).sourceOrderNo?.trim()
+        // AI 分析的 piNo 最可靠，fallback 到 sourceOrderNo
+        const aiItem = analysis?.items?.find(it => it.sku === sku)
+        const srcOrderNo = aiItem?.piNo?.trim()
+          || (packing as { sourceOrderNo?: string }).sourceOrderNo?.trim()
         const srcPI = srcOrderNo
           ? await prisma.sLS_PI.findFirst({ where: { piNo: srcOrderNo }, select: { id: true, orderId: true } })
           : null
@@ -1841,7 +2056,7 @@ async function _processDO({
           : null
 
         type PLPacking = import('./client').PatiscoShipmentPackingPL
-        const plItem = pl?.packings?.find(p => {
+        const plItem = pl?.packings?.find((p: unknown) => {
           const pp = p as PLPacking
           return pp.sourceProductID === (packing as PLPacking).sourceProductID
             && pp.sourceOrderID     === (packing as PLPacking).sourceOrderID
@@ -1957,8 +2172,8 @@ export async function syncPatiscoDeliveryOrders(
     return result
   }
 
-  // 先確認佇列有沒有 pending；若無，先 seed
-  const pendingCount = await prisma.sYS_PatiscoSync.count({ where: { docType: 'DO', status: 'pending' } })
+  // 先確認佇列有沒有 pending 或 fetched；若無，先 seed
+  const pendingCount = await prisma.sYS_PatiscoSync.count({ where: { docType: 'DO', status: { in: ['pending', 'fetched'] } } })
   if (pendingCount === 0) {
     const seeded = await seedDOQueue(prisma, creds)
     result.total = seeded.total

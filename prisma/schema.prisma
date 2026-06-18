@@ -53,8 +53,9 @@ model SYS_PatiscoSync {
   syncedAt     DateTime @default(now())
   source       String   // webhook | cron | manual
   status       String   // ok | partial | skipped | error
-  result       Json?
-  errorMsg     String?
+  result         Json?
+  analyzedResult Json?
+  errorMsg       String?
 
   @@unique([docType, patiscoDocId])
   @@index([syncedAt])

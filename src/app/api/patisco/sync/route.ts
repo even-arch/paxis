@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
       // 1. 對應出貨單沒有任何 SLS_ShipmentPI（header 層未關聯）
       // 2. 對應出貨單有任何 SLS_ShipmentItem.piId = null（item 層未關聯）
       const okDOs = await prisma.sYS_PatiscoSync.findMany({
-        where: { docType: 'DO', status: 'ok' },
+        where: { docType: 'DO', status: { in: ['ok', 'partial'] } },
         select: { id: true, patiscoDocId: true },
       })
       let marked = 0
