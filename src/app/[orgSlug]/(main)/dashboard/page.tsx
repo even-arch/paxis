@@ -144,7 +144,7 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
             <span className="text-xs text-gray-400">尚無同步紀錄</span>
           )}
         </div>
-        <Link href={orgPath(params.orgSlug, '/settings')} className="text-xs text-blue-600 hover:underline">手動同步</Link>
+        <Link href={orgPath(params.orgSlug, '/settings/patisco')} className="text-xs text-blue-600 hover:underline">手動同步</Link>
       </div>
 
       {/* 數字摘要 */}
