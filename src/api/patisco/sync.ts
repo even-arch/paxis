@@ -1606,16 +1606,15 @@ export async function processNextPendingDO(
   const systemUserId = systemUser?.id ?? 1
 
   try {
-    const { piCount } = await _processDO({ docId, docNo, copyId, source, prisma, creds, systemUserId })
-    // PI 未關聯時標記 partial，讓下次 cron 重新排程重試
-    const finalStatus = piCount > 0 ? 'ok' : 'partial'
+    const { piCount, unlinkedItemCount } = await _processDO({ docId, docNo, copyId, source, prisma, creds, systemUserId })
+    // header 層（SLS_ShipmentPI）或 item 層（SLS_ShipmentItem.piId）任一不完整 → partial
+    const finalStatus = (piCount > 0 && unlinkedItemCount === 0) ? 'ok' : 'partial'
     await prisma.sYS_PatiscoSync.update({
       where: { id: pending.id },
       data: {
         status: finalStatus,
         syncedAt: new Date(),
-        // 儲存 piCount 供 seedDOQueue 判斷：ok 但 piCount=0 → 也需要重排
-        result: { copyId, piCount },
+        result: { copyId, piCount, unlinkedItemCount },
       },
     })
     return { processed: true, hasMore: hasMorePending, docNo }
@@ -1639,7 +1638,7 @@ async function _processDO({
   prisma: PrismaClient
   creds: PatiscoCredentials & { _mcpUrl: string }
   systemUserId: number
-}): Promise<{ piCount: number }> {
+}): Promise<{ piCount: number; unlinkedItemCount: number }> {
   // getDeliveryOrderDetail 的 shipmentId 可能需要 copyId 而非 docId
   const lookupId = copyId || docId
 
@@ -1931,7 +1930,14 @@ async function _processDO({
         }
       }
     }
-  return { piCount: linkedPiIds.size }
+  // 計算 item 層未關聯 PI 的品項數（讓 partial 判斷涵蓋兩層）
+  const unlinkedItemCount = await prisma.sLS_ShipmentItem.count({
+    where: { shipmentId: shipment.id, piId: null },
+  })
+  if (unlinkedItemCount > 0) {
+    console.warn(`[do-process] DO ${docNo} 有 ${unlinkedItemCount} 個品項未關聯 PI`)
+  }
+  return { piCount: linkedPiIds.size, unlinkedItemCount }
 }
 
 // ─── 組合入口：seed + process N（向後相容舊呼叫點）────────────────────────────

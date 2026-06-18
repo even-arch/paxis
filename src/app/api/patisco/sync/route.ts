@@ -65,8 +65,9 @@ export async function POST(req: NextRequest) {
       result.reset = { deleted: deleted.count }
     }
     if (type === 'mark-do-partial') {
-      // 找出 status=ok 但對應出貨單沒有任何 SLS_ShipmentPI 的 DO，標記為 partial
-      // 下次 cron 的 seedDOQueue 會重新排程這些 DO
+      // 找出 status=ok 但有以下任一情況的 DO，標記為 partial 讓 cron 重新排程：
+      // 1. 對應出貨單沒有任何 SLS_ShipmentPI（header 層未關聯）
+      // 2. 對應出貨單有任何 SLS_ShipmentItem.piId = null（item 層未關聯）
       const okDOs = await prisma.sYS_PatiscoSync.findMany({
         where: { docType: 'DO', status: 'ok' },
         select: { id: true, patiscoDocId: true },
@@ -75,9 +76,17 @@ export async function POST(req: NextRequest) {
       for (const row of okDOs) {
         const shipment = await prisma.sLS_Shipment.findFirst({
           where: { patiscoDocId: row.patiscoDocId },
-          select: { id: true, _count: { select: { pis: true } } },
+          select: {
+            id: true,
+            _count: { select: { pis: true } },
+          },
         })
-        if (shipment && shipment._count.pis === 0) {
+        if (!shipment) continue
+        const noPIHeader = shipment._count.pis === 0
+        const unlinkedItems = noPIHeader ? 0 : await prisma.sLS_ShipmentItem.count({
+          where: { shipmentId: shipment.id, piId: null },
+        })
+        if (noPIHeader || unlinkedItems > 0) {
           await prisma.sYS_PatiscoSync.update({
             where: { id: row.id },
             data: { status: 'partial' },
