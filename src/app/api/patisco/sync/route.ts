@@ -64,6 +64,29 @@ export async function POST(req: NextRequest) {
       })
       result.reset = { deleted: deleted.count }
     }
+    if (type === 'mark-do-partial') {
+      // 找出 status=ok 但對應出貨單沒有任何 SLS_ShipmentPI 的 DO，標記為 partial
+      // 下次 cron 的 seedDOQueue 會重新排程這些 DO
+      const okDOs = await prisma.sYS_PatiscoSync.findMany({
+        where: { docType: 'DO', status: 'ok' },
+        select: { id: true, patiscoDocId: true },
+      })
+      let marked = 0
+      for (const row of okDOs) {
+        const shipment = await prisma.sLS_Shipment.findFirst({
+          where: { patiscoDocId: row.patiscoDocId },
+          select: { id: true, _count: { select: { pis: true } } },
+        })
+        if (shipment && shipment._count.pis === 0) {
+          await prisma.sYS_PatiscoSync.update({
+            where: { id: row.id },
+            data: { status: 'partial' },
+          })
+          marked++
+        }
+      }
+      result.markPartial = { checked: okDOs.length, marked }
+    }
 
     return NextResponse.json({
       ok: true,

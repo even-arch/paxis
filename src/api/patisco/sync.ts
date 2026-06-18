@@ -1597,10 +1597,12 @@ export async function processNextPendingDO(
   const systemUserId = systemUser?.id ?? 1
 
   try {
-    await _processDO({ docId, docNo, copyId, source, prisma, creds, systemUserId })
+    const { piCount } = await _processDO({ docId, docNo, copyId, source, prisma, creds, systemUserId })
+    // PI 未關聯時標記 partial，讓下次 cron 重新排程重試
+    const finalStatus = piCount > 0 ? 'ok' : 'partial'
     await prisma.sYS_PatiscoSync.update({
       where: { id: pending.id },
-      data: { status: 'ok', syncedAt: new Date() },
+      data: { status: finalStatus, syncedAt: new Date() },
     })
     return { processed: true, hasMore: hasMorePending, docNo }
   } catch (err) {
@@ -1623,7 +1625,7 @@ async function _processDO({
   prisma: PrismaClient
   creds: PatiscoCredentials & { _mcpUrl: string }
   systemUserId: number
-}) {
+}): Promise<{ piCount: number }> {
   // getDeliveryOrderDetail 的 shipmentId 可能需要 copyId 而非 docId
   const lookupId = copyId || docId
 
@@ -1901,6 +1903,7 @@ async function _processDO({
         }
       }
     }
+  return { piCount: linkedPiIds.size }
 }
 
 // ─── 組合入口：seed + process N（向後相容舊呼叫點）────────────────────────────
