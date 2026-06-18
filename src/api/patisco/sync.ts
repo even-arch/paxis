@@ -1818,6 +1818,40 @@ export async function processNextPendingDO(
   }
 }
 
+// ─── PI 金額驗證 ──────────────────────────────────────────────────────────────
+// 當 DO 提供 expectedAmount 時，比對 PAXIS 內的 PI 金額，防止同號 PI 誤連結
+// 允許 2% 的浮點誤差（匯率取捨、四捨五入）
+async function _verifyPIAmount(
+  piId: number,
+  expectedAmount: string | null | undefined,
+  prisma: PrismaClient,
+): Promise<boolean> {
+  if (!expectedAmount) return true  // 沒有金額可比對 → 不做驗證，直接通過
+
+  const expected = parseFloat(expectedAmount)
+  if (isNaN(expected) || expected <= 0) return true
+
+  const items = await prisma.sLS_PIItem.findMany({
+    where: { piId },
+    select: { unitPrice: true, quantity: true },
+  })
+
+  // PI 尚無品項（剛建立）→ 暫時通過，等品項同步後再驗
+  if (items.length === 0) return true
+
+  const actual = items.reduce((sum, it) => {
+    const price = it.unitPrice ? parseFloat(it.unitPrice.toString()) : 0
+    return sum + price * it.quantity
+  }, 0)
+
+  const diff = Math.abs(actual - expected) / expected
+  if (diff > 0.02) {
+    console.warn(`[pi-verify] PI id=${piId} 金額不符：expected=${expected} actual=${actual.toFixed(2)} diff=${(diff * 100).toFixed(1)}%`)
+    return false
+  }
+  return true
+}
+
 // ─── 共用：處理單一 DO 的完整邏輯 ────────────────────────────────────────────
 async function _processDO({
   docId, docNo, copyId, source, prisma, creds, systemUserId, preloadedCi, preloadedPl, analysis,
@@ -1972,36 +2006,54 @@ async function _processDO({
     const linkedPiIds = new Set<number>()
     const missingPiNos: string[] = []
 
+    // DO 中每個 PI 號碼對應的金額（用於驗證，防止同號不同批次 PI 誤連結）
+    const orderAmountMap = new Map<string, string>()
+    for (const ord of (detail.orders ?? [])) {
+      const no = (ord as { no?: string; amount?: string }).no?.trim()
+      const amt = (ord as { no?: string; amount?: string }).amount
+      if (no && amt) orderAmountMap.set(no, amt)
+    }
+
     if (analysis?.piNos?.length) {
       // 路徑 0（AI）：最可靠，直接用 AI 找到的所有 PI 號碼
       for (const piNo of analysis.piNos) {
         const pi = await prisma.sLS_PI.findFirst({ where: { piNo }, select: { id: true } })
-        if (pi) linkedPiIds.add(pi.id)
-        else missingPiNos.push(piNo)
+        if (!pi) { missingPiNos.push(piNo); continue }
+        const ok = await _verifyPIAmount(pi.id, orderAmountMap.get(piNo), prisma)
+        if (ok) linkedPiIds.add(pi.id)
+        else console.warn(`[do-process] DO ${docNo} 跳過 PI ${piNo}：金額不符`)
       }
     } else {
       // Fallback：確定性兩路徑提取
 
-      // 路徑 A：從 detail.orders[] 配對
+      // 路徑 A：從 detail.orders[] 配對（帶金額驗證）
       const ordersList = detail.orders ?? []
       for (const ord of ordersList) {
-        const piNo = (ord as { no?: string }).no?.trim()
+        const piNo = (ord as { no?: string; amount?: string }).no?.trim()
         if (!piNo) continue
         const pi = await prisma.sLS_PI.findFirst({ where: { piNo }, select: { id: true } })
-        if (pi) linkedPiIds.add(pi.id)
-        else missingPiNos.push(piNo)
+        if (!pi) { missingPiNos.push(piNo); continue }
+        const ok = await _verifyPIAmount(pi.id, (ord as { amount?: string }).amount, prisma)
+        if (ok) linkedPiIds.add(pi.id)
+        else console.warn(`[do-process] DO ${docNo} 跳過 PI ${piNo}：金額不符`)
       }
 
-      // 路徑 B：從 packings[].sourceOrderNo 補齊（當 orders[] 為空或有漏時）
+      // 路徑 B：從 packings[].sourceOrderNo 補齊（金額從 orderAmountMap 取）
       const packingPiNos = new Set<string>()
       for (const p of packingItems) {
         const no = (p as { sourceOrderNo?: string }).sourceOrderNo?.trim()
         if (no) packingPiNos.add(no)
       }
       for (const piNo of Array.from(packingPiNos)) {
+        if (linkedPiIds.size > 0 && Array.from(linkedPiIds).length > 0) {
+          // 已透過路徑 A 找到的就不重複查
+        }
         const pi = await prisma.sLS_PI.findFirst({ where: { piNo }, select: { id: true } })
-        if (pi) linkedPiIds.add(pi.id)
-        else if (!missingPiNos.includes(piNo)) missingPiNos.push(piNo)
+        if (!pi) { if (!missingPiNos.includes(piNo)) missingPiNos.push(piNo); continue }
+        if (linkedPiIds.has(pi.id)) continue  // 路徑 A 已加過
+        const ok = await _verifyPIAmount(pi.id, orderAmountMap.get(piNo), prisma)
+        if (ok) linkedPiIds.add(pi.id)
+        else console.warn(`[do-process] DO ${docNo} 跳過 PI ${piNo}（packings路徑）：金額不符`)
       }
     }
 
