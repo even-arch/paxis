@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 import Link from 'next/link'
 import { getPagePrisma } from '@/lib/page-db'
 import SortableHeader from '@/components/SortableHeader'
+import { orgPath } from '@/lib/org-path'
 
 const VALID_SORTS = ['name', 'sku', 'availableQty', 'quantity', 'reservedQty', 'pendingQty', 'safetyStock'] as const
 type SortField = typeof VALID_SORTS[number]
@@ -93,7 +94,7 @@ export default async function InventoryPage({
     if (filter) p.set('filter', filter)
     p.set('sort', newSort)
     p.set('dir', newDir)
-    return `/inventory?${p.toString()}`
+    return orgPath(params.orgSlug, `/inventory?${p.toString()}`)
   }
 
   const sh = (label: string, field: string, align: 'left' | 'right' | 'center' = 'right', className?: string) => (
@@ -121,7 +122,7 @@ export default async function InventoryPage({
           <p className="text-2xl font-semibold text-purple-600">{reservedCount}</p>
           <p className="text-xs text-gray-400 mt-0.5">已發 PI 尚未出貨</p>
         </div>
-        <Link href={filter !== 'low' ? '?filter=low' : '/inventory'}
+        <Link href={filter !== 'low' ? '?filter=low' : orgPath(params.orgSlug, '/inventory')}
           className={`bg-white rounded-lg shadow p-5 hover:shadow-md ${lowRows.length > 0 ? 'border-l-4 border-red-400' : ''}`}>
           <p className="text-xs text-gray-500 mb-1">低庫存警示</p>
           <p className={`text-2xl font-semibold ${lowRows.length > 0 ? 'text-red-600' : 'text-green-600'}`}>{lowRows.length}</p>
@@ -138,7 +139,7 @@ export default async function InventoryPage({
           className="border border-gray-300 rounded-md px-3 py-2 text-sm w-72 focus:outline-none focus:ring-2 focus:ring-blue-500" />
         <button type="submit" className="bg-gray-100 border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-200">搜尋</button>
         {(search || filter) && (
-          <Link href="/inventory" className="border border-gray-300 px-4 py-2 rounded-md text-sm text-gray-500 hover:bg-gray-50">清除</Link>
+          <Link href={orgPath(params.orgSlug, '/inventory')} className="border border-gray-300 px-4 py-2 rounded-md text-sm text-gray-500 hover:bg-gray-50">清除</Link>
         )}
         {filter !== 'low' && lowRows.length > 0 && (
           <Link href="?filter=low" className="border border-red-300 text-red-600 px-4 py-2 rounded-md text-sm hover:bg-red-50">
@@ -181,7 +182,7 @@ export default async function InventoryPage({
               return (
                 <tr key={row.id} className={`hover:bg-gray-50 ${isZero ? 'bg-red-50' : isLow ? 'bg-yellow-50' : ''}`}>
                   <td className="px-4 py-3">
-                    <Link href={`/inventory/${row.id}`} className="font-medium text-blue-600 hover:underline">
+                    <Link href={orgPath(params.orgSlug, `/inventory/${row.id}`)} className="font-medium text-blue-600 hover:underline">
                       {row.name}
                     </Link>
                     {row.sku && <span className="ml-1.5 text-xs text-gray-400 font-mono">{row.sku}</span>}
@@ -227,7 +228,7 @@ export default async function InventoryPage({
                     }
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Link href={`/inventory/${row.id}`} className="text-gray-400 hover:text-blue-600 text-xs">異動記錄</Link>
+                    <Link href={orgPath(params.orgSlug, `/inventory/${row.id}`)} className="text-gray-400 hover:text-blue-600 text-xs">異動記錄</Link>
                   </td>
                 </tr>
               )
