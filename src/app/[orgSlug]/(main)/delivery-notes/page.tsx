@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 import Link from 'next/link'
 import { getPagePrisma } from '@/lib/page-db'
 import { formatDate } from '@/lib/utils'
+import { orgPath } from '@/lib/org-path'
 
 const STATUS_LABEL: Record<string, string> = { DRAFT: '草稿', DISPATCHED: '已出貨', RECEIVED: '已簽收' }
 const STATUS_COLOR: Record<string, string> = {
@@ -26,7 +27,7 @@ export default async function DeliveryNotesPage({ params }: { params: { orgSlug:
     <div className="max-w-5xl">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-bold text-gray-800">簡易出貨單</h1>
-        <Link href="/delivery-notes/new" className="bg-teal-600 hover:bg-teal-700 text-white text-sm px-4 py-2 rounded-lg">
+        <Link href={orgPath(params.orgSlug, '/delivery-notes/new')} className="bg-teal-600 hover:bg-teal-700 text-white text-sm px-4 py-2 rounded-lg">
           + 新增出貨單
         </Link>
       </div>
@@ -53,7 +54,7 @@ export default async function DeliveryNotesPage({ params }: { params: { orgSlug:
               {notes.map(n => (
                 <tr key={n.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
-                    <Link href={`/delivery-notes/${n.id}`} className="font-mono text-teal-600 hover:underline text-xs">{n.docNo}</Link>
+                    <Link href={orgPath(params.orgSlug, `/delivery-notes/${n.id}`)} className="font-mono text-teal-600 hover:underline text-xs">{n.docNo}</Link>
                   </td>
                   <td className="px-4 py-3 text-gray-700">{n.customer?.shortName ?? n.customer?.name ?? '-'}</td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-500">
