@@ -139,7 +139,8 @@ function shouldSkipExistingSync(
   currentToken: string | null,
 ): boolean {
   if (!existing) return false
-  if (!['ok', 'partial', 'skipped'].includes(existing.status)) return false
+  // partial = 資料不完整，不論 token 是否相同都必須重試
+  if (!['ok', 'skipped'].includes(existing.status)) return false
   return !!currentToken && getStoredSyncToken(existing.result) === currentToken
 }
 
@@ -565,9 +566,10 @@ async function processOurPIToCustomer(
     }).catch(() => {})
   }
 
-  // ── 找或建 SLS_PI（去重：patiscoDocId 或 piNo 任一存在即跳過）────────────
+  // ── 找或建 SLS_PI ───────────────────────────────────────────────────────
   const existingPI = await prisma.sLS_PI.findFirst({
     where: { OR: [{ patiscoDocId: piId }, { piNo: pi.no }] },
+    include: { _count: { select: { items: true } } },
   })
   if (existingPI) {
     await prisma.sLS_PI.update({
@@ -579,10 +581,14 @@ async function processOurPIToCustomer(
         extraCharges: extraCharges.length > 0 ? extraCharges : undefined,
       },
     }).catch(() => {})
-    return { ok: true, items: [] }
+    // 已有品項 → 完整，直接跳過
+    if (existingPI._count.items > 0) {
+      return { ok: true, items: [] }
+    }
+    // 品項為零 → 屬於不完整的 PI，繼續往下補齊品項（不重建 PI，用現有 id）
   }
 
-  const slsPi = await prisma.sLS_PI.create({
+  const slsPi = existingPI ?? await prisma.sLS_PI.create({
     data: {
       orderId:        order.id,
       piNo:           pi.no,
@@ -1508,9 +1514,12 @@ export async function seedDOQueue(
     if (!existing) { toCreate.push(doHeader); continue }
 
     if (existing.status === 'ok') {
-      const storedCopyId = (existing.result as { copyId?: string } | null)?.copyId ?? ''
+      const stored = existing.result as { copyId?: string; piCount?: number } | null
+      const storedCopyId = stored?.copyId ?? ''
       const copyIdChanged = newCopyId && storedCopyId && newCopyId !== storedCopyId
-      if (!copyIdChanged && !isRecent) { skipped++; continue }
+      // piCount=0 代表出貨單已處理但 PI 連結還沒建立，需要重試
+      const missingPILink = (stored?.piCount ?? -1) === 0
+      if (!copyIdChanged && !isRecent && !missingPILink) { skipped++; continue }
     }
     toRequeue.push(doHeader)
   }
@@ -1602,7 +1611,12 @@ export async function processNextPendingDO(
     const finalStatus = piCount > 0 ? 'ok' : 'partial'
     await prisma.sYS_PatiscoSync.update({
       where: { id: pending.id },
-      data: { status: finalStatus, syncedAt: new Date() },
+      data: {
+        status: finalStatus,
+        syncedAt: new Date(),
+        // 儲存 piCount 供 seedDOQueue 判斷：ok 但 piCount=0 → 也需要重排
+        result: { copyId, piCount },
+      },
     })
     return { processed: true, hasMore: hasMorePending, docNo }
   } catch (err) {
