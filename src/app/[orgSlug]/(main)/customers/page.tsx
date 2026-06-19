@@ -82,7 +82,7 @@ export default async function CustomersPage({ params, searchParams }: Props) {
         )}
       </form>
 
-      <CustomerListClient customers={customers} isArchived={showArchived} />
+      <CustomerListClient customers={customers} isArchived={showArchived} sort={sort} dir={dir} />
 
       {totalPages > 1 && (
         <div className="flex items-center gap-2 mt-4 text-sm">

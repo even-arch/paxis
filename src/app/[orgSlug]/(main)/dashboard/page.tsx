@@ -58,7 +58,10 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
 
     prisma.sLS_PI.findMany({
       where: { status: 0, estimatedShipDate: { lte: in14Days } },
-      include: { order: { include: { customer: { select: { name: true } } } } },
+      include: {
+        order: { include: { customer: { select: { name: true } } } },
+        customer: { select: { name: true } },
+      },
       orderBy: { estimatedShipDate: 'asc' },
       take: 5,
     }),
@@ -274,9 +277,9 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
             return (
               <ActionRow
                 key={pi.id}
-                href={orgPath(params.orgSlug, `/sales/${pi.orderId}`)}
+                href={orgPath(params.orgSlug, pi.orderId ? `/sales/${pi.orderId}` : `/sales/pi`)}
                 primary={pi.piNo}
-                secondary={pi.order.customer?.name ?? pi.order.patiscoBuyerName ?? '未知客戶'}
+                secondary={pi.order?.customer?.name ?? pi.order?.patiscoBuyerName ?? pi.customer?.name ?? '未知客戶'}
                 tag={daysLeft === null ? '' : isOverdue ? `逾期 ${-daysLeft} 天` : daysLeft === 0 ? '今天出貨' : `${daysLeft} 天後`}
                 tagColor={isOverdue ? 'text-red-600 font-medium' : isUrgent ? 'text-amber-600 font-medium' : 'text-gray-400'}
               />

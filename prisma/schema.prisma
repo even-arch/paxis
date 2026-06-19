@@ -244,13 +244,30 @@ model SYS_PriceAdjustRule {
   @@map("SYS_PriceAdjustRule")
 }
 
+model SYS_DataAlert {
+  id          Int       @id @default(autoincrement())
+  type        String    // PI_CONFLICT | MISSING_PI | UNLINKED_ITEM | WORKFLOW_GAP
+  refType     String    // SLS_Shipment | SLS_PI | SLS_Order
+  refId       Int?
+  refNo       String?
+  message     String
+  detail      Json?
+  resolvedAt  DateTime?
+  resolvedBy  Int?
+  syncJobId   Int?
+  createdAt   DateTime  @default(now())
+
+  @@map("SYS_DataAlert")
+}
+
 // =============================================================================
 // 商品管理 (PRD_)
 // =============================================================================
 
 model PRD_Product {
   id            Int    @id @default(autoincrement())
-  name          String
+  name          String    // Patisco 匯入時暫用 SKU 填代，nameNeedsAI=true 代表待 AI 從規格產生正式品名
+  nameNeedsAI   Boolean   @default(false)
   sku           String?   @unique
   modelNo       String?
   description   String?
@@ -289,6 +306,7 @@ model PRD_Product {
   inventoryItems    INV_Stock[]
   purchaseItems     PO_Item[]
   salesItems        SLS_Item[]
+  piItems           SLS_PIItem[]
   costSheets        COST_Sheet[]
   categories        PRD_CategoryMapping[]
   history           PRD_ProductHistory[]
@@ -503,6 +521,7 @@ model CUS_Customer {
   chargeTemplate    PRN_ChargeTemplate? @relation(fields: [chargeTemplateId], references: [id])
 
   salesOrders       SLS_Order[]
+  salesPIs          SLS_PI[]
   shipments         SLS_Shipment[]
   contacts          CUS_Contact[]
   receivables       FIN_Receivable[]
@@ -820,9 +839,15 @@ model SLS_Item {
 // 觸發 reservedQty++，寫 INV_Movement type=2
 model SLS_PI {
   id          Int    @id @default(autoincrement())
-  orderId     Int
-  order       SLS_Order @relation(fields: [orderId], references: [id])
+  orderId     Int?
+  order       SLS_Order? @relation(fields: [orderId], references: [id])
   piNo        String    @unique
+
+  // 當無對應 SLS_Order 時，直接存 PI 本身的交易方資訊
+  customerId   Int?
+  customer     CUS_Customer? @relation(fields: [customerId], references: [id])
+  currencyCode String?
+  totalAmount  Decimal?
 
   // 文件日期（時間軸錨點）：PI 文件上印的發行日期
   piDate      DateTime? // PI 文件上的日期（AI 匯入 / 手動填入）
@@ -853,6 +878,8 @@ model SLS_PI {
   patiscoStatus    String?   // Patisco 文件狀態：'0'=Editing, '1'=Confirmed
   syncJobId        Int?      // Patisco sync job ID，用於回滾
 
+  archivedAt DateTime? // 封存時間；非 null = 已封存
+
   items          SLS_PIItem[]
   shipmentPIs    SLS_ShipmentPI[]
   shipmentItems  SLS_ShipmentItem[]
@@ -867,8 +894,10 @@ model SLS_PIItem {
   id          Int    @id @default(autoincrement())
   piId        Int
   pi          SLS_PI    @relation(fields: [piId], references: [id])
-  slsItemId   Int
-  slsItem     SLS_Item  @relation(fields: [slsItemId], references: [id])
+  slsItemId   Int?
+  slsItem     SLS_Item?  @relation(fields: [slsItemId], references: [id])
+  productId   Int?
+  product     PRD_Product? @relation(fields: [productId], references: [id])
 
   quantity    Int
 
@@ -914,6 +943,8 @@ model SLS_Shipment {
   patiscoDocId  String?
   patiscoDocNo  String?
   syncJobId     Int?    // Patisco sync job ID，用於回滾
+
+  archivedAt DateTime? // 封存時間；非 null = 已封存
 
   // 出貨文件號（Packing List / Commercial Invoice 上的編號，供核對用）
   packingListNo     String?

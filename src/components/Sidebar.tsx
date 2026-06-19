@@ -31,6 +31,7 @@ const b2bGroups: NavGroup[] = [
     items: [
       { label: '客戶',      href: '/customers', icon: '🤝' },
       { label: '客戶訂單',  href: '/sales',     icon: '📋' },
+      { label: '我方 PI',   href: '/sales/pi',  icon: '📄' },
     ],
   },
   {

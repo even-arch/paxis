@@ -42,7 +42,8 @@ export async function POST(req: NextRequest, {
 
   // 釋放預留：reservedQty--，寫 INV_Movement type=3
   for (const piItem of pi.items) {
-    const productId = piItem.slsItem.productId
+    const productId = piItem.slsItem?.productId ?? piItem.productId
+    if (!productId) continue  // 無法識別商品，跳過
 
     const stock = await prisma.iNV_Stock.update({
       where: { productId },
@@ -66,13 +67,15 @@ export async function POST(req: NextRequest, {
     })
   }
 
-  // 若此訂單已無有效 PI，訂單狀態退回「已確認」
-  const activePiCount = pi.order.pis.length - 1 // 扣掉剛取消這筆
-  if (activePiCount <= 0) {
-    await prisma.sLS_Order.update({
-      where: { id: pi.orderId },
-      data: { status: 1 },
-    })
+  // 若此訂單已無有效 PI，訂單狀態退回「已確認」（只對有 SLS_Order 的 PI 做）
+  if (pi.order && pi.orderId) {
+    const activePiCount = pi.order.pis.length - 1 // 扣掉剛取消這筆
+    if (activePiCount <= 0) {
+      await prisma.sLS_Order.update({
+        where: { id: pi.orderId },
+        data: { status: 1 },
+      })
+    }
   }
 
   return NextResponse.json({ ok: true })

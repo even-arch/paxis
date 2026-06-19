@@ -152,7 +152,7 @@ export default async function PurchasesPage({ params, searchParams }: Props) {
         )}
       </form>
 
-      <PurchaseListClient orders={orders} isArchived={showArchived} />
+      <PurchaseListClient orders={orders} isArchived={showArchived} sort={sort} dir={dir} />
 
       {totalPages > 1 && (
         <div className="flex items-center gap-2 mt-4 text-sm">

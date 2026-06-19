@@ -69,8 +69,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const piList = shipment.pis.map(sp => ({
     piId:    sp.pi.id,
     piNo:    sp.pi.piNo,
-    orderId: sp.pi.order.id,
-    orderNo: sp.pi.order.orderNo,
+    orderId: sp.pi.order?.id ?? null,
+    orderNo: sp.pi.order?.orderNo ?? null,
   }))
 
   return NextResponse.json({

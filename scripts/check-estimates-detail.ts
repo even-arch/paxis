@@ -25,7 +25,7 @@ async function main() {
   let totalAR = 0
   console.log('Shipment | ciExRate | OrderTotal sum | receivable')
   for (const s of shipments) {
-    const orderSum = s.pis.reduce((sum, sp) => sum + Number(sp.pi.order.totalAmount ?? 0), 0)
+    const orderSum = s.pis.reduce((sum, sp) => sum + Number(sp.pi.order?.totalAmount ?? sp.pi.totalAmount ?? 0), 0)
     const rec = s.receivable
     const recInfo = rec ? `REC(${rec.currencyCode} foreign=${rec.amountForeign} twd=${rec.amountTWD})` : 'no receivable'
     console.log(`${s.shipmentNo} | ${s.ciExchangeRate} | ${orderSum} | ${recInfo}`)
@@ -36,7 +36,7 @@ async function main() {
   // 2. 看看有沒有重複的 order 被計算多次
   console.log('\n--- Checking duplicate orders in pis ---')
   for (const s of shipments.slice(0, 3)) {
-    const orderIds = s.pis.map(sp => sp.pi.order.id)
+    const orderIds = s.pis.map(sp => sp.pi.order?.id).filter(Boolean)
     const unique = new Set(orderIds)
     if (orderIds.length !== unique.size) {
       console.log(`${s.shipmentNo}: ${orderIds.length} pis but only ${unique.size} unique orders!`)

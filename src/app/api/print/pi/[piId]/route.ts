@@ -17,29 +17,24 @@ export async function GET(
   const pi = await prisma.sLS_PI.findUnique({
     where: { id: piId },
     include: {
-      order: {
-        include: {
-          customer: true,
-        },
-      },
+      order: { include: { customer: true } },
+      customer: true,
       items: {
         include: {
           slsItem: {
             include: {
               product: {
                 select: {
-                  name: true,
-                  sku: true,
-                  modelNo: true,
-                  specification: true,
-                  unit: true,
-                  unitPerCarton: true,
-                  cbm: true,
-                  grossWeight: true,
-                  netWeight: true,
-                  countryOfOrigin: true,
+                  name: true, sku: true, modelNo: true, specification: true, unit: true,
+                  unitPerCarton: true, cbm: true, grossWeight: true, netWeight: true, countryOfOrigin: true,
                 },
               },
+            },
+          },
+          product: {
+            select: {
+              name: true, sku: true, modelNo: true, specification: true, unit: true,
+              unitPerCarton: true, cbm: true, grossWeight: true, netWeight: true, countryOfOrigin: true,
             },
           },
         },
@@ -65,8 +60,9 @@ export async function GET(
     9:  'DDP',
   }
 
+  const orderCustomer = pi.order?.customer ?? pi.customer
   const items = pi.items.map(item => {
-    const product = item.slsItem?.product
+    const product = item.slsItem?.product ?? item.product
     const unitPrice = Number(item.unitPrice ?? item.slsItem?.unitPrice ?? 0)
     const qty = item.quantity
     const amount = unitPrice * qty
@@ -84,7 +80,7 @@ export async function GET(
       quantity: qty,
       unitPrice,
       amount,
-      currencyCode: pi.order.currencyCode,
+      currencyCode: pi.order?.currencyCode ?? pi.currencyCode ?? '',
     }
   })
 
@@ -104,20 +100,20 @@ export async function GET(
       status: pi.status,
     },
     order: {
-      orderNo: pi.order.orderNo,
-      customerPoNo: pi.order.customerPoNo,
-      currencyCode: pi.order.currencyCode,
-      paymentTerms: pi.order.customer?.paymentTerms ?? null,
+      orderNo: pi.order?.orderNo ?? null,
+      customerPoNo: pi.order?.customerPoNo ?? null,
+      currencyCode: pi.order?.currencyCode ?? pi.currencyCode ?? '',
+      paymentTerms: orderCustomer?.paymentTerms ?? null,
     },
-    customer: pi.order.customer ? {
-      id: pi.order.customer.id,
-      name: pi.order.customer.name,
-      shortName: pi.order.customer.shortName,
-      address: pi.order.customer.address,
-      city: pi.order.customer.city,
-      countryCode: pi.order.customer.countryCode,
-      email: pi.order.customer.email,
-      contactPerson: pi.order.customer.contactPerson,
+    customer: orderCustomer ? {
+      id: orderCustomer.id,
+      name: orderCustomer.name,
+      shortName: orderCustomer.shortName,
+      address: orderCustomer.address,
+      city: orderCustomer.city,
+      countryCode: orderCustomer.countryCode,
+      email: orderCustomer.email,
+      contactPerson: orderCustomer.contactPerson,
     } : null,
     company: company ? {
       nameEn: company.nameEn,
@@ -140,7 +136,7 @@ export async function GET(
       cartons: totalCartons || null,
       grossWeightKg: totalGrossWeight || null,
       cbm: totalCbm || null,
-      currencyCode: pi.order.currencyCode,
+      currencyCode: pi.order?.currencyCode ?? pi.currencyCode ?? '',
     },
   })
 }

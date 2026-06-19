@@ -25,20 +25,18 @@ export async function GET(req: Request) {
       id: true,
       piNo: true,
       orderId: true,
+      totalAmount: true,
+      currencyCode: true,
+      customer: {
+        select: { name: true, address: true, city: true, countryCode: true, postalCode: true, taxId: true },
+      },
       order: {
         select: {
           id: true,
           totalAmount: true,
           currencyCode: true,
           customer: {
-            select: {
-              name: true,
-              address: true,
-              city: true,
-              countryCode: true,
-              postalCode: true,
-              taxId: true,
-            },
+            select: { name: true, address: true, city: true, countryCode: true, postalCode: true, taxId: true },
           },
           items: {
             select: {
@@ -47,44 +45,73 @@ export async function GET(req: Request) {
               unitPrice: true,
               unit: true,
               product: {
-                select: {
-                  sku: true,
-                  modelNo: true,
-                  name: true,
-                  specification: true,
-                },
+                select: { sku: true, modelNo: true, name: true, specification: true },
               },
             },
+          },
+        },
+      },
+      items: {
+        select: {
+          id: true,
+          quantity: true,
+          unitPrice: true,
+          unit: true,
+          productId: true,
+          slsItemId: true,
+          product: {
+            select: { sku: true, modelNo: true, name: true, specification: true },
           },
         },
       },
     },
   })
 
-  const result = pis.map(pi => ({
-    id: pi.id,
-    piNo: pi.piNo,
-    orderId: pi.orderId,
-    customerName: pi.order.customer?.name ?? null,
-    totalAmount: pi.order.totalAmount ? Number(pi.order.totalAmount) : null,
-    currencyCode: pi.order.currencyCode,
-    customerAddress: pi.order.customer?.address ?? null,
-    customerCity: pi.order.customer?.city ?? null,
-    customerCountry: pi.order.customer?.countryCode ?? null,
-    customerPostal: pi.order.customer?.postalCode ?? null,
-    customerTaxId: pi.order.customer?.taxId ?? null,
-    items: pi.order.items.map(it => ({
-      slsItemId: it.id,
-      sku: it.product.sku ?? '',
-      modelNo: it.product.modelNo ?? '',
-      name: it.product.name,
-      specification: it.product.specification ?? '',
-      quantity: it.quantity,
-      unitPrice: Number(it.unitPrice),
-      unit: it.unit ?? 'PC',
-      currencyCode: pi.order.currencyCode,
-    })),
-  }))
+  const result = pis.map(pi => {
+    const cust = pi.order?.customer ?? pi.customer
+    const currCode = pi.order?.currencyCode ?? pi.currencyCode ?? ''
+    const totalAmt = pi.order?.totalAmount ?? pi.totalAmount
+    // Use SLS_Order items if available, otherwise fall back to PI's own items
+    const orderItems = pi.order?.items ?? []
+    const piItems = pi.items ?? []
+    const mappedItems = orderItems.length > 0
+      ? orderItems.map(it => ({
+          slsItemId: it.id,
+          sku: it.product.sku ?? '',
+          modelNo: it.product.modelNo ?? '',
+          name: it.product.name,
+          specification: it.product.specification ?? '',
+          quantity: it.quantity,
+          unitPrice: Number(it.unitPrice),
+          unit: it.unit ?? 'PC',
+          currencyCode: currCode,
+        }))
+      : piItems.map(it => ({
+          slsItemId: it.slsItemId ?? null,
+          sku: it.product?.sku ?? '',
+          modelNo: it.product?.modelNo ?? '',
+          name: it.product?.name ?? '',
+          specification: it.product?.specification ?? '',
+          quantity: it.quantity,
+          unitPrice: Number(it.unitPrice),
+          unit: it.unit ?? 'PC',
+          currencyCode: currCode,
+        }))
+    return {
+      id: pi.id,
+      piNo: pi.piNo,
+      orderId: pi.orderId,
+      customerName: cust?.name ?? null,
+      totalAmount: totalAmt ? Number(totalAmt) : null,
+      currencyCode: currCode,
+      customerAddress: cust?.address ?? null,
+      customerCity: cust?.city ?? null,
+      customerCountry: cust?.countryCode ?? null,
+      customerPostal: cust?.postalCode ?? null,
+      customerTaxId: cust?.taxId ?? null,
+      items: mappedItems,
+    }
+  })
 
   return NextResponse.json({ pis: result })
 }

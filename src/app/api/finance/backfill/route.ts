@@ -20,7 +20,9 @@ export async function POST() {
       pis: {
         include: {
           pi: {
-            include: {
+            select: {
+              totalAmount: true,
+              currencyCode: true,
               order: {
                 select: {
                   customerId: true,
@@ -41,16 +43,22 @@ export async function POST() {
   let arUpdated = 0
 
   for (const shipment of shipmentsWithoutReceivable) {
-    const orders = shipment.pis.map(sp => sp.pi.order).filter(o => o.totalAmount != null)
+    // 嘗試從 PI.order 或 PI 本身取得金額
+    const piAmounts = shipment.pis.map(sp => ({
+      totalAmount: sp.pi.order?.totalAmount ?? sp.pi.totalAmount,
+      currencyCode: sp.pi.order?.currencyCode ?? sp.pi.currencyCode ?? 'TWD',
+      exchangeRate: sp.pi.order?.exchangeRate ?? 1,
+      customerId: sp.pi.order?.customerId ?? null,
+    })).filter(o => o.totalAmount != null)
 
     // 無法確定金額 → 跳過，避免建出空殼記錄
-    if (orders.length === 0) {
+    if (piAmounts.length === 0) {
       arSkipped++
       continue
     }
 
-    // 訂單金額加總（SLS_Order.totalAmount 是台幣，currencyCode=TWD，rate=1）
-    const amountTWD = orders.reduce((s, o) => {
+    // 訂單金額加總
+    const amountTWD = piAmounts.reduce((s, o) => {
       const amt = Number(o.totalAmount ?? 0)
       const rate = Number(o.exchangeRate ?? 1)
       return s + (o.currencyCode === 'TWD' ? amt : amt * rate)
@@ -68,7 +76,7 @@ export async function POST() {
 
     const amountForeign = amountTWD * ciRate          // EUR 金額
     const rateAtInvoice = 1 / ciRate                   // EUR→TWD 匯率（約 36）
-    const customerId = shipment.customerId ?? orders.find(o => o.customerId)?.customerId ?? null
+    const customerId = shipment.customerId ?? piAmounts.find(o => o.customerId)?.customerId ?? null
 
     const existing = await prisma.fIN_Receivable.findUnique({ where: { shipmentId: shipment.id } })
     if (existing) {

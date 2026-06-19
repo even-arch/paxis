@@ -61,6 +61,8 @@ export async function GET() {
             select: {
               piNo: true,
               orderId: true,
+              totalAmount: true,
+              currencyCode: true,
               extraCharges: true,
               order: {
                 select: {
@@ -113,11 +115,13 @@ export async function GET() {
     } else {
       // 從 PI → Order 計算，加上 PI 層級的 extraCharges（百分比 + 固定金額）
       arTWD = s.pis.reduce((sum, sp) => {
-        const o = sp.pi.order
-        if (!o.totalAmount) return sum
-        const base = o.currencyCode === 'TWD'
-          ? Number(o.totalAmount)
-          : Number(o.totalAmount) * Number(o.exchangeRate ?? 1)
+        const totalAmt = sp.pi.order?.totalAmount ?? sp.pi.totalAmount
+        const currCode = sp.pi.order?.currencyCode ?? sp.pi.currencyCode ?? 'TWD'
+        const exchRate = sp.pi.order?.exchangeRate ?? 1
+        if (!totalAmt) return sum
+        const base = currCode === 'TWD'
+          ? Number(totalAmt)
+          : Number(totalAmt) * Number(exchRate)
         const { pctMultiplier, flatTWD } = calcExtraCharges(sp.pi.extraCharges)
         return sum + base * pctMultiplier + flatTWD
       }, 0)
@@ -132,6 +136,7 @@ export async function GET() {
 
     for (const sp of s.pis) {
       const slsOrder = sp.pi.order
+      if (!slsOrder) continue  // standalone PI — no SLS_Order to match PO against
 
       // fallback 1：salesOrderId
       const bySlsId = poBySlsId.get(slsOrder.id) ?? []
@@ -172,6 +177,7 @@ export async function GET() {
 
     for (const sp of s.pis) {
       const slsOrder = sp.pi.order
+      if (!slsOrder) continue  // standalone PI — skip PO matching diagnosis
       const bySlsId = poBySlsId.get(slsOrder.id) ?? []
       const byNo = poByPoNo.get(slsOrder.orderNo)
 
@@ -197,7 +203,7 @@ export async function GET() {
       actualShipDate: s.actualShipDate,
       customer: s.customer
         ? { id: s.customer.id, name: s.customer.shortName ?? s.customer.name }
-        : { id: null, name: s.pis[0]?.pi.order.orderNo ?? '—' },
+        : { id: null, name: s.pis[0]?.pi.order?.orderNo ?? s.pis[0]?.pi.piNo ?? '—' },
       ar: {
         foreign: arForeign,
         currency: arCurrency,

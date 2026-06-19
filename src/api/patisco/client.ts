@@ -1383,7 +1383,7 @@ export async function getOrderCopyDetail(
   creds: PatiscoCredentials,
   copyId: string,
 ) {
-  return mcpCall<{ data?: PatiscoOrderCopyDetail | null; item?: PatiscoOrderCopyDetail }>(creds, 'getOrderCopyDetail', { copyId })
+  return mcpCall<{ detail?: PatiscoOrderCopyDetail | null; data?: PatiscoOrderCopyDetail | null; item?: PatiscoOrderCopyDetail }>(creds, 'getOrderCopyDetail', { copyId })
 }
 
 /** 取得副本的商品明細（新版參數：copyId + page） */

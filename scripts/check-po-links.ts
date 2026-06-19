@@ -20,7 +20,7 @@ async function main() {
     },
   })
 
-  const sampleOrderNo = sample?.pi.order.orderNo
+  const sampleOrderNo = sample?.pi.order?.orderNo
   const poByPatisco = sampleOrderNo
     ? await prisma.pO_Order.findMany({
         where: { patiscoOrderNo: sampleOrderNo },
@@ -32,7 +32,7 @@ async function main() {
     totalPO,
     linkedPO,
     sampleOrderNo,
-    linkedFromSalesOrder: sample?.pi.order.purchaseOrders.length,
+    linkedFromSalesOrder: sample?.pi.order?.purchaseOrders?.length,
     poByPatisco,
   }, null, 2))
 }

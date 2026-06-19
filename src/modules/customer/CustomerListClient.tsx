@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useOrgPath } from '@/lib/use-org-path'
+import SortableHeader from '@/components/SortableHeader'
 
 type Customer = {
   id: number
@@ -15,11 +16,20 @@ type Customer = {
   _count: { salesOrders: number }
 }
 
-type Props = { customers: Customer[]; isArchived: boolean }
+type Props = { customers: Customer[]; isArchived: boolean; sort: string; dir: 'asc' | 'desc' }
 
-export default function CustomerListClient({ customers, isArchived }: Props) {
+export default function CustomerListClient({ customers, isArchived, sort, dir }: Props) {
   const router = useRouter()
   const toOrgPath = useOrgPath()
+  const searchParams = useSearchParams()
+
+  function buildUrl(newSort: string, newDir: 'asc' | 'desc') {
+    const p = new URLSearchParams(searchParams.toString())
+    p.set('sort', newSort)
+    p.set('dir', newDir)
+    p.delete('page')
+    return toOrgPath(`/customers?${p.toString()}`)
+  }
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [pending, startTransition] = useTransition()
 
@@ -60,11 +70,11 @@ export default function CustomerListClient({ customers, isArchived }: Props) {
               <th className="px-4 py-3 w-8">
                 <input type="checkbox" checked={selectedIds.size === customers.length && customers.length > 0} onChange={toggleAll} className="rounded" />
               </th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">客戶名稱</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">簡稱</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">國家</th>
+              <SortableHeader label="客戶名稱" field="name" sort={sort} dir={dir} buildUrl={buildUrl} />
+              <SortableHeader label="簡稱" field="shortName" sort={sort} dir={dir} buildUrl={buildUrl} />
+              <SortableHeader label="國家" field="countryCode" sort={sort} dir={dir} buildUrl={buildUrl} />
               <th className="text-left px-4 py-3 font-medium text-gray-600">付款條件</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">幣別</th>
+              <SortableHeader label="幣別" field="currencyCode" sort={sort} dir={dir} buildUrl={buildUrl} />
               <th className="text-right px-4 py-3 font-medium text-gray-600">訂單數</th>
               <th className="px-4 py-3" />
             </tr>

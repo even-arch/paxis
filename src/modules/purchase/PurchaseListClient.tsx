@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useOrgPath } from '@/lib/use-org-path'
 import { formatDate } from '@/lib/utils'
 import { statusBadge } from '@/modules/purchase/poUtils'
+import SortableHeader from '@/components/SortableHeader'
 
 type Order = {
   id: number
@@ -21,11 +22,22 @@ type Order = {
 type Props = {
   orders: Order[]
   isArchived: boolean
+  sort: string
+  dir: 'asc' | 'desc'
 }
 
-export default function PurchaseListClient({ orders, isArchived }: Props) {
+export default function PurchaseListClient({ orders, isArchived, sort, dir }: Props) {
   const router = useRouter()
   const toOrgPath = useOrgPath()
+  const searchParams = useSearchParams()
+
+  function buildUrl(newSort: string, newDir: 'asc' | 'desc') {
+    const p = new URLSearchParams(searchParams.toString())
+    p.set('sort', newSort)
+    p.set('dir', newDir)
+    p.delete('page')
+    return toOrgPath(`/purchases?${p.toString()}`)
+  }
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [pending, startTransition] = useTransition()
 
@@ -84,13 +96,13 @@ export default function PurchaseListClient({ orders, isArchived }: Props) {
                   checked={selectedIds.size === orders.length && orders.length > 0}
                   onChange={toggleAll} className="rounded" />
               </th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">供應商訂單號</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Patisco 訂單</th>
+              <SortableHeader label="供應商訂單號" field="poNo" sort={sort} dir={dir} buildUrl={buildUrl} />
+              <SortableHeader label="Patisco 訂單" field="patiscoOrderNo" sort={sort} dir={dir} buildUrl={buildUrl} />
               <th className="text-left px-4 py-3 font-medium text-gray-600">供應商</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">狀態</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">預計到貨</th>
+              <SortableHeader label="狀態" field="status" sort={sort} dir={dir} buildUrl={buildUrl} />
+              <SortableHeader label="預計到貨" field="expectedDate" sort={sort} dir={dir} buildUrl={buildUrl} />
               <th className="text-right px-4 py-3 font-medium text-gray-600">項目</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">建立日期</th>
+              <SortableHeader label="建立日期" field="orderDate" sort={sort} dir={dir} buildUrl={buildUrl} />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">

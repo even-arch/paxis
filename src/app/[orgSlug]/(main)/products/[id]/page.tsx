@@ -29,6 +29,51 @@ export default async function ProductDetailPage({
 
   const stock = product.inventoryItems[0]
 
+  // 從 SLS_Item 取得買過這個產品的客戶（含訂單資訊）
+  const salesItems = await prisma.sLS_Item.findMany({
+    where: { productId: product.id },
+    select: {
+      id: true,
+      unitPrice: true,
+      quantity: true,
+      unit: true,
+      productNameSnapshot: true,
+      order: {
+        select: {
+          id: true,
+          orderNo: true,
+          orderDate: true,
+          patiscoBuyerName: true,
+          customer: { select: { id: true, name: true, shortName: true } },
+        },
+      },
+    },
+    orderBy: { order: { orderDate: 'desc' } },
+    take: 50,
+  })
+
+  // 從 PO_Item 取得賣過這個產品的供應商（含採購單資訊）
+  const poItems = await prisma.pO_Item.findMany({
+    where: { productId: product.id },
+    select: {
+      id: true,
+      unitPrice: true,
+      quantity: true,
+      unit: true,
+      productNameSnapshot: true,
+      order: {
+        select: {
+          id: true,
+          poNo: true,
+          orderDate: true,
+          supplier: { select: { id: true, name: true, shortName: true } },
+        },
+      },
+    },
+    orderBy: { order: { orderDate: 'desc' } },
+    take: 50,
+  })
+
   return (
     <div className="max-w-3xl">
       <div className="flex items-center justify-between mb-6">
@@ -128,6 +173,90 @@ export default async function ProductDetailPage({
             <Row label="建議售價" value={product.sellingPrice ? product.sellingPrice.toString() : undefined} />
             <Row label="開放 POS 販售" value={product.isAvailableForPos ? '是' : '否'} />
             <Row label="POS 產品 ID" value={product.posProductId} />
+          </Card>
+        )}
+
+        {/* 客戶交易紀錄 */}
+        {salesItems.length > 0 && (
+          <Card title="客戶訂單紀錄">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-gray-500 border-b border-gray-100">
+                  <th className="pb-2 font-medium">客戶</th>
+                  <th className="pb-2 font-medium">訂單號</th>
+                  <th className="pb-2 font-medium">日期</th>
+                  <th className="pb-2 font-medium">規格快照</th>
+                  <th className="pb-2 font-medium text-right">數量</th>
+                  <th className="pb-2 font-medium text-right">單價</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {salesItems.map(item => {
+                  const customerName = item.order.customer?.shortName ?? item.order.customer?.name ?? item.order.patiscoBuyerName ?? '-'
+                  const customerId = item.order.customer?.id
+                  return (
+                    <tr key={item.id} className="hover:bg-gray-50">
+                      <td className="py-2">
+                        {customerId
+                          ? <Link href={orgPath(params.orgSlug, `/customers/${customerId}`)} className="text-blue-600 hover:underline">{customerName}</Link>
+                          : <span className="text-gray-500">{customerName}</span>}
+                      </td>
+                      <td className="py-2">
+                        <Link href={orgPath(params.orgSlug, `/sales/${item.order.id}`)} className="text-blue-600 hover:underline font-mono text-xs">
+                          {item.order.orderNo}
+                        </Link>
+                      </td>
+                      <td className="py-2 text-gray-500 text-xs whitespace-nowrap">
+                        {item.order.orderDate ? formatDate(item.order.orderDate) : '-'}
+                      </td>
+                      <td className="py-2 text-gray-400 text-xs max-w-[180px] truncate">{item.productNameSnapshot ?? '-'}</td>
+                      <td className="py-2 text-right">{item.quantity} {item.unit ?? ''}</td>
+                      <td className="py-2 text-right font-mono text-xs">{item.unitPrice?.toString() ?? '-'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </Card>
+        )}
+
+        {/* 供應商交易紀錄 */}
+        {poItems.length > 0 && (
+          <Card title="供應商採購紀錄">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-gray-500 border-b border-gray-100">
+                  <th className="pb-2 font-medium">供應商</th>
+                  <th className="pb-2 font-medium">採購單號</th>
+                  <th className="pb-2 font-medium">日期</th>
+                  <th className="pb-2 font-medium">規格快照</th>
+                  <th className="pb-2 font-medium text-right">數量</th>
+                  <th className="pb-2 font-medium text-right">單價</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {poItems.map(item => (
+                  <tr key={item.id} className="hover:bg-gray-50">
+                    <td className="py-2">
+                      <Link href={orgPath(params.orgSlug, `/suppliers/${item.order.supplier.id}`)} className="text-blue-600 hover:underline">
+                        {item.order.supplier.shortName ?? item.order.supplier.name}
+                      </Link>
+                    </td>
+                    <td className="py-2">
+                      <Link href={orgPath(params.orgSlug, `/purchases/${item.order.id}`)} className="text-blue-600 hover:underline font-mono text-xs">
+                        {item.order.poNo}
+                      </Link>
+                    </td>
+                    <td className="py-2 text-gray-500 text-xs whitespace-nowrap">
+                      {item.order.orderDate ? formatDate(item.order.orderDate) : '-'}
+                    </td>
+                    <td className="py-2 text-gray-400 text-xs max-w-[180px] truncate">{item.productNameSnapshot ?? '-'}</td>
+                    <td className="py-2 text-right">{item.quantity} {item.unit ?? ''}</td>
+                    <td className="py-2 text-right font-mono text-xs">{item.unitPrice?.toString() ?? '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </Card>
         )}
 

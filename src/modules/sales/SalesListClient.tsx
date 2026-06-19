@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useOrgPath } from '@/lib/use-org-path'
 import { formatDate, formatCurrency } from '@/lib/utils'
+import SortableHeader from '@/components/SortableHeader'
 
 const STATUS_LABELS: Record<number, { label: string; color: string }> = {
   0: { label: '草稿',    color: 'bg-gray-100 text-gray-600' },
@@ -35,12 +36,23 @@ type Order = {
 type Props = {
   orders: Order[]
   isArchived: boolean
+  sort: string
+  dir: 'asc' | 'desc'
 }
 
-export default function SalesListClient({ orders, isArchived }: Props) {
+export default function SalesListClient({ orders, isArchived, sort, dir }: Props) {
   const router = useRouter()
   const toOrgPath = useOrgPath()
+  const searchParams = useSearchParams()
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+
+  function buildUrl(newSort: string, newDir: 'asc' | 'desc') {
+    const p = new URLSearchParams(searchParams.toString())
+    p.set('sort', newSort)
+    p.set('dir', newDir)
+    p.delete('page')
+    return toOrgPath(`/sales?${p.toString()}`)
+  }
   const [pending, startTransition] = useTransition()
 
   function toggle(id: number) {
@@ -98,14 +110,14 @@ export default function SalesListClient({ orders, isArchived }: Props) {
                   checked={selectedIds.size === orders.length && orders.length > 0}
                   onChange={toggleAll} className="rounded" />
               </th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">訂單號</th>
+              <SortableHeader label="訂單號" field="orderNo" sort={sort} dir={dir} buildUrl={buildUrl} />
               <th className="text-left px-4 py-3 font-medium text-gray-600">客戶</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">幣別</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-600">金額</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">狀態</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">來源</th>
+              <SortableHeader label="幣別" field="currencyCode" sort={sort} dir={dir} buildUrl={buildUrl} />
+              <SortableHeader label="金額" field="totalAmount" sort={sort} dir={dir} buildUrl={buildUrl} align="right" />
+              <SortableHeader label="狀態" field="status" sort={sort} dir={dir} buildUrl={buildUrl} />
+              <SortableHeader label="來源" field="source" sort={sort} dir={dir} buildUrl={buildUrl} />
               <th className="text-left px-4 py-3 font-medium text-gray-600">ETD</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">建立日期</th>
+              <SortableHeader label="建立日期" field="patiscoCreatedAt" sort={sort} dir={dir} buildUrl={buildUrl} />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">

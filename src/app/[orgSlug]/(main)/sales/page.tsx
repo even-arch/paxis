@@ -175,7 +175,7 @@ export default async function SalesPage({ params, searchParams }: Props) {
         )}
       </form>
 
-      <SalesListClient orders={orders} isArchived={showArchived} />
+      <SalesListClient orders={orders} isArchived={showArchived} sort={sort} dir={dir} />
 
       {totalPages > 1 && (
         <div className="flex items-center gap-2 mt-4 text-sm">

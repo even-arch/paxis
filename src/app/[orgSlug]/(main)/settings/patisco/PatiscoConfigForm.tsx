@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import DuplicatePIModal from './DuplicatePIModal'
+import type { PIConflict } from '@/api/patisco/sync'
 
 type Config = {
   mcpUrl: string
@@ -31,15 +33,19 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
   const [testing, setTesting] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [syncElapsed, setSyncElapsed] = useState(0)
+  const [syncProgress, setSyncProgress] = useState<{
+    phase: 'phase1' | 'phase2' | null
+    phase1Done: number
+    phase1Total: number
+    phase2Step: string | null
+  }>({ phase: null, phase1Done: 0, phase1Total: 0, phase2Step: null })
   const [msg, setMsg] = useState<{ type: 'ok' | 'error'; text: string } | null>(null)
   const [testResult, setTestResult] = useState<{ ok: boolean; piCount?: number; error?: string } | null>(null)
   const [syncResult, setSyncResult] = useState<{
-    buyers?: { created: number; updated: number; total: number; errors: number }
-    pi?: { processed: number; skipped: number; errors: number }
-    po?: { processed: number; skipped: number; errors: number }
-    deliveries?: { processed: number; errors: number; total: number }
     durationMs?: number
+    phase2?: Record<string, { created: number; updated: number; skipped: number; errors: string[] }>
   } | null>(null)
+  const [piConflicts, setPiConflicts] = useState<PIConflict[]>([])
 
   const isConfigured = !!initialConfig
   const statusOk = initialConfig?.lastTestStatus === 'ok'
@@ -112,22 +118,91 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
 
   async function handleManualSync() {
     setSyncing(true); setSyncResult(null); setMsg(null); setSyncElapsed(0)
+    setSyncProgress({ phase: null, phase1Done: 0, phase1Total: 0, phase2Step: null })
     const startTime = Date.now()
     const timer = setInterval(() => setSyncElapsed(Math.floor((Date.now() - startTime) / 1000)), 500)
+
+    // 輪詢進度
+    const poller = setInterval(async () => {
+      try {
+        const res = await fetch('/api/patisco/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'status' }),
+        })
+        const data = await res.json()
+        const job = data.jobs?.[0]
+        if (job && (job.status === 'phase1' || job.status === 'phase2' || job.status === 'running')) {
+          setSyncProgress({
+            phase: job.status === 'phase1' ? 'phase1' : 'phase2',
+            phase1Done: job.phase1Done ?? 0,
+            phase1Total: job.phase1Total ?? 0,
+            phase2Step: job.phase2Step ?? null,
+          })
+        }
+      } catch { /* 輪詢失敗不影響主流程 */ }
+    }, 2000)
+
     try {
-      const data = await callSync({ type: 'all' })
-      clearInterval(timer)
+      // Phase 1：反覆呼叫直到 done >= total（增量，timeout 後繼續）
+      setSyncProgress(p => ({ ...p, phase: 'phase1' }))
+      let phase1Done = 0
+      let phase1Total = 1  // 先設 1，拿到第一次結果再更新
+      while (phase1Done < phase1Total) {
+        const p1 = await callSync({ type: 'phase1' })
+        phase1Done = p1.done ?? 0
+        phase1Total = p1.total ?? 0
+        setSyncProgress({ phase: 'phase1', phase1Done, phase1Total, phase2Step: null })
+        if (phase1Done >= phase1Total) break
+        // 還有未拉完的，稍等後繼續（限最多 10 輪避免無限迴圈）
+        await new Promise(r => setTimeout(r, 500))
+      }
+
+      // Phase 2：逐步執行，每個 step 獨立請求，避免 504
+      setSyncProgress(p => ({ ...p, phase: 'phase2', phase2Step: null }))
+      const statusData = await callSync({ type: 'status' })
+      const jobId = statusData.jobs?.[0]?.id
+      if (!jobId) throw new Error('找不到 sync job id')
+
+      const phase2Results: Record<string, { created: number; updated: number; skipped: number; errors: string[] }> = {}
+      const allConflicts: PIConflict[] = []
+      let p2Done = false
+      while (!p2Done) {
+        const p2 = await callSync({ type: 'phase2', jobId, step: 'next' })
+        if (p2.stepName && p2.stepName !== 'done') {
+          phase2Results[p2.stepName] = p2.result
+          setSyncProgress(prev => ({ ...prev, phase2Step: p2.stepName }))
+          // 收集 sls_pis 步驟回傳的衝突
+          if (p2.result?.conflicts?.length) {
+            allConflicts.push(...p2.result.conflicts)
+          }
+        }
+        p2Done = !!p2.done
+      }
+      if (allConflicts.length > 0) setPiConflicts(allConflicts)
+
+      clearInterval(timer); clearInterval(poller)
       setSyncing(false)
-      setSyncResult({ ...data, durationMs: Date.now() - startTime })
+      setSyncResult({ durationMs: Date.now() - startTime, phase2: phase2Results })
+      setSyncProgress({ phase: null, phase1Done: 0, phase1Total: 0, phase2Step: null })
       router.refresh()
     } catch (err) {
-      clearInterval(timer)
+      clearInterval(timer); clearInterval(poller)
       setSyncing(false)
+      setSyncProgress({ phase: null, phase1Done: 0, phase1Total: 0, phase2Step: null })
       setMsg({ type: 'error', text: `同步失敗：${err instanceof Error ? err.message : '未知錯誤'}` })
     }
   }
 
   return (
+    <>
+    {piConflicts.length > 0 && (
+      <DuplicatePIModal
+        conflicts={piConflicts}
+        onResolved={(piNo) => setPiConflicts(prev => prev.filter(c => c.piNo !== piNo))}
+        onClose={() => setPiConflicts([])}
+      />
+    )}
     <div className="bg-white rounded-lg shadow divide-y divide-gray-100">
 
       {/* ── 狀態列 ── */}
@@ -169,9 +244,30 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
       )}
 
       {syncing && (
-        <div className="px-6 py-2.5 bg-blue-600 text-white text-sm flex items-center gap-2">
-          <Spinner white />
-          正在同步 Patisco 資料，已等待 {syncElapsed}s…
+        <div className="px-6 py-3 bg-blue-600 text-white text-sm space-y-1.5">
+          <div className="flex items-center gap-2">
+            <Spinner white />
+            <span className="font-medium">正在同步 Patisco 資料… {syncElapsed > 0 ? `${syncElapsed}s` : ''}</span>
+          </div>
+          <div className="pl-5 space-y-0.5 text-blue-100 text-xs">
+            {syncProgress.phase === 'phase1' ? (
+              <p>
+                第一階段：拉取文件
+                {syncProgress.phase1Total > 0
+                  ? ` ${syncProgress.phase1Done} / ${syncProgress.phase1Total} 筆`
+                  : syncProgress.phase1Done > 0
+                    ? ` 已拉取 ${syncProgress.phase1Done} 筆`
+                    : '…'}
+              </p>
+            ) : (
+              <p>第一階段：拉取文件
+                {syncProgress.phase1Total > 0 ? ` ✓ ${syncProgress.phase1Done} 筆` : ''}
+              </p>
+            )}
+            {syncProgress.phase === 'phase2' && (
+              <p>第二階段：解析中 — {PHASE2_STEP_LABELS[syncProgress.phase2Step ?? ''] ?? syncProgress.phase2Step ?? '準備中'}</p>
+            )}
+          </div>
         </div>
       )}
 
@@ -180,23 +276,16 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
           <p className="font-medium mb-2">
             ✓ 同步完成{syncResult.durationMs ? `（${(syncResult.durationMs / 1000).toFixed(1)}s）` : ''}
           </p>
-          <div className="grid grid-cols-3 gap-3 text-xs">
-            {syncResult.buyers && (
-              <SyncCard label="客戶" icon="👥"
-                rows={[`新增 ${syncResult.buyers.created}`, `更新 ${syncResult.buyers.updated}`, `共 ${syncResult.buyers.total} 筆`]}
-                err={syncResult.buyers.errors} />
-            )}
-            {syncResult.pi && (
-              <SyncCard label="PI 同步" icon="📄"
-                rows={[`處理 ${syncResult.pi.processed}`, `跳過 ${syncResult.pi.skipped}`]}
-                err={syncResult.pi.errors} />
-            )}
-            {syncResult.po && (
-              <SyncCard label="採購 PO" icon="📦"
-                rows={[`處理 ${syncResult.po.processed}`, `跳過 ${syncResult.po.skipped}`]}
-                err={syncResult.po.errors} />
-            )}
-          </div>
+          {syncResult.phase2 && (
+            <div className="grid grid-cols-4 gap-2 text-xs">
+              {Object.entries(syncResult.phase2).map(([step, r]) => (
+                <SyncCard key={step}
+                  label={PHASE2_STEP_LABELS[step] ?? step}
+                  rows={[`新增 ${r.created}`, `更新 ${r.updated}`, `跳過 ${r.skipped}`]}
+                  err={r.errors.length} />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -255,6 +344,7 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
         </div>
       </form>
     </div>
+    </>
   )
 }
 
@@ -267,7 +357,7 @@ function Spinner({ white }: { white?: boolean }) {
   )
 }
 
-function SyncCard({ label, icon, rows, err }: { label: string; icon: string; rows: string[]; err: number }) {
+function SyncCard({ label, icon, rows, err }: { label: string; icon?: string; rows: string[]; err: number }) {
   return (
     <div className="bg-white rounded px-3 py-2 border border-blue-100">
       <p className="font-medium text-blue-700 mb-1">{icon} {label}</p>
@@ -275,6 +365,18 @@ function SyncCard({ label, icon, rows, err }: { label: string; icon: string; row
       {err > 0 && <p className="text-red-500">錯誤 {err}</p>}
     </div>
   )
+}
+
+const PHASE2_STEP_LABELS: Record<string, string> = {
+  customers:       '客戶主檔',
+  suppliers:       '供應商主檔',
+  products:        '產品主檔',
+  sls_orders:      '客戶訂單',
+  po_orders:       '採購訂單',
+  po_supplier_pis: '供應商 PI',
+  sls_pis:         '我方 PI',
+  sls_shipments:   '出貨單',
+  done:            '完成',
 }
 
 const lbl = 'block text-sm font-medium text-gray-700 mb-1'

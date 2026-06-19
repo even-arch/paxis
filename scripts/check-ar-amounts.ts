@@ -15,6 +15,7 @@ async function main() {
               },
               items: { select: { unitPrice: true, quantity: true } },
             },
+            // piNo, totalAmount, currencyCode auto-selected via include
           },
         },
       },
@@ -32,7 +33,7 @@ async function main() {
       const pi = sp.pi
       const piItemsTotal = pi.items.reduce((sum, i) => sum + Number(i.unitPrice ?? 0) * i.quantity, 0)
       console.log(`  PI: ${pi.piNo}`)
-      console.log(`    Order.totalAmount: ${pi.order.totalAmount} (${pi.order.currencyCode}, rate=${pi.order.exchangeRate})`)
+      console.log(`    Order.totalAmount: ${pi.order?.totalAmount ?? pi.totalAmount} (${pi.order?.currencyCode ?? pi.currencyCode}, rate=${pi.order?.exchangeRate ?? 1})`)
       console.log(`    PI items sum: ${piItemsTotal}`)
     }
     const shipItemsTotal = s.items.reduce((sum, i) => sum + Number(i.slsItem?.unitPrice ?? 0) * (i.quantity ?? 0), 0)

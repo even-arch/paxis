@@ -7,6 +7,7 @@ import {
   rollbackSyncJob,
   phase1FetchAll,
   phase2ParseAll,
+  phase2RunNextStep,
 } from '@/api/patisco/sync'
 import { patiscoLogin } from '@/api/patisco/client'
 
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await req.json().catch(() => ({})) as { type?: string; jobId?: number }
+  const body = await req.json().catch(() => ({})) as { type?: string; jobId?: number; step?: string }
   const type = body.type ?? 'all'
   const start = Date.now()
 
@@ -44,10 +45,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, durationMs: Date.now() - start, jobId: job.id, ...result })
     }
 
-    // ── 單獨跑 Phase 2（解析已存在的 raw data）──────────────────────────
+    // ── 單獨跑 Phase 2（逐步模式：每次呼叫跑一個 step）───────────────
     if (type === 'phase2') {
       const jobId = body.jobId
       if (!jobId) return NextResponse.json({ ok: false, error: 'jobId 必填' }, { status: 400 })
+
+      // step=next（預設）：只跑下一個未完成的 step
+      // step=all：一次跑完全部（舊行為，保留相容）
+      if (!body.step || body.step === 'next') {
+        const r = await phase2RunNextStep(prisma, jobId)
+        if (r.done) {
+          await prisma.sYS_SyncJob.update({
+            where: { id: jobId },
+            data: { status: 'completed', completedAt: new Date() },
+          })
+        }
+        return NextResponse.json({ ok: true, durationMs: Date.now() - start, jobId, ...r })
+      }
+
+      // 舊版 all-in-one（給 cron 或 manual runPatiscoSync 用）
       const result = await phase2ParseAll(prisma, jobId)
       await prisma.sYS_SyncJob.update({
         where: { id: jobId },

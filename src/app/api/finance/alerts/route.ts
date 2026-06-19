@@ -29,7 +29,10 @@ export async function GET() {
         include: {
           pi: {
             select: {
+              piNo: true,
               orderId: true,
+              totalAmount: true,
+              currencyCode: true,
               extraCharges: true,
               order: {
                 select: { id: true, orderNo: true, totalAmount: true, currencyCode: true, exchangeRate: true },
@@ -82,9 +85,11 @@ export async function GET() {
 
     // 計算 AR TWD
     const arTWD = s.pis.reduce((sum, sp) => {
-      const o = sp.pi.order
-      if (!o.totalAmount) return sum
-      const base = o.currencyCode === 'TWD' ? Number(o.totalAmount) : Number(o.totalAmount) * Number(o.exchangeRate ?? 1)
+      const totalAmt = sp.pi.order?.totalAmount ?? sp.pi.totalAmount
+      const currCode = sp.pi.order?.currencyCode ?? sp.pi.currencyCode ?? 'TWD'
+      const exchRate = sp.pi.order?.exchangeRate ?? 1
+      if (!totalAmt) return sum
+      const base = currCode === 'TWD' ? Number(totalAmt) : Number(totalAmt) * Number(exchRate)
       return sum + base * calcExtraCharges(sp.pi.extraCharges)
     }, 0)
 
@@ -95,6 +100,11 @@ export async function GET() {
 
     for (const sp of s.pis) {
       const slsOrder = sp.pi.order
+      if (!slsOrder) {
+        // Standalone PI — no SLS_Order to match PO against
+        unmatchedOrders.push(sp.pi.piNo)
+        continue
+      }
       const bySlsId = poBySlsId.get(slsOrder.id) ?? []
       const byNo = poByPoNo.get(slsOrder.orderNo)
 

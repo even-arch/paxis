@@ -167,13 +167,13 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (piIds.length > 0) {
       const pis = await prisma.sLS_PI.findMany({
         where: { id: { in: piIds } },
-        include: { order: { select: { customerId: true } } },
+        select: { id: true, status: true, customerId: true, order: { select: { customerId: true } } },
       })
       for (const pi of pis) {
         if (pi.status !== 0) {
           return NextResponse.json({ error: `PI id=${pi.id} 已取消或不存在` }, { status: 400 })
         }
-        if (order.customerId && pi.order.customerId !== order.customerId) {
+        if (order.customerId && (pi.order?.customerId ?? pi.customerId) !== order.customerId) {
           return NextResponse.json({ error: `PI id=${pi.id} 不屬於同一個客戶` }, { status: 400 })
         }
       }
