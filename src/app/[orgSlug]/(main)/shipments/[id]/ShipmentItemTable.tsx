@@ -107,7 +107,7 @@ export default function ShipmentItemTable({ groups, shipmentCurrencyCode }: Prop
         onClick={() => setVolUnit(v => v === 'ft3' ? 'm3' : 'ft3')}
         className="text-[10px] bg-gray-200 hover:bg-gray-300 rounded px-1.5 py-0.5 font-mono text-gray-500 leading-none"
       >
-        {volUnit === 'ft3' ? 'ft³ ⇌ m³' : 'm³ ⇌ ft³'}
+        {volUnit === 'ft3' ? 'ft³' : 'm³'}
       </button>
     </div>
   )
