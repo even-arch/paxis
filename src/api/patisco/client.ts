@@ -733,6 +733,7 @@ export type PatiscoOrderDetail = {
   payment?: string    // TradingTerm code（13=FOB, 14=FOR…）
   isPaid?: string
   createdDate?: string
+  expiredDate?: string | null  // 預計出貨日 / 有效期限
   buyer?: {
     name?: string
     address?: string

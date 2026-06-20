@@ -14,7 +14,7 @@ const SOURCE_LABELS: Record<string, string> = {
 type Shipment = {
   id: number
   shipmentNo: string
-  actualShipDate: Date | string
+  actualShipDate: Date | string | null
   portOfLoading: string | null
   currencyCode: string | null
   source: string

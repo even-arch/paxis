@@ -14,6 +14,7 @@ type PI = {
   estimatedShipDate: Date | string | null
   status: number
   patiscoCreatedAt: Date | string | null
+  customer: { name: string; shortName: string | null } | null
   order: { id: number; orderNo: string; customer: { name: string; shortName: string | null } | null } | null
   _count: { items: number }
 }
@@ -89,20 +90,18 @@ export default function PIListClient({ pis, isArchived, sort, dir }: Props) {
             )}
             {pis.map(pi => {
               const isSelected = selectedIds.has(pi.id)
-              const customerName = pi.order?.customer?.shortName ?? pi.order?.customer?.name ?? '-'
+              const cust = pi.order?.customer ?? pi.customer
+              const customerName = cust?.shortName ?? cust?.name ?? '-'
               return (
                 <tr key={pi.id} className={`hover:bg-gray-50 ${isSelected ? 'bg-teal-50' : ''}`}>
                   <td className="px-4 py-3">
                     <input type="checkbox" checked={isSelected} onChange={() => toggle(pi.id)} className="rounded" />
                   </td>
                   <td className="px-4 py-3">
-                    {pi.order ? (
-                      <Link href={toOrgPath(`/sales/${pi.order.id}`)} className="font-mono font-medium text-teal-600 hover:underline">
-                        {pi.piNo}
-                      </Link>
-                    ) : (
-                      <span className="font-mono font-medium text-gray-700">{pi.piNo}</span>
-                    )}
+                    <Link href={pi.order ? toOrgPath(`/sales/${pi.order.id}`) : toOrgPath(`/sales/pi/${pi.id}`)}
+                      className="font-mono font-medium text-teal-600 hover:underline">
+                      {pi.piNo}
+                    </Link>
                   </td>
                   <td className="px-4 py-3 text-gray-700">{customerName}</td>
                   <td className="px-4 py-3 text-gray-500 font-mono text-xs">{pi.order?.orderNo ?? '-'}</td>

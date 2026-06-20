@@ -318,7 +318,7 @@ export default async function SalesDetailPage({
           shipments={shipments.map(s => ({
             id: s.id,
             shipmentNo: s.shipmentNo,
-            actualShipDate: s.actualShipDate.toISOString(),
+            actualShipDate: s.actualShipDate?.toISOString() ?? null,
             shippingMethod: s.shippingMethod,
             portOfLoading: s.portOfLoading,
             portOfDischarge: s.portOfDischarge,

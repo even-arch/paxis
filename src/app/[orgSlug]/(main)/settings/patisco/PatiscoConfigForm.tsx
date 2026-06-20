@@ -244,28 +244,37 @@ export default function PatiscoConfigForm({ initialConfig }: { initialConfig: Co
       )}
 
       {syncing && (
-        <div className="px-6 py-3 bg-blue-600 text-white text-sm space-y-1.5">
-          <div className="flex items-center gap-2">
-            <Spinner white />
-            <span className="font-medium">正在同步 Patisco 資料… {syncElapsed > 0 ? `${syncElapsed}s` : ''}</span>
+        <div className="px-6 py-3 bg-blue-600 text-white text-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Spinner white />
+              <span className="font-medium">正在同步 Patisco 資料…</span>
+            </div>
+            <div className="flex items-center gap-3">
+              {syncElapsed > 0 && <span className="text-blue-200 text-xs">{syncElapsed}s</span>}
+              <span className="font-mono text-xs bg-blue-700 px-2 py-0.5 rounded">{calcSyncPercent(syncProgress)}%</span>
+            </div>
           </div>
-          <div className="pl-5 space-y-0.5 text-blue-100 text-xs">
+          {/* 進度條 */}
+          <div className="h-1.5 bg-blue-800 rounded-full overflow-hidden mb-2">
+            <div
+              className="h-full bg-white rounded-full transition-all duration-700 ease-out"
+              style={{ width: `${calcSyncPercent(syncProgress)}%` }}
+            />
+          </div>
+          <div className="text-blue-100 text-xs space-y-0.5">
             {syncProgress.phase === 'phase1' ? (
               <p>
-                第一階段：拉取文件
+                第一階段：下載文件
                 {syncProgress.phase1Total > 0
                   ? ` ${syncProgress.phase1Done} / ${syncProgress.phase1Total} 筆`
-                  : syncProgress.phase1Done > 0
-                    ? ` 已拉取 ${syncProgress.phase1Done} 筆`
-                    : '…'}
+                  : syncProgress.phase1Done > 0 ? ` 已下載 ${syncProgress.phase1Done} 筆` : '…'}
               </p>
             ) : (
-              <p>第一階段：拉取文件
-                {syncProgress.phase1Total > 0 ? ` ✓ ${syncProgress.phase1Done} 筆` : ''}
-              </p>
+              <p>第一階段：下載文件 {syncProgress.phase1Total > 0 ? `✓ ${syncProgress.phase1Done} 筆` : ''}</p>
             )}
             {syncProgress.phase === 'phase2' && (
-              <p>第二階段：解析中 — {PHASE2_STEP_LABELS[syncProgress.phase2Step ?? ''] ?? syncProgress.phase2Step ?? '準備中'}</p>
+              <p>第二階段：解析 {PHASE2_STEP_LABELS[syncProgress.phase2Step ?? ''] ?? syncProgress.phase2Step ?? '準備中'}</p>
             )}
           </div>
         </div>
@@ -365,6 +374,22 @@ function SyncCard({ label, icon, rows, err }: { label: string; icon?: string; ro
       {err > 0 && <p className="text-red-500">錯誤 {err}</p>}
     </div>
   )
+}
+
+const PHASE2_STEPS = [
+  'customers', 'suppliers', 'products',
+  'sls_orders', 'po_orders', 'po_supplier_pis',
+  'sls_pis', 'sls_shipments',
+]
+
+function calcSyncPercent(progress: { phase: 'phase1' | 'phase2' | null; phase1Done: number; phase1Total: number; phase2Step: string | null }): number {
+  if (!progress.phase) return 0
+  if (progress.phase === 'phase1') {
+    const p1 = progress.phase1Total > 0 ? progress.phase1Done / progress.phase1Total : 0
+    return Math.round(p1 * 50)
+  }
+  const stepIdx = progress.phase2Step ? PHASE2_STEPS.indexOf(progress.phase2Step) : -1
+  return Math.round(50 + (stepIdx >= 0 ? stepIdx / PHASE2_STEPS.length : 0) * 50)
 }
 
 const PHASE2_STEP_LABELS: Record<string, string> = {

@@ -4,7 +4,7 @@ import { getPagePrisma } from '@/lib/page-db'
 import { orgPath } from '@/lib/org-path'
 import PurchaseListClient from '@/modules/purchase/PurchaseListClient'
 
-const VALID_SORTS = ['poNo', 'patiscoOrderNo', 'status', 'expectedDate', 'orderDate'] as const
+const VALID_SORTS = ['poNo', 'patiscoOrderNo', 'status', 'expectedDate', 'orderDate', 'patiscoCreatedAt'] as const
 type SortField = typeof VALID_SORTS[number]
 
 type Props = {
@@ -23,7 +23,7 @@ export default async function PurchasesPage({ params, searchParams }: Props) {
   const statusFilter = searchParams.status ?? ''
   const supplierId = searchParams.supplierId ? Number(searchParams.supplierId) : undefined
   const page = Math.max(1, Number(searchParams.page ?? 1))
-  const sort: SortField = VALID_SORTS.includes(searchParams.sort as SortField) ? searchParams.sort as SortField : 'orderDate'
+  const sort: SortField = VALID_SORTS.includes(searchParams.sort as SortField) ? searchParams.sort as SortField : 'patiscoCreatedAt'
   const dir = searchParams.dir === 'asc' ? 'asc' : 'desc'
   const showArchived = searchParams.archived === 'true'
   const limit = 20

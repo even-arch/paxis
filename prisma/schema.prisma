@@ -603,6 +603,7 @@ model PO_Order {
   patiscoOrderNo    String?
   patiscoOrderId    String?
   patiscoStatus     String?   // Patisco 文件狀態：'0'=Editing, '1'=Confirmed
+  patiscoCreatedAt  DateTime? // Patisco 原始建立時間（PO 文件上的 createdDate）
 
   syncJobId     Int?      // Patisco sync job ID，用於回滾
   createdBy     Int
@@ -614,6 +615,7 @@ model PO_Order {
   items         PO_Item[]
   supplierPIs   PO_SupplierPI[]
   receipts      PO_Receipt[]
+  shipments     SLS_Shipment[]
 
   @@index([supplierId, status])
   @@index([poNo])
@@ -927,8 +929,8 @@ model SLS_Shipment {
 
   shipmentNo  String    @unique
 
-  // 實際出貨資訊（作為最終 shippedAt 記錄）
-  actualShipDate  DateTime
+  // 實際出貨資訊（作為最終 shippedAt 記錄；nullable — Patisco 未提供時可事後補填）
+  actualShipDate  DateTime?
   shippingMethod  String?  // SEA | AIR | COURIER
   portOfLoading   String?  // UN/LOCODE，如 TWKHH
   portOfDischarge String?
@@ -945,6 +947,15 @@ model SLS_Shipment {
   syncJobId     Int?    // Patisco sync job ID，用於回滾
 
   archivedAt DateTime? // 封存時間；非 null = 已封存
+
+  // 採購側連結（回查 DO 對應的 PO，供成本勾稽）
+  poOrderId    Int?
+  poOrder      PO_Order? @relation(fields: [poOrderId], references: [id])
+
+  // Patisco DO 原始日期（來自 listDeliveryOrders + getDeliveryOrderDetail）
+  doCreatedDate   DateTime?  // DO 建立日（Patisco createdDate）
+  doExpiredDate   DateTime?  // DO 有效期限（Patisco expiredDate）
+  doCompletedDate DateTime?  // DO 完成日（Patisco completedDate，來自清單項目）
 
   // 出貨文件號（Packing List / Commercial Invoice 上的編號，供核對用）
   packingListNo     String?

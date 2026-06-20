@@ -7,7 +7,7 @@ import { useOrgPath } from '@/lib/use-org-path'
 type BreakdownItem = { productName: string; sku: string | null; qty: number; unitPrice: number; value: number }
 type SupplierBreakdown = {
   shipmentNo: string
-  actualShipDate: string
+  actualShipDate: string | null
   currencyCode: string
   totalValue: number
   breakdown: { supplierId: number | null; supplierName: string; totalValue: number; pct: number; items: BreakdownItem[] }[]
@@ -40,7 +40,7 @@ type ShipmentItem = {
 type ExistingShipment = {
   id: number
   shipmentNo: string
-  actualShipDate: string
+  actualShipDate: string | null
   shippingMethod: string | null
   portOfLoading: string | null
   portOfDischarge: string | null
@@ -128,7 +128,7 @@ export default function SalesShipmentPanel({ orderId, orderStatus, items, active
     if (!d) return
     const rows = [
       ['出貨單號', d.shipmentNo],
-      ['出貨日期', d.actualShipDate.slice(0, 10)],
+      ['出貨日期', d.actualShipDate?.slice(0, 10) ?? '—'],
       ['幣別', d.currencyCode],
       [''],
       ['供應商', '金額', '佔比%', '商品', 'SKU', '數量', '單價'],
@@ -166,7 +166,7 @@ export default function SalesShipmentPanel({ orderId, orderStatus, items, active
       writeFile: (wb: unknown, filename: string) => void
     }
     const aoa: unknown[][] = [
-      ['出貨單號', d.shipmentNo, '', '出貨日期', d.actualShipDate.slice(0, 10), '', '幣別', d.currencyCode],
+      ['出貨單號', d.shipmentNo, '', '出貨日期', d.actualShipDate?.slice(0, 10) ?? '—', '', '幣別', d.currencyCode],
       [],
       ['供應商', '金額', '佔比%', '商品', 'SKU', '數量', '單價', '小計'],
       ...d.breakdown.flatMap(b =>
@@ -396,7 +396,7 @@ export default function SalesShipmentPanel({ orderId, orderStatus, items, active
                     {s.source === 'UPS' && <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded">UPS</span>}
                   </div>
                   <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-500 mb-1">
-                    <span>離港日：<span className="text-gray-700 font-medium">{s.actualShipDate.slice(0, 10)}</span></span>
+                    <span>離港日：<span className="text-gray-700 font-medium">{s.actualShipDate?.slice(0, 10) ?? '未填'}</span></span>
                     {s.portOfLoading && <span>裝運港：<span className="text-gray-700">{s.portOfLoading}</span></span>}
                     {s.portOfDischarge && <span>目的港：<span className="text-gray-700">{s.portOfDischarge}</span></span>}
                     {s.trackingNo && <span>B/L：<span className="font-mono text-gray-700">{s.trackingNo}</span></span>}
@@ -488,7 +488,7 @@ export default function SalesShipmentPanel({ orderId, orderStatus, items, active
                   <div className="bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-700">出貨完整紀錄</div>
                   <div className="p-4 grid grid-cols-2 gap-x-8 gap-y-2 text-xs">
                     <div><span className="text-gray-400">出貨單號：</span><span className="font-mono font-medium">{s.shipmentNo}</span></div>
-                    <div><span className="text-gray-400">離港日：</span><span className="font-medium">{s.actualShipDate.slice(0, 10)}</span></div>
+                    <div><span className="text-gray-400">離港日：</span><span className="font-medium">{s.actualShipDate?.slice(0, 10) ?? '未填'}</span></div>
                     {s.shippingMethod && <div><span className="text-gray-400">運送方式：</span>{s.shippingMethod}</div>}
                     {s.portOfLoading && <div><span className="text-gray-400">裝運港（POL）：</span>{s.portOfLoading}</div>}
                     {s.portOfDischarge && <div><span className="text-gray-400">目的港（POD）：</span>{s.portOfDischarge}</div>}

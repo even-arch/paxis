@@ -27,6 +27,7 @@ export default async function PIListPage({ params, searchParams }: Props) {
   if (search) {
     where.OR = [
       { piNo: { contains: search, mode: 'insensitive' } },
+      { customer: { name: { contains: search, mode: 'insensitive' } } },
       { order: { customer: { name: { contains: search, mode: 'insensitive' } } } },
       { order: { orderNo: { contains: search, mode: 'insensitive' } } },
     ]
@@ -40,6 +41,7 @@ export default async function PIListPage({ params, searchParams }: Props) {
       skip: (page - 1) * limit,
       take: limit,
       include: {
+        customer: { select: { name: true, shortName: true } },
         order: { select: { id: true, orderNo: true, customer: { select: { name: true, shortName: true } } } },
         _count: { select: { items: true } },
       },

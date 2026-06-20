@@ -4,7 +4,7 @@ import { getPagePrisma } from '@/lib/page-db'
 import { orgPath } from '@/lib/org-path'
 import ShipmentListClient from '@/modules/shipment/ShipmentListClient'
 
-const VALID_SORTS = ['shipmentNo', 'actualShipDate', 'currencyCode', 'source', 'performedAt'] as const
+const VALID_SORTS = ['shipmentNo', 'actualShipDate', 'currencyCode', 'source', 'performedAt', 'doCreatedDate'] as const
 type SortField = typeof VALID_SORTS[number]
 
 type Props = {
@@ -16,7 +16,7 @@ export default async function ShipmentsPage({ params, searchParams }: Props) {
   const prisma = await getPagePrisma(params.orgSlug)
   const search = searchParams.search ?? ''
   const page = Math.max(1, Number(searchParams.page ?? 1))
-  const sort: SortField = VALID_SORTS.includes(searchParams.sort as SortField) ? searchParams.sort as SortField : 'actualShipDate'
+  const sort: SortField = VALID_SORTS.includes(searchParams.sort as SortField) ? searchParams.sort as SortField : 'doCreatedDate'
   const dir = searchParams.dir === 'asc' ? 'asc' : 'desc'
   const showArchived = searchParams.archived === 'true'
   const limit = 20

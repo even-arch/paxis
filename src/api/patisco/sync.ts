@@ -191,7 +191,12 @@ async function fetchDetailForDO(creds: PatiscoCredentials, item: Record<string, 
   ])
   const pl = plR.ok ? (plR.data?.detail ?? plR.data ?? null) : null
   const ci = ciR.ok ? (ciR.data?.detail ?? ciR.data ?? null) : null
-  return { packingList: pl, commercialInvoice: ci }
+  // 儲存清單項目中的日期欄位（detail 中不含）
+  const listMeta = {
+    completedDate: (item.completedDate ?? item.CompletedDate ?? null) as string | null,
+    listExpiredDate: (item.expiredDate ?? item.ExpiredDate ?? null) as string | null,
+  }
+  return { packingList: pl, commercialInvoice: ci, listMeta }
 }
 
 // ─── Phase 1：拉所有 raw data ────────────────────────────────────────────────
@@ -352,6 +357,10 @@ export async function phase1FetchAll(
 function getRawRecords(prisma: PrismaClient, docType: string): Promise<RawSyncRecord[]> {
   return prisma.sYS_PatiscoSync.findMany({
     where: { docType, status: 'ok' },
+    orderBy: [
+      { patiscoModifiedAt: 'desc' },  // 最新的先處理
+      { syncedAt: 'desc' },           // 若 modifiedAt 相同，以 sync 時間排序
+    ],
     select: { id: true, docType: true, patiscoDocId: true, patiscoDocNo: true, result: true },
   }) as Promise<RawSyncRecord[]>
 }
@@ -722,7 +731,9 @@ export async function step5_poOrders(prisma: PrismaClient, jobId: number): Promi
           currencyCode: resolvePatiscoCurrency(header.payment),
           exchangeRate: 1,
           totalAmount: toDecimal(raw.price?.amount),
-          orderDate: parsePatiscoDate(header.createdDate) ?? new Date(),
+          orderDate: parsePatiscoDate(header.createdDate) ?? undefined,
+          expectedDate: parsePatiscoDate(header.expiredDate) ?? undefined,
+          patiscoCreatedAt: parsePatiscoDate(header.createdDate) ?? undefined,
           patiscoOrderId: rec.patiscoDocId,
           patiscoOrderNo: rec.patiscoDocNo,
           patiscoStatus: header.status ?? undefined,
@@ -968,7 +979,7 @@ export async function step7_slsPIs(prisma: PrismaClient, jobId: number): Promise
           currencyCode: orderId ? undefined : currencyCode,
           totalAmount: orderId ? undefined : totalAmount,
           piNo,
-          piDate: parsePatiscoDate(header.createdDate) ?? new Date(),
+          piDate: parsePatiscoDate(header.createdDate) ?? undefined,
           estimatedShipDate: parsePatiscoDate(rawHeader.expiredDate) ?? undefined,
           status: 0,
           source: 'PATISCO',
@@ -1058,7 +1069,7 @@ export async function step7_buildOnePIFromDocId(
       data: {
         orderNo: piNo, customerId: customer?.id ?? undefined, status: 1,
         currencyCode, exchangeRate: 1,
-        orderDate: parsePatiscoDate(header.createdDate) ?? new Date(),
+        orderDate: parsePatiscoDate(header.createdDate) ?? undefined,
         source: 'PATISCO', patiscoBuyerName: buyerName ?? undefined,
         patiscoDocId: rec.patiscoDocId, patiscoDocNo: rec.patiscoDocNo,
         syncJobId: jobId || undefined, createdBy: SYS_USER_ID, performedBy: null,
@@ -1092,7 +1103,7 @@ export async function step7_buildOnePIFromDocId(
   const pi = await prisma.sLS_PI.create({
     data: {
       orderId: salesOrder.id, piNo,
-      piDate: parsePatiscoDate(header.createdDate) ?? new Date(),
+      piDate: parsePatiscoDate(header.createdDate) ?? undefined,
       estimatedShipDate: parsePatiscoDate(rawHeader.expiredDate) ?? undefined,
       status: 0, source: 'PATISCO',
       patiscoDocId: rec.patiscoDocId, patiscoDocNo: rec.patiscoDocNo,
@@ -1121,7 +1132,7 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
 
   for (const rec of records) {
     try {
-      const raw = rec.result as { packingList?: PatiscoShipmentDetail; commercialInvoice?: PatiscoShipmentDetail }
+      const raw = rec.result as { packingList?: PatiscoShipmentDetail; commercialInvoice?: PatiscoShipmentDetail; listMeta?: { completedDate?: string | null; listExpiredDate?: string | null } }
       const pl = raw?.packingList
       const ci = raw?.commercialInvoice
       const detail = pl ?? ci
@@ -1162,17 +1173,36 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
       const linkedPIs = piNos.length > 0
         ? await prisma.sLS_PI.findMany({
             where: { piNo: { in: piNos } },
-            select: { id: true, piNo: true },
+            select: { id: true, piNo: true, orderId: true },
           })
         : []
 
-      const shipDate = parsePatiscoDate(detail.shipDate ?? detail.createdDate) ?? new Date()
+      // 回查採購訂單：SLS_PI → SLS_Order → PO_Order（salesOrderId 連結）
+      // 若對應唯一一張 PO_Order，直接連結；多張時取第一張（split order 場景）
+      const salesOrderId = linkedPIs.find(p => p.orderId)?.orderId ?? null
+      let poOrderId: number | undefined = undefined
+      if (salesOrderId) {
+        const poOrders = await prisma.pO_Order.findMany({
+          where: { salesOrderId },
+          select: { id: true },
+          take: 1,
+        })
+        if (poOrders.length === 1) poOrderId = poOrders[0].id
+      }
+
+      const shipDate = parsePatiscoDate(detail.shipDate) ?? undefined
 
       const shipment = await prisma.sLS_Shipment.create({
         data: {
           shipmentNo,
           customerId: customer?.id ?? undefined,
+          poOrderId: poOrderId ?? undefined,
           actualShipDate: shipDate,
+          doCreatedDate: parsePatiscoDate(detail.createdDate) ?? undefined,
+          doExpiredDate: parsePatiscoDate(detail.expiredDate ?? raw.listMeta?.listExpiredDate) ?? undefined,
+          doCompletedDate: parsePatiscoDate(raw.listMeta?.completedDate) ?? undefined,
+          portOfLoading: detail.port?.trim() ?? undefined,
+          trackingNo: detail.shipNo?.trim() ?? undefined,
           source: 'PATISCO',
           patiscoDocId: rec.patiscoDocId,
           patiscoDocNo: rec.patiscoDocNo,

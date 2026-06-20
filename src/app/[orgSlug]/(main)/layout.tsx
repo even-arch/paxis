@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { masterPrisma } from '@/lib/master-db'
 import { getOrgPrisma } from '@/lib/org-db'
 import Sidebar from '@/components/Sidebar'
+import SyncStatusBanner from '@/components/SyncStatusBanner'
 
 export default async function MainLayout({
   children,
@@ -33,7 +34,10 @@ export default async function MainLayout({
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar companyName={companyName} orgSlug={params.orgSlug} />
-      <main className="flex-1 overflow-auto p-6">{children}</main>
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <SyncStatusBanner />
+        <main className="flex-1 overflow-auto p-6">{children}</main>
+      </div>
     </div>
   )
 }
