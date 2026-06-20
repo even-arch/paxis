@@ -36,11 +36,11 @@ type Props = {
 const fmt = (n: number) =>
   n > 0 ? n.toFixed(n % 1 === 0 ? 0 : 3).replace(/\.?0+$/, '') : '-'
 
-const fmtMoney = (s: string | null, currency: string | null) => {
+const fmtMoney = (s: string | null) => {
   if (!s) return null
   const n = parseFloat(s)
   if (isNaN(n) || n === 0) return null
-  return `${currency ?? ''} ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`.trim()
+  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function cartonLabel(item: ShipmentItemData) {
@@ -134,8 +134,12 @@ export default function ShipmentItemTable({ groups, shipmentCurrencyCode }: Prop
             <th className="text-left px-4 py-2 font-medium text-gray-600">品名</th>
             <th className="text-right px-4 py-2 font-medium text-gray-600 w-16">數量</th>
             <th className="text-center px-4 py-2 font-medium text-gray-600 w-14">單位</th>
-            <th className="text-right px-4 py-2 font-medium text-gray-600 w-24">單價</th>
-            <th className="text-right px-4 py-2 font-medium text-gray-600 w-28">總價</th>
+            <th className="text-right px-4 py-2 font-medium text-gray-600 w-24">
+              單價{shipmentCurrencyCode ? <span className="text-gray-400 font-normal ml-1">({shipmentCurrencyCode})</span> : ''}
+            </th>
+            <th className="text-right px-4 py-2 font-medium text-gray-600 w-28">
+              總價{shipmentCurrencyCode ? <span className="text-gray-400 font-normal ml-1">({shipmentCurrencyCode})</span> : ''}
+            </th>
             <th className="text-right px-4 py-2 font-medium text-gray-600 w-14">箱數</th>
             <th className="text-center px-4 py-2 font-medium text-gray-600 w-20">C/NO.</th>
             <th className="text-right px-4 py-2 font-medium text-gray-600 w-20">毛重 (kg)</th>
@@ -146,8 +150,7 @@ export default function ShipmentItemTable({ groups, shipmentCurrencyCode }: Prop
         <tbody>
           {groups.map((group, gi) => {
             const s = groupSummary(group.items)
-            const piCurrency = group.piCurrencyCode ?? shipmentCurrencyCode
-            const piAmtLabel = fmtMoney(group.piTotalAmount, piCurrency)
+            const piAmtLabel = fmtMoney(group.piTotalAmount)
             const groupUnitMap = new Map<string, number>()
             for (const item of group.items) {
               const u = item.unit?.trim() || 'PC'
