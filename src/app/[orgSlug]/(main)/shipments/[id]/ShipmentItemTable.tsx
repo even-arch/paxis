@@ -101,15 +101,15 @@ export default function ShipmentItemTable({ groups, shipmentCurrencyCode }: Prop
   const unitEntries = Array.from(qtyByUnit.entries()).sort((a, b) => b[1] - a[1])
 
   const volHeader = (
-    <span className="flex items-center gap-1">
-      體積
+    <div className="flex flex-col items-end gap-1">
+      <span>材積</span>
       <button
         onClick={() => setVolUnit(v => v === 'ft3' ? 'm3' : 'ft3')}
-        className="ml-1 text-[10px] bg-gray-200 hover:bg-gray-300 rounded px-1 py-0.5 font-mono text-gray-600 leading-none"
+        className="text-[10px] bg-gray-200 hover:bg-gray-300 rounded px-1.5 py-0.5 font-mono text-gray-500 leading-none"
       >
-        {volUnit === 'ft3' ? 'ft³ ⇌' : 'm³ ⇌'}
+        {volUnit === 'ft3' ? 'ft³ ⇌ m³' : 'm³ ⇌ ft³'}
       </button>
-    </span>
+    </div>
   )
 
   const volCell = (item: ShipmentItemData) =>
@@ -134,17 +134,17 @@ export default function ShipmentItemTable({ groups, shipmentCurrencyCode }: Prop
             <th className="text-left px-4 py-2 font-medium text-gray-600">品名</th>
             <th className="text-right px-4 py-2 font-medium text-gray-600 w-16">數量</th>
             <th className="text-center px-4 py-2 font-medium text-gray-600 w-14">單位</th>
-            <th className="text-right px-4 py-2 font-medium text-gray-600 w-24">
+            <th className="text-right px-3 py-2 font-medium text-gray-600 w-24">
               單價{shipmentCurrencyCode ? <span className="text-gray-400 font-normal ml-1">({shipmentCurrencyCode})</span> : ''}
             </th>
-            <th className="text-right px-4 py-2 font-medium text-gray-600 w-28">
+            <th className="text-right px-3 py-2 font-medium text-gray-600 w-36">
               總價{shipmentCurrencyCode ? <span className="text-gray-400 font-normal ml-1">({shipmentCurrencyCode})</span> : ''}
             </th>
-            <th className="text-right px-4 py-2 font-medium text-gray-600 w-14">箱數</th>
-            <th className="text-center px-4 py-2 font-medium text-gray-600 w-20">C/NO.</th>
-            <th className="text-right px-4 py-2 font-medium text-gray-600 w-20">毛重 (kg)</th>
-            <th className="text-right px-4 py-2 font-medium text-gray-600 w-20">淨重 (kg)</th>
-            <th className="text-right px-4 py-2 font-medium text-gray-600 w-20">{volHeader}</th>
+            <th className="text-right px-3 py-2 font-medium text-gray-600 w-14">箱數</th>
+            <th className="text-center px-3 py-2 font-medium text-gray-600 w-20">C/NO.</th>
+            <th className="text-right px-3 py-2 font-medium text-gray-600 w-16">毛重 (kg)</th>
+            <th className="text-right px-3 py-2 font-medium text-gray-600 w-16">淨重 (kg)</th>
+            <th className="text-right px-3 py-2 font-medium text-gray-600 w-20">{volHeader}</th>
           </tr>
         </thead>
         <tbody>
@@ -195,17 +195,17 @@ export default function ShipmentItemTable({ groups, shipmentCurrencyCode }: Prop
                       <td className="px-4 py-2 text-gray-700 text-xs">{item.productName ?? '-'}</td>
                       <td className="px-4 py-2 text-right text-gray-700">{item.quantity.toLocaleString()}</td>
                       <td className="px-4 py-2 text-center text-gray-500 text-xs">{item.unit ?? '-'}</td>
-                      <td className="px-4 py-2 text-right text-gray-500 text-xs font-mono">
+                      <td className="px-3 py-2 text-right text-gray-500 text-xs font-mono">
                         {item.unitPrice ? parseFloat(item.unitPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }) : '-'}
                       </td>
-                      <td className="px-4 py-2 text-right text-gray-600 text-xs font-mono">
+                      <td className="px-3 py-2 text-right text-gray-600 text-xs font-mono">
                         {totalPrice ? parseFloat(totalPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                       </td>
-                      <td className="px-4 py-2 text-right text-gray-500">{item.cartons ?? '-'}</td>
-                      <td className="px-4 py-2 text-center text-gray-500 text-xs font-mono">{cartonLabel(item)}</td>
-                      <td className="px-4 py-2 text-right text-gray-500 text-xs">{item.grossWeightKg ? parseFloat(item.grossWeightKg).toString() : '-'}</td>
-                      <td className="px-4 py-2 text-right text-gray-500 text-xs">{item.netWeightKg ? parseFloat(item.netWeightKg).toString() : '-'}</td>
-                      <td className="px-4 py-2 text-right text-gray-500 text-xs font-mono">{volCell(item)}</td>
+                      <td className="px-3 py-2 text-right text-gray-500">{item.cartons ?? '-'}</td>
+                      <td className="px-3 py-2 text-center text-gray-500 text-xs font-mono">{cartonLabel(item)}</td>
+                      <td className="px-3 py-2 text-right text-gray-500 text-xs">{item.grossWeightKg ? parseFloat(item.grossWeightKg).toString() : '-'}</td>
+                      <td className="px-3 py-2 text-right text-gray-500 text-xs">{item.netWeightKg ? parseFloat(item.netWeightKg).toString() : '-'}</td>
+                      <td className="px-3 py-2 text-right text-gray-500 text-xs font-mono">{volCell(item)}</td>
                     </tr>
                   )
                 })}
