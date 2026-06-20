@@ -52,7 +52,7 @@ export default function NotificationBell() {
 
   useEffect(() => { setDismissed(loadDismissed()) }, [])
 
-  useEffect(() => {
+  function fetchAlerts() {
     fetch('/api/finance/alerts')
       .then(r => r.json())
       .then((d: { alerts: FinanceAlert[] }) => setFinanceAlerts(d.alerts ?? []))
@@ -61,7 +61,13 @@ export default function NotificationBell() {
       .then(r => r.json())
       .then((d: { alerts: DataAlert[] }) => setDataAlerts(d.alerts ?? []))
       .catch(() => {})
-  }, [])
+  }
+
+  // 頁面載入時拉一次
+  useEffect(() => { fetchAlerts() }, [])
+
+  // 開啟面板時也重新拉（資料可能在背景 sync 後已更新）
+  useEffect(() => { if (open) fetchAlerts() }, [open])
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
