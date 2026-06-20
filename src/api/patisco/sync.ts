@@ -31,6 +31,7 @@ import {
   getDeliveryOrderDetail,
   extractOrderDetail,
   resolvePatiscoCurrency,
+  PATISCO_CURRENCY,
   type PatiscoCredentials,
   type PatiscoOrderCopyDetail,
   type PatiscoOrderCopyProduct,
@@ -711,17 +712,38 @@ export async function step5_poOrders(prisma: PrismaClient, jobId: number): Promi
         where: { poNo },
         select: { id: true },
       })
-      if (existing) {
-        // 暫時不做 source 判斷（PO_Order 無 source 欄位），直接 skip
-        r.skipped++
-        continue
-      }
 
       // 嘗試連結 SLS_Order（同訂單號碼）
       const salesOrder = await prisma.sLS_Order.findFirst({
         where: { orderNo: poNo },
         select: { id: true },
       })
+
+      const currencyCode = resolvePatiscoCurrency((header as unknown as { currencyCode?: string }).currencyCode)
+      const orderDate = parsePatiscoDate(header.createdDate) ?? undefined
+      const patiscoCreatedAt = orderDate
+      const totalAmount = toDecimal(raw.price?.amount)
+      const expectedDate = parsePatiscoDate(header.expiredDate) ?? undefined
+      const patiscoStatus = header.status ?? undefined
+
+      if (existing) {
+        // 既有記錄：更新幣別、金額、狀態（不改 source/supplier/poNo）
+        await prisma.pO_Order.update({
+          where: { id: existing.id },
+          data: {
+            currencyCode,
+            totalAmount,
+            orderDate,
+            expectedDate,
+            patiscoCreatedAt,
+            patiscoStatus,
+            salesOrderId: salesOrder?.id ?? undefined,
+            syncJobId: jobId,
+          },
+        })
+        r.updated++
+        continue
+      }
 
       const order = await prisma.pO_Order.create({
         data: {
@@ -730,15 +752,15 @@ export async function step5_poOrders(prisma: PrismaClient, jobId: number): Promi
           salesOrderId: salesOrder?.id ?? null,
           sourceType: salesOrder ? 1 : 0,
           status: 1,
-          currencyCode: resolvePatiscoCurrency(header.payment),
+          currencyCode,
           exchangeRate: 1,
-          totalAmount: toDecimal(raw.price?.amount),
-          orderDate: parsePatiscoDate(header.createdDate) ?? undefined,
-          expectedDate: parsePatiscoDate(header.expiredDate) ?? undefined,
-          patiscoCreatedAt: parsePatiscoDate(header.createdDate) ?? undefined,
+          totalAmount,
+          orderDate,
+          expectedDate,
+          patiscoCreatedAt,
           patiscoOrderId: rec.patiscoDocId,
           patiscoOrderNo: rec.patiscoDocNo,
-          patiscoStatus: header.status ?? undefined,
+          patiscoStatus,
           syncJobId: jobId,
           createdBy: SYS_USER_ID,
         },
@@ -840,7 +862,7 @@ export async function step7_slsPIs(prisma: PrismaClient, jobId: number): Promise
     prisma.pRD_Product.findMany({ select: { id: true, sku: true } }),
     prisma.cUS_Customer.findMany({ select: { id: true, name: true } }),
     prisma.sLS_Order.findMany({ select: { id: true, orderNo: true } }),
-    prisma.sLS_PI.findMany({ select: { id: true, piNo: true, source: true } }),
+    prisma.sLS_PI.findMany({ select: { id: true, piNo: true, source: true, orderId: true } }),
   ])
   const productMap = new Map(allProducts.map(p => [p.sku, p.id]))
   const customerMap = new Map(allCustomers.map(c => [c.name, c.id]))
@@ -901,12 +923,23 @@ export async function step7_slsPIs(prisma: PrismaClient, jobId: number): Promise
       // 有衝突的 piNo 等用戶手動解決，此次略過
       if (conflictPiNos.has(piNo)) { r.skipped++; continue }
 
+      // PI 的幣別（header.currencyCode 是 Patisco 內部編號，header.payment 是交易條件）
+      const buyerName = header.buyer?.name?.trim()
+      const rawHeader = header as unknown as { currencyCode?: string; expiredDate?: string | null }
+      const currencyCode = resolvePatiscoCurrency(rawHeader.currencyCode)
+
       const existing = piMap.get(piNo)
       if (existing) {
         if (existing.source === 'PATISCO') {
+          // 更新幣別 + Patisco 元資料（修正舊記錄的錯誤幣別）
           await prisma.sLS_PI.update({
             where: { piNo },
-            data: { patiscoDocId: rec.patiscoDocId, patiscoStatus: header.status ?? undefined, archivedAt: null },
+            data: {
+              patiscoDocId: rec.patiscoDocId,
+              patiscoStatus: header.status ?? undefined,
+              archivedAt: null,
+              currencyCode: existing.orderId ? undefined : currencyCode,
+            },
           })
           r.updated++
         } else {
@@ -914,11 +947,6 @@ export async function step7_slsPIs(prisma: PrismaClient, jobId: number): Promise
         }
         continue
       }
-
-      // PI 的幣別（header.currencyCode 是 Patisco 內部編號，header.payment 是交易條件）
-      const buyerName = header.buyer?.name?.trim()
-      const rawHeader = header as unknown as { currencyCode?: string; expiredDate?: string | null }
-      const currencyCode = resolvePatiscoCurrency(rawHeader.currencyCode)
       const customerId = buyerName ? customerMap.get(buyerName) ?? undefined : undefined
 
       // 如果 PO_COPY 已在 step4 建立了 SLS_Order，則連結；否則 PI 獨立存在
@@ -993,7 +1021,7 @@ export async function step7_slsPIs(prisma: PrismaClient, jobId: number): Promise
           performedBy: null,
         },
       })
-      piMap.set(piNo, { id: pi.id, piNo, source: 'PATISCO' })
+      piMap.set(piNo, { id: pi.id, piNo, source: 'PATISCO', orderId: null })
 
       // 建立 SLS_PIItem
       for (const p of (raw.products ?? [])) {
@@ -1147,15 +1175,6 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
         where: { shipmentNo },
         select: { id: true, source: true, archivedAt: true },
       })
-      if (existing) {
-        if (existing.source === 'PATISCO' && existing.archivedAt) {
-          await prisma.sLS_Shipment.update({ where: { shipmentNo }, data: { archivedAt: null } })
-          r.updated++
-        } else {
-          r.skipped++
-        }
-        continue
-      }
 
       const buyerName = detail.buyer?.name?.trim()
       const customer = buyerName
@@ -1163,18 +1182,16 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
         : null
 
       // 出貨單連 PI：DO 裡的 orders[].no 可能含額外說明（如 "E2520244 KY"）
-      // 嘗試完整號碼，找不到再取第一段（空格前）
+      // 先嘗試完整號碼，再嘗試空格前的 base（兩者取聯集，避免重複）
       const rawOrderNos = (detail.orders ?? [])
         .map((o: { no?: string }) => o.no?.trim())
         .filter(Boolean) as string[]
-      const piNos = rawOrderNos.map(no => {
-        const base = no.split(' ')[0]
-        return base
-      }).filter(Boolean)
+      const basePiNos = rawOrderNos.map(no => no.split(' ')[0]).filter(Boolean)
+      const allPiNosToSearch = Array.from(new Set([...rawOrderNos, ...basePiNos]))
 
-      const linkedPIs = piNos.length > 0
+      const linkedPIs = allPiNosToSearch.length > 0
         ? await prisma.sLS_PI.findMany({
-            where: { piNo: { in: piNos } },
+            where: { piNo: { in: allPiNosToSearch } },
             select: { id: true, piNo: true, orderId: true },
           })
         : []
@@ -1193,34 +1210,19 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
       }
 
       const shipDate = parsePatiscoDate(detail.shipDate) ?? undefined
-
-      const shipment = await prisma.sLS_Shipment.create({
-        data: {
-          shipmentNo,
-          customerId: customer?.id ?? undefined,
-          poOrderId: poOrderId ?? undefined,
-          actualShipDate: shipDate,
-          doCreatedDate: parsePatiscoDate(detail.createdDate) ?? undefined,
-          doExpiredDate: parsePatiscoDate(detail.expiredDate ?? raw.listMeta?.listExpiredDate) ?? undefined,
-          doCompletedDate: parsePatiscoDate(raw.listMeta?.completedDate) ?? undefined,
-          portOfLoading: detail.port?.trim() ?? undefined,
-          trackingNo: detail.shipNo?.trim() ?? undefined,
-          source: 'PATISCO',
-          patiscoDocId: rec.patiscoDocId,
-          patiscoDocNo: rec.patiscoDocNo,
-          packingListNo: pl?.no ?? undefined,
-          commercialInvNo: ci?.no ?? undefined,
-          syncJobId: jobId,
-          performedBy: null,
-        },
-      })
-
-      // 建立 SLS_ShipmentPI（出貨單 ↔ PI 關聯）
-      for (const pi of linkedPIs) {
-        await prisma.sLS_ShipmentPI.create({
-          data: { shipmentId: shipment.id, piId: pi.id },
-        })
-      }
+      // 幣別解析（不 fallback 到 USD，寧可留 null 也不要錯）：
+      // 1. DO header 的 exchangeRate.oriCurrency（直接 ISO 字串，最準）
+      // 2. DO header 的 currencyCode（數字 → 查表）
+      // 3. 已連結 PI 的 currencyCode
+      const doExRate = detail.exchangeRate as { oriCurrency?: string } | undefined
+      const shipmentCurrency: string | undefined =
+        doExRate?.oriCurrency?.trim() ||
+        (detail.currencyCode ? PATISCO_CURRENCY[parseInt(detail.currencyCode)] : undefined) ||
+        (linkedPIs.length > 0 ? await prisma.sLS_PI.findFirst({
+          where: { id: { in: linkedPIs.map(p => p.id) }, currencyCode: { not: null } },
+          select: { currencyCode: true },
+        }).then(pi => pi?.currencyCode ?? undefined) : undefined) ||
+        undefined
 
       // 預載 piId → (sku → slsItemId) Map，用於建立 SLS_ShipmentItem
       const piSkuToSlsItemId = new Map<string, number>()
@@ -1239,40 +1241,149 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
         }
       }
 
-      // 建立 SLS_ShipmentItem
-      const packings = (pl?.packings ?? ci?.packings ?? []) as Array<{
+      // 品項清單（Packing List 或 Commercial Invoice 的 packings）
+      type RawPacking = {
         sku?: string
+        specification?: string
+        modelNo?: string
         quantity?: string
-        grossWeight?: string
-        netWeight?: string
+        grossWeight?: string; totalGrossWeight?: string
+        netWeight?: string; totalNetWeight?: string
         imperialTotalDimension?: string
         sourceOrderNo?: string
         quantityOfCartons?: string
-      }>
+        caseNumbers?: Array<{ caseNo1?: string; caseNo2?: string }>
+      }
+      const packings = (pl?.packings ?? ci?.packings ?? []) as RawPacking[]
+
+      // 解析 packings：group by (piId, sku)，合併多列同 SKU 的數值
+      type GroupedItem = {
+        piId: number | null; slsItemId: number | null
+        rawSku: string | undefined; rawProductName: string | undefined
+        quantity: number
+        grossWeightKg: number; netWeightKg: number; cubicFt: number; cbm: number
+        cartons: number
+        cartonNos: string[]   // 收集所有箱號，最後取 min/max
+      }
+      const groupMap = new Map<string, GroupedItem>()
 
       for (const packing of packings) {
         const sku = packing.sku?.trim()
         const sourceOrderNo = packing.sourceOrderNo?.trim()
         const matchedPI = sourceOrderNo
-          ? linkedPIs.find(p => p.piNo === sourceOrderNo)
+          ? linkedPIs.find(p => p.piNo === sourceOrderNo || p.piNo.startsWith(sourceOrderNo + ' ') || sourceOrderNo.startsWith(p.piNo.split(' ')[0]))
           : linkedPIs[0]
-
         const piId = matchedPI?.id ?? linkedPIs[0]?.id ?? null
         const slsItemId = (piId && sku) ? (piSkuToSlsItemId.get(`${piId}:${sku}`) ?? null) : null
+        const key = `${piId ?? 'null'}::${sku ?? ''}`
 
-        await prisma.sLS_ShipmentItem.create({
-          data: {
-            shipmentId: shipment.id,
-            piId,
-            slsItemId,
-            rawSku: sku ?? undefined,
-            quantity: toInt(packing.quantity),
-            grossWeightKg: packing.grossWeight ? parseFloat(packing.grossWeight) : undefined,
-            cubicFt: packing.imperialTotalDimension
-              ? parseFloat(packing.imperialTotalDimension)
-              : undefined,
-          },
+        const cubicFt = packing.imperialTotalDimension ? parseFloat(packing.imperialTotalDimension) : 0
+        const grossKg = parseFloat(packing.grossWeight ?? packing.totalGrossWeight ?? '0') || 0
+        const netKg = parseFloat(packing.netWeight ?? packing.totalNetWeight ?? '0') || 0
+        const qty = toInt(packing.quantity)
+        const ctns = packing.quantityOfCartons ? parseInt(packing.quantityOfCartons) || 0 : 0
+        const caseNos = (packing.caseNumbers ?? []).flatMap(c => [c.caseNo1, c.caseNo2].filter(Boolean) as string[])
+        const productName = packing.specification?.trim() || packing.modelNo?.trim() || undefined
+
+        if (groupMap.has(key)) {
+          const g = groupMap.get(key)!
+          g.quantity += qty
+          g.grossWeightKg += grossKg
+          g.netWeightKg += netKg
+          g.cubicFt += cubicFt
+          g.cbm += cubicFt * 0.028317
+          g.cartons += ctns
+          g.cartonNos.push(...caseNos)
+          if (!g.rawProductName && productName) g.rawProductName = productName
+        } else {
+          groupMap.set(key, {
+            piId, slsItemId, rawSku: sku, rawProductName: productName,
+            quantity: qty,
+            grossWeightKg: grossKg, netWeightKg: netKg,
+            cubicFt, cbm: cubicFt * 0.028317,
+            cartons: ctns, cartonNos: caseNos,
+          })
+        }
+      }
+
+      // 將 groupMap 轉換為可插入的資料陣列
+      const toItemRows = (shipmentId: number) =>
+        Array.from(groupMap.values()).map(g => {
+          const nos = g.cartonNos.map((n: string) => parseInt(n)).filter((n: number) => !isNaN(n)).sort((a: number, b: number) => a - b)
+          return {
+            shipmentId,
+            piId: g.piId,
+            slsItemId: g.slsItemId,
+            rawSku: g.rawSku,
+            rawProductName: g.rawProductName,
+            quantity: g.quantity || 1,
+            grossWeightKg: g.grossWeightKg > 0 ? g.grossWeightKg : undefined,
+            netWeightKg: g.netWeightKg > 0 ? g.netWeightKg : undefined,
+            cubicFt: g.cubicFt > 0 ? g.cubicFt : undefined,
+            cbm: g.cbm > 0 ? g.cbm : undefined,
+            cartons: g.cartons > 0 ? g.cartons : undefined,
+            cartonNoFrom: nos.length > 0 ? String(nos[0]) : undefined,
+            cartonNoTo: nos.length > 1 ? String(nos[nos.length - 1]) : (nos.length === 1 ? String(nos[0]) : undefined),
+          }
         })
+
+      if (existing) {
+        if (existing.source === 'PATISCO') {
+          // 既有記錄：更新幣別 + PI 連結 + 品項（全部重建，修正舊 sync 的錯誤）
+          await prisma.sLS_Shipment.update({
+            where: { shipmentNo },
+            data: {
+              customerId: customer?.id ?? undefined,
+              poOrderId: poOrderId ?? undefined,
+              currencyCode: shipmentCurrency ?? undefined,
+              archivedAt: null,
+            },
+          })
+          await prisma.sLS_ShipmentPI.deleteMany({ where: { shipmentId: existing.id } })
+          for (const pi of linkedPIs) {
+            await prisma.sLS_ShipmentPI.create({ data: { shipmentId: existing.id, piId: pi.id } })
+          }
+          await prisma.sLS_ShipmentItem.deleteMany({ where: { shipmentId: existing.id } })
+          for (const row of toItemRows(existing.id)) {
+            await prisma.sLS_ShipmentItem.create({ data: row })
+          }
+          r.updated++
+        } else {
+          r.skipped++
+        }
+        continue
+      }
+
+      const shipment = await prisma.sLS_Shipment.create({
+        data: {
+          shipmentNo,
+          customerId: customer?.id ?? undefined,
+          poOrderId: poOrderId ?? undefined,
+          currencyCode: shipmentCurrency ?? undefined,
+          actualShipDate: shipDate,
+          doCreatedDate: parsePatiscoDate(detail.createdDate) ?? undefined,
+          doExpiredDate: parsePatiscoDate(detail.expiredDate ?? raw.listMeta?.listExpiredDate) ?? undefined,
+          doCompletedDate: parsePatiscoDate(raw.listMeta?.completedDate) ?? undefined,
+          portOfLoading: detail.port?.trim() ?? undefined,
+          trackingNo: detail.shipNo?.trim() ?? undefined,
+          source: 'PATISCO',
+          patiscoDocId: rec.patiscoDocId,
+          patiscoDocNo: rec.patiscoDocNo,
+          packingListNo: pl?.no ?? undefined,
+          commercialInvNo: ci?.no ?? undefined,
+          syncJobId: jobId,
+          performedBy: null,
+        },
+      })
+
+      // 建立 SLS_ShipmentPI
+      for (const pi of linkedPIs) {
+        await prisma.sLS_ShipmentPI.create({ data: { shipmentId: shipment.id, piId: pi.id } })
+      }
+
+      // 建立 SLS_ShipmentItem（已 group by piId+sku，不重複）
+      for (const row of toItemRows(shipment.id)) {
+        await prisma.sLS_ShipmentItem.create({ data: row })
       }
       r.created++
     } catch (e) {

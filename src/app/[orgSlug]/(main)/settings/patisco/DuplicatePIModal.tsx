@@ -24,8 +24,9 @@ export default function DuplicatePIModal({ conflicts, onResolved, onClose }: Pro
 
   if (conflicts.length === 0) return null
 
-  const conflict = conflicts[current]
-  const isLast = current === conflicts.length - 1
+  const safeIdx = Math.min(current, conflicts.length - 1)
+  const conflict = conflicts[safeIdx]
+  const isLast = safeIdx === conflicts.length - 1
 
   async function handleChoose(docId: string) {
     setLoading(true); setError(null)
@@ -38,8 +39,9 @@ export default function DuplicatePIModal({ conflicts, onResolved, onClose }: Pro
       const data = await res.json()
       if (!data.ok) throw new Error(data.error ?? '解決失敗')
       onResolved(conflict.piNo)
-      if (isLast) onClose()
-      else setCurrent(c => c + 1)
+      // 不手動 setCurrent：onResolved 從 parent 移除這筆後，
+      // 下一筆自然滑到 conflicts[safeIdx] 位置，
+      // 若全部解決則 conflicts.length === 0，modal 自動關閉。
     } catch (e) {
       setError(e instanceof Error ? e.message : '未知錯誤')
     } finally {
