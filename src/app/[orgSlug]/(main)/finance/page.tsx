@@ -44,9 +44,10 @@ type Receivable = {
   customer: { id: number; name: string; shortName: string | null } | null
   customerName: string | null
   shipment: {
+    id: number
     shipmentNo: string
     actualShipDate: string
-    pis: { pi: { id: number; piNo: string; order: { id: number; orderNo: string } } }[]
+    pis: { pi: { id: number; piNo: string; order: { id: number; orderNo: string } | null } }[]
   }
 }
 
@@ -397,7 +398,7 @@ export default function FinancePage() {
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">客戶</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">客戶訂單</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">出貨單 / PI</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">出貨日</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">到期日</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-600">應收 (TWD)</th>
@@ -421,21 +422,23 @@ export default function FinancePage() {
                         ) : <span className="text-gray-600">{custName}</span>}
                       </td>
                       <td className="px-4 py-3">
-                        {r.shipment.pis.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
+                        <Link href={toOrgPath(`/shipments/${r.shipment.id}`)}
+                          className="font-mono text-gray-800 hover:underline text-xs font-medium block">
+                          {r.shipment.shipmentNo}
+                        </Link>
+                        {r.shipment.pis.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-0.5">
                             {r.shipment.pis.map(sp => (
                               sp.pi.order?.id ? (
                                 <Link key={sp.pi.id} href={toOrgPath(`/sales/${sp.pi.order.id}`)}
-                                  className="font-mono text-blue-600 hover:underline text-xs">
+                                  className="font-mono text-blue-500 hover:underline text-xs">
                                   {sp.pi.piNo}
                                 </Link>
                               ) : (
-                                <span key={sp.pi.id} className="font-mono text-blue-600 text-xs">{sp.pi.piNo}</span>
+                                <span key={sp.pi.id} className="font-mono text-gray-400 text-xs">{sp.pi.piNo}</span>
                               )
                             ))}
                           </div>
-                        ) : (
-                          <span className="text-gray-400 text-xs">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(r.shipment.actualShipDate)}</td>
