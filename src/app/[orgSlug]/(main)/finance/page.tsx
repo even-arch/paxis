@@ -424,10 +424,14 @@ export default function FinancePage() {
                         {r.shipment.pis.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {r.shipment.pis.map(sp => (
-                              <Link key={sp.pi.id} href={toOrgPath(`/sales/${sp.pi.order.id}`)}
-                                className="font-mono text-blue-600 hover:underline text-xs">
-                                {sp.pi.piNo}
-                              </Link>
+                              sp.pi.order?.id ? (
+                                <Link key={sp.pi.id} href={toOrgPath(`/sales/${sp.pi.order.id}`)}
+                                  className="font-mono text-blue-600 hover:underline text-xs">
+                                  {sp.pi.piNo}
+                                </Link>
+                              ) : (
+                                <span key={sp.pi.id} className="font-mono text-blue-600 text-xs">{sp.pi.piNo}</span>
+                              )
                             ))}
                           </div>
                         ) : (
