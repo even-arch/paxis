@@ -44,30 +44,30 @@ export async function POST() {
 
   for (const shipment of shipmentsWithoutReceivable) {
     // 嘗試從 PI.order 或 PI 本身取得金額
+    // SLS_PI 是主，SLS_Order 只做 fallback
     const piAmounts = shipment.pis.map(sp => ({
-      totalAmount: sp.pi.order?.totalAmount ?? sp.pi.totalAmount,
-      currencyCode: sp.pi.order?.currencyCode ?? sp.pi.currencyCode ?? 'TWD',
-      exchangeRate: sp.pi.order?.exchangeRate ?? 1,
+      totalAmount: sp.pi.totalAmount ?? sp.pi.order?.totalAmount,
+      currencyCode: sp.pi.currencyCode ?? sp.pi.order?.currencyCode ?? 'TWD',
+      orderExchangeRate: sp.pi.order?.exchangeRate ?? null,
       customerId: sp.pi.order?.customerId ?? null,
     })).filter(o => o.totalAmount != null)
 
-    // 無法確定金額 → 跳過，避免建出空殼記錄
     if (piAmounts.length === 0) {
       arSkipped++
       continue
     }
 
-    // 訂單金額加總
+    const ciRate = Number(shipment.ciExchangeRate ?? 0)
+
+    // PI 金額加總：EUR → TWD 用報帳匯率（ciExchangeRate）倒算
     const amountTWD = piAmounts.reduce((s, o) => {
       const amt = Number(o.totalAmount ?? 0)
-      const rate = Number(o.exchangeRate ?? 1)
-      return s + (o.currencyCode === 'TWD' ? amt : amt * rate)
+      if (o.currencyCode === 'TWD') return s + amt
+      // ciRate = TWD→EUR（e.g. 0.02717），所以 EUR→TWD = amt / ciRate
+      if (ciRate > 0) return s + amt / ciRate
+      // fallback：SLS_Order.exchangeRate（EUR→TWD 方向）
+      return s + amt * Number(o.orderExchangeRate ?? 1)
     }, 0)
-
-    // ciExchangeRate 是 TWD→EUR（例如 0.0278 = 1 TWD = 0.0278 EUR）
-    // amountForeign（EUR）= TWD × ciExchangeRate
-    // rateAtInvoice（EUR→TWD）= 1 / ciExchangeRate
-    const ciRate = Number(shipment.ciExchangeRate ?? 0)
 
     if (amountTWD <= 0 || ciRate <= 0) {
       arSkipped++

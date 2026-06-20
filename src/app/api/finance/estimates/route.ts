@@ -123,15 +123,13 @@ export async function GET() {
     } else {
       // 從 PI → Order 計算，加上 PI 層級的 extraCharges（百分比 + 固定金額）
       arTWD = s.pis.reduce((sum, sp) => {
-        const totalAmt = sp.pi.order?.totalAmount ?? sp.pi.totalAmount
-        const currCode = sp.pi.order?.currencyCode ?? sp.pi.currencyCode ?? 'TWD'
-        // EUR→TWD 換算：優先用 SLS_Order.exchangeRate；standalone PI 用 1/ciExchangeRate
-        const exchRate = sp.pi.order?.exchangeRate
-          ?? (ciRate > 0 ? (1 / ciRate) : 1)
+        // SLS_PI 是主，SLS_Order 只做 fallback
+        const totalAmt = sp.pi.totalAmount ?? sp.pi.order?.totalAmount
+        const currCode = sp.pi.currencyCode ?? sp.pi.order?.currencyCode ?? 'TWD'
         if (!totalAmt) return sum
         const base = currCode === 'TWD'
           ? Number(totalAmt)
-          : Number(totalAmt) * Number(exchRate)
+          : (ciRate > 0 ? Number(totalAmt) / ciRate : Number(totalAmt) * Number(sp.pi.order?.exchangeRate ?? 1))
         const { pctMultiplier, flatTWD } = calcExtraCharges(sp.pi.extraCharges)
         return sum + base * pctMultiplier + flatTWD
       }, 0)
