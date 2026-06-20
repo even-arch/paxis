@@ -1021,6 +1021,10 @@ model SLS_ShipmentItem {
   cubicFt       Decimal?       // 材積 ft³（Patisco 原始值）
   cbm           Decimal?       // 材積 m³（= cubicFt × 0.028317）
 
+  // 計價資訊（來自 SLS_PIItem，sync 時帶入）
+  unit          String?        // 單位（PCS / PAIRS / SETS 等）
+  unitPrice     Decimal?       // 單價（幣別同所屬 PI）
+
   @@index([shipmentId])
   @@index([piId])
   @@map("SLS_ShipmentItem")

@@ -1226,18 +1226,21 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
 
       // 預載 piId → (sku → slsItemId) Map，用於建立 SLS_ShipmentItem
       const piSkuToSlsItemId = new Map<string, number>()
+      const piSkuToPriceUnit = new Map<string, { unitPrice: import('@prisma/client').Prisma.Decimal | null, unit: string | null }>()
       if (linkedPIs.length > 0) {
         const piItems = await prisma.sLS_PIItem.findMany({
           where: { piId: { in: linkedPIs.map(p => p.id) } },
           select: {
-            piId: true,
-            slsItemId: true,
+            piId: true, slsItemId: true, unitPrice: true, unit: true,
             slsItem: { select: { product: { select: { sku: true } } } },
           },
         })
         for (const item of piItems) {
           const sku = item.slsItem?.product?.sku
-          if (sku && item.slsItemId != null) piSkuToSlsItemId.set(`${item.piId}:${sku}`, item.slsItemId)
+          if (sku) {
+            if (item.slsItemId != null) piSkuToSlsItemId.set(`${item.piId}:${sku}`, item.slsItemId)
+            piSkuToPriceUnit.set(`${item.piId}:${sku}`, { unitPrice: item.unitPrice, unit: item.unit })
+          }
         }
       }
 
@@ -1263,7 +1266,9 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
         quantity: number
         grossWeightKg: number; netWeightKg: number; cubicFt: number; cbm: number
         cartons: number
-        cartonNos: string[]   // 收集所有箱號，最後取 min/max
+        cartonNos: string[]
+        unit: string | undefined
+        unitPrice: import('@prisma/client').Prisma.Decimal | null | undefined
       }
       const groupMap = new Map<string, GroupedItem>()
 
@@ -1275,6 +1280,7 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
           : linkedPIs[0]
         const piId = matchedPI?.id ?? linkedPIs[0]?.id ?? null
         const slsItemId = (piId && sku) ? (piSkuToSlsItemId.get(`${piId}:${sku}`) ?? null) : null
+        const priceUnit = (piId && sku) ? piSkuToPriceUnit.get(`${piId}:${sku}`) : undefined
         const key = `${piId ?? 'null'}::${sku ?? ''}`
 
         const cubicFt = packing.imperialTotalDimension ? parseFloat(packing.imperialTotalDimension) : 0
@@ -1302,6 +1308,8 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
             grossWeightKg: grossKg, netWeightKg: netKg,
             cubicFt, cbm: cubicFt * 0.028317,
             cartons: ctns, cartonNos: caseNos,
+            unit: priceUnit?.unit ?? undefined,
+            unitPrice: priceUnit?.unitPrice ?? undefined,
           })
         }
       }
@@ -1324,6 +1332,8 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
             cartons: g.cartons > 0 ? g.cartons : undefined,
             cartonNoFrom: nos.length > 0 ? String(nos[0]) : undefined,
             cartonNoTo: nos.length > 1 ? String(nos[nos.length - 1]) : (nos.length === 1 ? String(nos[0]) : undefined),
+            unit: g.unit ?? undefined,
+            unitPrice: g.unitPrice ?? undefined,
           }
         })
 
