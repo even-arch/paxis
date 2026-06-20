@@ -51,6 +51,12 @@ export async function GET() {
     },
   })
 
+  function extractDocNo(str: string): string {
+    const m = str.match(/\b([A-Z]{1,3}\d{5,})\b/)
+    if (m) return m[1]
+    return str.split(' ')[0]
+  }
+
   const poBySlsId = new Map<number, typeof allPOs>()
   const poByPoNo = new Map<string, typeof allPOs[0]>()
   for (const po of allPOs) {
@@ -60,6 +66,9 @@ export async function GET() {
       poBySlsId.set(po.salesOrderId, arr)
     }
     poByPoNo.set(po.poNo, po)
+    // 同時以 extractDocNo 結果建索引，讓 "E2620037 YABAN" 也能被 "E2620037" 查到
+    const docNo = extractDocNo(po.poNo)
+    if (docNo !== po.poNo) poByPoNo.set(docNo, po)
   }
 
   function poAmountTWD(po: typeof allPOs[0]): number {
@@ -83,35 +92,34 @@ export async function GET() {
   for (const s of shipments) {
     const issues: string[] = []
 
-    // 計算 AR TWD
+    // AR = SLS_PI.totalAmount（我方 PI 金額，最終確認的客戶價格）
     const arTWD = s.pis.reduce((sum, sp) => {
-      const totalAmt = sp.pi.order?.totalAmount ?? sp.pi.totalAmount
-      const currCode = sp.pi.order?.currencyCode ?? sp.pi.currencyCode ?? 'TWD'
-      const exchRate = sp.pi.order?.exchangeRate ?? 1
+      const totalAmt = sp.pi.totalAmount
+      const currCode = sp.pi.currencyCode ?? 'TWD'
       if (!totalAmt) return sum
-      const base = currCode === 'TWD' ? Number(totalAmt) : Number(totalAmt) * Number(exchRate)
+      const base = currCode === 'TWD' ? Number(totalAmt) : Number(totalAmt) * Number(sp.pi.order?.exchangeRate ?? 1)
       return sum + base * calcExtraCharges(sp.pi.extraCharges)
     }, 0)
 
-    // 計算 AP 並找出問題
+    // AP = PO_Order.totalAmount（付給供應商的採購金額）
+    // 找法：SLS_PI → SLS_Order → PO_Order（via salesOrderId 或 poNo = orderNo）
     let apTWD = 0
-    const unmatchedOrders: string[] = []
+    const unmatchedPIs: string[] = []   // 找不到對應 PO 的 PI
     const nullAmountPos: string[] = []
 
     for (const sp of s.pis) {
       const slsOrder = sp.pi.order
-      if (!slsOrder) {
-        // Standalone PI — no SLS_Order to match PO against
-        unmatchedOrders.push(sp.pi.piNo)
-        continue
-      }
-      const bySlsId = poBySlsId.get(slsOrder.id) ?? []
-      const byNo = poByPoNo.get(slsOrder.orderNo)
+      // 優先用 salesOrderId 連結；若 SLS_PI 沒有 orderId，嘗試用 piNo 對 poNo
+      const bySlsId = slsOrder ? (poBySlsId.get(slsOrder.id) ?? []) : []
+      const byNo = slsOrder
+        ? (poByPoNo.get(slsOrder.orderNo) ? [poByPoNo.get(slsOrder.orderNo)!] : [])
+        : (poByPoNo.get(sp.pi.piNo) ? [poByPoNo.get(sp.pi.piNo)!] : [])
 
-      if (bySlsId.length === 0 && !byNo) {
-        unmatchedOrders.push(slsOrder.orderNo)
+      const candidates = bySlsId.length > 0 ? bySlsId : byNo
+
+      if (candidates.length === 0) {
+        unmatchedPIs.push(sp.pi.piNo)
       } else {
-        const candidates = bySlsId.length > 0 ? bySlsId : (byNo ? [byNo] : [])
         for (const po of candidates) {
           const amt = poAmountTWD(po)
           if (amt <= 0) nullAmountPos.push(po.poNo)
@@ -120,8 +128,8 @@ export async function GET() {
       }
     }
 
-    if (unmatchedOrders.length > 0)
-      issues.push(`${unmatchedOrders.length} 張訂單找不到 PO（${unmatchedOrders.slice(0, 3).join('、')}${unmatchedOrders.length > 3 ? '…' : ''}）`)
+    if (unmatchedPIs.length > 0)
+      issues.push(`${unmatchedPIs.length} 張 PI 找不到對應採購單（${unmatchedPIs.slice(0, 3).join('、')}${unmatchedPIs.length > 3 ? '…' : ''}）`)
     if (nullAmountPos.length > 0)
       issues.push(`${nullAmountPos.length} 張 PO 金額為空（${nullAmountPos.slice(0, 2).join('、')}${nullAmountPos.length > 2 ? '…' : ''}）`)
 
