@@ -22,7 +22,13 @@ export async function GET() {
     },
   })
 
-  // 建立兩個查詢 map：salesOrderId → PO，及 poNo → PO
+  function extractDocNo(str: string): string {
+    const m = str.match(/\b([A-Z]{1,3}\d{5,})\b/)
+    if (m) return m[1]
+    return str.split(' ')[0]
+  }
+
+  // 建立兩個查詢 map：salesOrderId → PO，及 poNo → PO（含 extractDocNo 索引）
   const poBySlsId = new Map<number, typeof allPOs>()
   const poByPoNo = new Map<string, typeof allPOs[0]>()
   for (const po of allPOs) {
@@ -32,6 +38,8 @@ export async function GET() {
       poBySlsId.set(po.salesOrderId, arr)
     }
     poByPoNo.set(po.poNo, po)
+    const docNo = extractDocNo(po.poNo)
+    if (docNo !== po.poNo) poByPoNo.set(docNo, po)
   }
 
   function poAmountTWD(po: typeof allPOs[0]): number {
@@ -117,7 +125,9 @@ export async function GET() {
       arTWD = s.pis.reduce((sum, sp) => {
         const totalAmt = sp.pi.order?.totalAmount ?? sp.pi.totalAmount
         const currCode = sp.pi.order?.currencyCode ?? sp.pi.currencyCode ?? 'TWD'
-        const exchRate = sp.pi.order?.exchangeRate ?? 1
+        // EUR→TWD 換算：優先用 SLS_Order.exchangeRate；standalone PI 用 1/ciExchangeRate
+        const exchRate = sp.pi.order?.exchangeRate
+          ?? (ciRate > 0 ? (1 / ciRate) : 1)
         if (!totalAmt) return sum
         const base = currCode === 'TWD'
           ? Number(totalAmt)
@@ -136,7 +146,22 @@ export async function GET() {
 
     for (const sp of s.pis) {
       const slsOrder = sp.pi.order
-      if (!slsOrder) continue  // standalone PI — no SLS_Order to match PO against
+
+      if (!slsOrder) {
+        // standalone PI（Patisco 流程）：直接用 piNo 對 poNo
+        const piDocNo = extractDocNo(sp.pi.piNo)
+        const po = poByPoNo.get(sp.pi.piNo) ?? poByPoNo.get(piDocNo)
+        if (po && !poMap.has(po.id)) {
+          poMap.set(po.id, {
+            poNo: po.poNo,
+            supplierName: po.supplier.shortName ?? po.supplier.name,
+            amountTWD: poAmountTWD(po),
+            currency: po.currencyCode,
+            matchType: 'byPiNo',
+          })
+        }
+        continue
+      }
 
       // fallback 1：salesOrderId
       const bySlsId = poBySlsId.get(slsOrder.id) ?? []
@@ -151,9 +176,10 @@ export async function GET() {
         })
       }
 
-      // fallback 2：poNo = orderNo
+      // fallback 2：poNo = orderNo（含 extractDocNo 模糊比對）
       if (bySlsId.length === 0) {
-        const po = poByPoNo.get(slsOrder.orderNo)
+        const lookupKey = slsOrder.orderNo
+        const po = poByPoNo.get(lookupKey) ?? poByPoNo.get(extractDocNo(lookupKey))
         if (po && !poMap.has(po.id)) {
           poMap.set(po.id, {
             poNo: po.poNo,
@@ -177,9 +203,17 @@ export async function GET() {
 
     for (const sp of s.pis) {
       const slsOrder = sp.pi.order
-      if (!slsOrder) continue  // standalone PI — skip PO matching diagnosis
+      if (!slsOrder) {
+        // standalone PI：用 piNo 對 poNo
+        const piDocNo = extractDocNo(sp.pi.piNo)
+        const po = poByPoNo.get(sp.pi.piNo) ?? poByPoNo.get(piDocNo)
+        if (!po) unmatchedOrders.push(sp.pi.piNo)
+        else if (!po.totalAmount && po.items.length === 0) nullAmountPos.push(po.poNo)
+        continue
+      }
       const bySlsId = poBySlsId.get(slsOrder.id) ?? []
-      const byNo = poByPoNo.get(slsOrder.orderNo)
+      const lookupKey = slsOrder.orderNo
+      const byNo = poByPoNo.get(lookupKey) ?? poByPoNo.get(extractDocNo(lookupKey))
 
       if (bySlsId.length === 0 && !byNo) {
         unmatchedOrders.push(slsOrder.orderNo)
