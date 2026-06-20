@@ -111,9 +111,12 @@ export async function GET() {
       const slsOrder = sp.pi.order
       // 優先用 salesOrderId 連結；若 SLS_PI 沒有 orderId，嘗試用 piNo 對 poNo
       const bySlsId = slsOrder ? (poBySlsId.get(slsOrder.id) ?? []) : []
-      const byNo = slsOrder
-        ? (poByPoNo.get(slsOrder.orderNo) ? [poByPoNo.get(slsOrder.orderNo)!] : [])
-        : (poByPoNo.get(sp.pi.piNo) ? [poByPoNo.get(sp.pi.piNo)!] : [])
+
+      // 查詢時也套 extractDocNo，避免 "E2620037 Prime Aero" 查不到 "E2620037 YABAN"
+      const lookupKey = slsOrder ? slsOrder.orderNo : sp.pi.piNo
+      const lookupDocNo = extractDocNo(lookupKey)
+      const found = poByPoNo.get(lookupKey) ?? poByPoNo.get(lookupDocNo)
+      const byNo = found ? [found] : []
 
       const candidates = bySlsId.length > 0 ? bySlsId : byNo
 
