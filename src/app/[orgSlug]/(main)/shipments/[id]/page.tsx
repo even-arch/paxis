@@ -227,7 +227,7 @@ export default async function ShipmentDetailPage({ params }: Props) {
             <table className="w-full text-sm">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="text-left px-4 py-2 font-medium text-gray-600">PI / SKU</th>
+                  <th className="text-left px-4 py-2 font-medium text-gray-600">SKU</th>
                   <th className="text-left px-4 py-2 font-medium text-gray-600">品名</th>
                   <th className="text-right px-4 py-2 font-medium text-gray-600">數量</th>
                   <th className="text-right px-4 py-2 font-medium text-gray-600">箱數</th>
@@ -241,21 +241,29 @@ export default async function ShipmentDetailPage({ params }: Props) {
               <tbody>
                 {groupList.map((group, gi) => {
                   const s = groupSummary(group.items)
-                  const showSubtotal = group.items.length > 1
                   return (
                     <>
-                      {group.items.map((item, ii) => (
-                        <tr key={item.id} className={`border-t ${ii === 0 ? 'border-t-2 border-teal-200 bg-teal-50' : 'border-gray-100 hover:bg-gray-50'}`}>
-                          <td className="px-4 py-2 align-top">
-                            {multiGroup && ii === 0 && (
-                              <div className="text-xs font-bold text-teal-700 font-mono whitespace-nowrap mb-0.5">{group.label}</div>
+                      {/* PI 標題列：顯示 PI 號碼 + 該 PI 的小計數字 */}
+                      {multiGroup && (
+                        <tr key={`pi-${gi}`} className="border-t-2 border-teal-200 bg-teal-50">
+                          <td colSpan={2} className="px-4 py-2 text-xs font-bold text-teal-700 font-mono whitespace-nowrap">{group.label}</td>
+                          <td className="px-4 py-2 text-right text-xs font-semibold text-teal-800">{s.totalQty.toLocaleString()}</td>
+                          <td className="px-4 py-2 text-right text-xs font-semibold text-teal-800">{(s.totalCartons ?? 0) > 0 ? s.totalCartons : '-'}</td>
+                          <td className="px-4 py-2 text-center text-xs font-mono text-teal-700">{s.rangeLabel}</td>
+                          <td className="px-4 py-2 text-right text-xs font-semibold text-teal-800">{fmt(s.totalGW)}</td>
+                          <td className="px-4 py-2 text-right text-xs font-semibold text-teal-800">{fmt(s.totalNW)}</td>
+                          <td className="px-4 py-2 text-right text-xs font-semibold text-teal-800">{fmt(s.totalFt3)}</td>
+                          <td className="px-4 py-2 text-right text-xs font-semibold text-teal-800">{fmt(s.totalCbm)}</td>
+                        </tr>
+                      )}
+                      {/* 各 SKU 明細列 */}
+                      {group.items.map((item) => (
+                        <tr key={item.id} className="border-t border-gray-100 hover:bg-gray-50">
+                          <td className="px-4 py-2 font-mono text-xs text-gray-600 whitespace-nowrap pl-6">
+                            {item.slsItem?.product?.sku ?? item.rawSku ?? '-'}
+                            {!item.slsItem && item.rawSku && (
+                              <span className="ml-1 text-amber-500 text-xs" title="此 SKU 尚未連結至銷售品項（SLS_Item 為 null）">⚠</span>
                             )}
-                            <div className="font-mono text-xs text-gray-600 whitespace-nowrap">
-                              {item.slsItem?.product?.sku ?? item.rawSku ?? '-'}
-                              {!item.slsItem && item.rawSku && (
-                                <span className="ml-1 text-amber-500 text-xs" title="此 SKU 尚未連結至銷售品項（SLS_Item 為 null）">⚠</span>
-                              )}
-                            </div>
                           </td>
                           <td className="px-4 py-2 text-gray-700 text-xs">
                             {item.slsItem?.product?.name ?? item.rawProductName ?? '-'}
@@ -272,19 +280,6 @@ export default async function ShipmentDetailPage({ params }: Props) {
                           <td className="px-4 py-2 text-right text-gray-500 text-xs">{item.cbm?.toString() ?? '-'}</td>
                         </tr>
                       ))}
-                      {/* 小計列：品項超過 1 筆時才顯示 */}
-                      {showSubtotal && (
-                        <tr key={`sub-${gi}`} className="bg-teal-50 border-t border-teal-100">
-                          <td colSpan={2} className="px-4 py-1.5 text-xs text-teal-600 font-medium">小計</td>
-                          <td className="px-4 py-1.5 text-right text-xs font-semibold text-teal-800">{s.totalQty.toLocaleString()}</td>
-                          <td className="px-4 py-1.5 text-right text-xs font-semibold text-teal-800">{(s.totalCartons ?? 0) > 0 ? s.totalCartons : '-'}</td>
-                          <td className="px-4 py-1.5 text-center text-xs font-mono text-teal-700">{s.rangeLabel}</td>
-                          <td className="px-4 py-1.5 text-right text-xs font-semibold text-teal-800">{fmt(s.totalGW)}</td>
-                          <td className="px-4 py-1.5 text-right text-xs font-semibold text-teal-800">{fmt(s.totalNW)}</td>
-                          <td className="px-4 py-1.5 text-right text-xs font-semibold text-teal-800">{fmt(s.totalFt3)}</td>
-                          <td className="px-4 py-1.5 text-right text-xs font-semibold text-teal-800">{fmt(s.totalCbm)}</td>
-                        </tr>
-                      )}
                     </>
                   )
                 })}
