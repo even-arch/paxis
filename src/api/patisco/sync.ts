@@ -116,6 +116,18 @@ function isSelf(name?: string | null): boolean {
   return SELF_COMPANY_KEYWORDS.some(kw => lower.includes(kw))
 }
 
+/**
+ * 從可能含有前後綴的字串中抽取文件號碼（如 E2620021）。
+ * 例：「Order E2620021 Prime Aero」→「E2620021」
+ * 規則：找第一個符合「1~3 個大寫字母 + 5 位以上數字」的子字串；
+ * 若找不到，退而取第一個空格前的字。
+ */
+function extractDocNo(str: string): string {
+  const m = str.match(/\b([A-Z]{1,3}\d{5,})\b/)
+  if (m) return m[1]
+  return str.split(' ')[0]
+}
+
 /** 安全取得 Decimal 字串 */
 function toDecimal(v?: string | number | null): string {
   if (v == null || v === '') return '0'
@@ -1181,12 +1193,12 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
         ? await prisma.cUS_Customer.findFirst({ where: { name: buyerName }, select: { id: true } })
         : null
 
-      // 出貨單連 PI：DO 裡的 orders[].no 可能含額外說明（如 "E2520244 KY"）
-      // 先嘗試完整號碼，再嘗試空格前的 base（兩者取聯集，避免重複）
+      // 出貨單連 PI：DO 裡的 orders[].no 可能含前後綴（如 "Order E2520244 KY"）
+      // 同時搜完整字串、抽出的文件號（extractDocNo）、第一個空格前的 base，取聯集
       const rawOrderNos = (detail.orders ?? [])
         .map((o: { no?: string }) => o.no?.trim())
         .filter(Boolean) as string[]
-      const basePiNos = rawOrderNos.map(no => no.split(' ')[0]).filter(Boolean)
+      const basePiNos = rawOrderNos.flatMap(no => [extractDocNo(no), no.split(' ')[0]]).filter(Boolean)
       const allPiNosToSearch = Array.from(new Set([...rawOrderNos, ...basePiNos]))
 
       const linkedPIs = allPiNosToSearch.length > 0
@@ -1214,7 +1226,13 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
       // 1. DO header 的 exchangeRate.oriCurrency（直接 ISO 字串，最準）
       // 2. DO header 的 currencyCode（數字 → 查表）
       // 3. 已連結 PI 的 currencyCode
-      const doExRate = detail.exchangeRate as { oriCurrency?: string } | undefined
+      const doExRate = detail.exchangeRate as { oriCurrency?: string; value?: string | null } | undefined
+      // CI 的 exchangeRate.value 是報關匯率（e.g. "0.02717" = 1 TWD = 0.02717 EUR）
+      const ciExchangeRateValue = ci?.exchangeRate
+        ? (ci.exchangeRate as { value?: string | null }).value
+        : doExRate?.value
+      const ciExchangeRate = ciExchangeRateValue ? parseFloat(ciExchangeRateValue) : undefined
+
       const shipmentCurrency: string | undefined =
         doExRate?.oriCurrency?.trim() ||
         (detail.currencyCode ? PATISCO_CURRENCY[parseInt(detail.currencyCode)] : undefined) ||
@@ -1233,10 +1251,11 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
           select: {
             piId: true, slsItemId: true, unitPrice: true, unit: true,
             slsItem: { select: { product: { select: { sku: true } } } },
+            product: { select: { sku: true } },
           },
         })
         for (const item of piItems) {
-          const sku = item.slsItem?.product?.sku
+          const sku = item.slsItem?.product?.sku ?? item.product?.sku
           if (sku) {
             if (item.slsItemId != null) piSkuToSlsItemId.set(`${item.piId}:${sku}`, item.slsItemId)
             piSkuToPriceUnit.set(`${item.piId}:${sku}`, { unitPrice: item.unitPrice, unit: item.unit })
@@ -1244,22 +1263,31 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
         }
       }
 
-      // 品項清單（Packing List 或 Commercial Invoice 的 packings）
-      type RawPacking = {
-        sku?: string
-        specification?: string
-        modelNo?: string
-        quantity?: string
-        grossWeight?: string; totalGrossWeight?: string
-        netWeight?: string; totalNetWeight?: string
-        imperialTotalDimension?: string
-        sourceOrderNo?: string
-        quantityOfCartons?: string
-        caseNumbers?: Array<{ caseNo1?: string; caseNo2?: string }>
+      // ── 兩份文件各自讀取，照單全收 ──────────────────────────────────────
+      // CI packings：定價資料（unit、price），以 sourceOrderNo+sku 為 key
+      type CIPacking = { sku?: string; sourceOrderNo?: string; unit?: string; price?: string; quantity?: string; specification?: string; modelNo?: string }
+      const ciPackings = (ci?.packings ?? []) as CIPacking[]
+      // CI 價格索引：key = `${sourceOrderNo}::${sku}` 或 `::${sku}`
+      const ciPriceMap = new Map<string, { unit: string | undefined; price: string | undefined }>()
+      for (const cp of ciPackings) {
+        const sku = cp.sku?.trim()
+        if (!sku) continue
+        const rawNo = cp.sourceOrderNo?.trim() ?? ''
+        const docNo = rawNo ? extractDocNo(rawNo) : ''
+        const entry = { unit: cp.unit?.trim() || undefined, price: cp.price || undefined }
+        // 同時以原始字串和抽出的文件號建索引
+        ciPriceMap.set(`${rawNo}::${sku}`, entry)
+        if (docNo && docNo !== rawNo) ciPriceMap.set(`${docNo}::${sku}`, entry)
+        const skuKey = `::${sku}`
+        if (!ciPriceMap.has(skuKey)) ciPriceMap.set(skuKey, entry)
       }
-      const packings = (pl?.packings ?? ci?.packings ?? []) as RawPacking[]
 
-      // 解析 packings：group by (piId, sku)，合併多列同 SKU 的數值
+      // PL packings：物流資料（重量、材積、箱號）
+      type PLPacking = { sku?: string; sourceOrderNo?: string; specification?: string; modelNo?: string; quantity?: string; grossWeight?: string; totalGrossWeight?: string; netWeight?: string; totalNetWeight?: string; imperialTotalDimension?: string; quantityOfCartons?: string; caseNumbers?: Array<{ caseNo1?: string; caseNo2?: string }> }
+      // 若 PL 存在用 PL；沒有 PL 時退而求其次用 CI 的 packings（不含物流資料，但至少有品項）
+      const plPackings = (pl?.packings ?? ci?.packings ?? []) as PLPacking[]
+
+      // 解析 PL：group by (piId, sku)，累計物流數值
       type GroupedItem = {
         piId: number | null; slsItemId: number | null
         rawSku: string | undefined; rawProductName: string | undefined
@@ -1268,19 +1296,25 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
         cartons: number
         cartonNos: string[]
         unit: string | undefined
-        unitPrice: import('@prisma/client').Prisma.Decimal | null | undefined
+        unitPrice: string | null
       }
       const groupMap = new Map<string, GroupedItem>()
 
-      for (const packing of packings) {
+      for (const packing of plPackings) {
         const sku = packing.sku?.trim()
         const sourceOrderNo = packing.sourceOrderNo?.trim()
+        const sourceDocNo = sourceOrderNo ? extractDocNo(sourceOrderNo) : undefined
         const matchedPI = sourceOrderNo
-          ? linkedPIs.find(p => p.piNo === sourceOrderNo || p.piNo.startsWith(sourceOrderNo + ' ') || sourceOrderNo.startsWith(p.piNo.split(' ')[0]))
+          ? linkedPIs.find(p =>
+              p.piNo === sourceOrderNo ||
+              (sourceDocNo && p.piNo === sourceDocNo) ||
+              p.piNo.startsWith(sourceOrderNo + ' ') ||
+              sourceOrderNo.startsWith(p.piNo.split(' ')[0]) ||
+              (sourceDocNo && sourceDocNo === extractDocNo(p.piNo))
+            )
           : linkedPIs[0]
         const piId = matchedPI?.id ?? linkedPIs[0]?.id ?? null
         const slsItemId = (piId && sku) ? (piSkuToSlsItemId.get(`${piId}:${sku}`) ?? null) : null
-        const priceUnit = (piId && sku) ? piSkuToPriceUnit.get(`${piId}:${sku}`) : undefined
         const key = `${piId ?? 'null'}::${sku ?? ''}`
 
         const cubicFt = packing.imperialTotalDimension ? parseFloat(packing.imperialTotalDimension) : 0
@@ -1290,6 +1324,14 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
         const ctns = packing.quantityOfCartons ? parseInt(packing.quantityOfCartons) || 0 : 0
         const caseNos = (packing.caseNumbers ?? []).flatMap(c => [c.caseNo1, c.caseNo2].filter(Boolean) as string[])
         const productName = packing.specification?.trim() || packing.modelNo?.trim() || undefined
+
+        // 從 CI 取定價：先嘗試 orderNo+sku，再 fallback 到純 sku
+        const ciKey = sku ? (`${sourceOrderNo ?? ''}::${sku}`) : ''
+        const ciData = (sku && ciPriceMap.get(ciKey)) || (sku && ciPriceMap.get(`::${sku}`)) || undefined
+        // 最終 fallback：SLS_PIItem lookup（舊路徑，CI 沒有時才用）
+        const piLookup = (piId && sku) ? piSkuToPriceUnit.get(`${piId}:${sku}`) : undefined
+        const finalUnit = ciData?.unit || piLookup?.unit || undefined
+        const finalPrice = ciData?.price || (piLookup?.unitPrice != null ? String(piLookup.unitPrice) : null)
 
         if (groupMap.has(key)) {
           const g = groupMap.get(key)!
@@ -1301,6 +1343,8 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
           g.cartons += ctns
           g.cartonNos.push(...caseNos)
           if (!g.rawProductName && productName) g.rawProductName = productName
+          if (!g.unit && finalUnit) g.unit = finalUnit
+          if (!g.unitPrice && finalPrice) g.unitPrice = finalPrice
         } else {
           groupMap.set(key, {
             piId, slsItemId, rawSku: sku, rawProductName: productName,
@@ -1308,8 +1352,8 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
             grossWeightKg: grossKg, netWeightKg: netKg,
             cubicFt, cbm: cubicFt * 0.028317,
             cartons: ctns, cartonNos: caseNos,
-            unit: priceUnit?.unit ?? undefined,
-            unitPrice: priceUnit?.unitPrice ?? undefined,
+            unit: finalUnit,
+            unitPrice: finalPrice,
           })
         }
       }
@@ -1346,6 +1390,7 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
               customerId: customer?.id ?? undefined,
               poOrderId: poOrderId ?? undefined,
               currencyCode: shipmentCurrency ?? undefined,
+              ciExchangeRate: ciExchangeRate ?? undefined,
               archivedAt: null,
             },
           })
@@ -1381,6 +1426,7 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
           patiscoDocNo: rec.patiscoDocNo,
           packingListNo: pl?.no ?? undefined,
           commercialInvNo: ci?.no ?? undefined,
+          ciExchangeRate: ciExchangeRate ?? undefined,
           syncJobId: jobId,
           performedBy: null,
         },
@@ -1646,10 +1692,11 @@ async function step9_dataAlerts(prisma: PrismaClient, jobId: number): Promise<Sy
   await prisma.sYS_DataAlert.deleteMany({ where: { syncJobId: jobId, resolvedAt: null } })
 
   // ① 出貨單引用了不存在的 PI（MISSING_PI）
+  // 真正異常：rawSku 有值但連 piId 都是 null（PI 完全對不上）
   const shipmentItems = await prisma.sLS_ShipmentItem.findMany({
-    where: { slsItemId: null, rawSku: { not: null } },
+    where: { slsItemId: null, piId: null, rawSku: { not: null } },
     select: {
-      id: true, rawSku: true, piId: true,
+      id: true, rawSku: true,
       shipment: { select: { id: true, shipmentNo: true } },
     },
   })
@@ -1668,8 +1715,8 @@ async function step9_dataAlerts(prisma: PrismaClient, jobId: number): Promise<Sy
         refType: 'SLS_Shipment',
         refId: shipmentId,
         refNo: shipmentNo,
-        message: `出貨單 ${shipmentNo} 有 ${skus.length} 個品項找不到對應的 PI 品項`,
-        detail: { skus, hint: '可能是對應的 PI 尚未建立，或 PI 衝突未解決。下次同步後若 PI 已建立，此告警會自動消失。' },
+        message: `出貨單 ${shipmentNo} 有 ${skus.length} 個品項找不到對應的 PI（${skus.slice(0, 3).join('、')}${skus.length > 3 ? '…' : ''}）`,
+        detail: { skus, hint: '這些 SKU 的出貨記錄完全沒有對應的 PI，可能是 PI 尚未建立或 PI 衝突未解決。重新同步後若 PI 已建立此告警會自動消失。' },
         syncJobId: jobId,
       },
     })
