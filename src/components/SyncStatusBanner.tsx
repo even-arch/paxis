@@ -15,6 +15,7 @@ const PHASE2_STEPS = [
   'customers', 'suppliers', 'products',
   'sls_orders', 'po_orders', 'po_supplier_pis',
   'sls_pis', 'sls_shipments',
+  'relink', 'ai_audit', 'data_alerts',
 ]
 
 const PHASE2_LABELS: Record<string, string> = {
@@ -26,6 +27,9 @@ const PHASE2_LABELS: Record<string, string> = {
   po_supplier_pis: '供應商 PI',
   sls_pis:         '我方 PI',
   sls_shipments:   '出貨單',
+  relink:          '資料補連中',
+  ai_audit:        'AI 缺口分析',
+  data_alerts:     '資料品質檢查',
 }
 
 function calcPercent(job: SyncJob): number {

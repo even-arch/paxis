@@ -16,6 +16,8 @@
  */
 
 import type { PrismaClient } from '@prisma/client'
+import { callLLM } from '@/lib/ai-llm'
+import { decrypt } from '@/lib/crypto'
 import {
   patiscoLogin,
   listPurchaseOrderCopies,
@@ -1304,6 +1306,216 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
   return r
 }
 
+// ─── Phase 3：Re-link Loop ────────────────────────────────────────────────────
+// 每次 pass 嘗試補連所有孤兒記錄，有任何修復就再跑一次，最多 MAX_RELINK_PASSES 次
+
+const MAX_RELINK_PASSES = 3
+
+async function relinkPass(prisma: PrismaClient): Promise<{ fixed: number; detail: Record<string, number> }> {
+  const detail: Record<string, number> = {}
+  let fixed = 0
+
+  // 1. SLS_PI.orderId = null → 找 SLS_Order by piNo = orderNo
+  const orphanPIs = await prisma.sLS_PI.findMany({
+    where: { orderId: null },
+    select: { id: true, piNo: true },
+  })
+  for (const pi of orphanPIs) {
+    const order = await prisma.sLS_Order.findFirst({
+      where: { orderNo: pi.piNo },
+      select: { id: true },
+    })
+    if (!order) continue
+    await prisma.sLS_PI.update({
+      where: { id: pi.id },
+      data: { orderId: order.id, customerId: undefined, currencyCode: undefined, totalAmount: undefined },
+    })
+    fixed++
+    detail['sls_pi_order'] = (detail['sls_pi_order'] ?? 0) + 1
+  }
+
+  // 2. PO_SupplierPI → PO_Order：目前已在 step6 用 poNo 配對，只補 orderId 真的缺失的情況
+  // （PI_COPY 的 piNo = PO 上的 poNo）
+  const orphanSupplierPIs = await prisma.pO_SupplierPI.findMany({
+    where: { orderId: 0 },  // orderId 是 required，理論上不存在 null，但保留以防萬一
+    select: { id: true, piNo: true },
+  })
+  for (const spi of orphanSupplierPIs) {
+    const order = await prisma.pO_Order.findFirst({
+      where: { poNo: spi.piNo },
+      select: { id: true },
+    })
+    if (!order) continue
+    await prisma.pO_SupplierPI.update({ where: { id: spi.id }, data: { orderId: order.id } })
+    fixed++
+    detail['po_supplier_pi_order'] = (detail['po_supplier_pi_order'] ?? 0) + 1
+  }
+
+  // 3. SLS_Shipment.poOrderId = null → 透過 SLS_PI → SLS_Order → PO_Order 補連
+  const orphanShipments = await prisma.sLS_Shipment.findMany({
+    where: { poOrderId: null },
+    select: {
+      id: true,
+      pis: { select: { pi: { select: { orderId: true } } } },
+    },
+  })
+  for (const sh of orphanShipments) {
+    const salesOrderId = sh.pis.find(p => p.pi?.orderId)?.pi?.orderId ?? null
+    if (!salesOrderId) continue
+    const po = await prisma.pO_Order.findFirst({
+      where: { salesOrderId },
+      select: { id: true },
+      take: 1,
+    })
+    if (!po) continue
+    await prisma.sLS_Shipment.update({ where: { id: sh.id }, data: { poOrderId: po.id } })
+    fixed++
+    detail['sls_shipment_po'] = (detail['sls_shipment_po'] ?? 0) + 1
+  }
+
+  // 4. SLS_PIItem.slsItemId = null → 找 SLS_Item by orderId + productId
+  const orphanPIItems = await prisma.sLS_PIItem.findMany({
+    where: { slsItemId: null },
+    select: { id: true, piId: true, productId: true, pi: { select: { orderId: true } } },
+  })
+  for (const item of orphanPIItems) {
+    if (!item.pi?.orderId || !item.productId) continue
+    const slsItem = await prisma.sLS_Item.findFirst({
+      where: { orderId: item.pi.orderId, productId: item.productId },
+      select: { id: true },
+    })
+    if (!slsItem) continue
+    await prisma.sLS_PIItem.update({ where: { id: item.id }, data: { slsItemId: slsItem.id } })
+    fixed++
+    detail['sls_pi_item'] = (detail['sls_pi_item'] ?? 0) + 1
+  }
+
+  // 5. SLS_ShipmentItem.slsItemId = null → 找 SLS_PIItem by piId + sku
+  const orphanShipItems = await prisma.sLS_ShipmentItem.findMany({
+    where: { slsItemId: null, rawSku: { not: null } },
+    select: { id: true, piId: true, rawSku: true },
+  })
+  for (const item of orphanShipItems) {
+    if (!item.piId || !item.rawSku) continue
+    const piItem = await prisma.sLS_PIItem.findFirst({
+      where: { piId: item.piId, slsItem: { product: { sku: item.rawSku } } },
+      select: { slsItemId: true },
+    })
+    if (!piItem?.slsItemId) continue
+    await prisma.sLS_ShipmentItem.update({ where: { id: item.id }, data: { slsItemId: piItem.slsItemId } })
+    fixed++
+    detail['sls_shipment_item'] = (detail['sls_shipment_item'] ?? 0) + 1
+  }
+
+  return { fixed, detail }
+}
+
+export async function phase3_relink(prisma: PrismaClient, jobId: number): Promise<SyncStepResult> {
+  const r: SyncStepResult = { created: 0, updated: 0, skipped: 0, errors: [] }
+  let totalFixed = 0
+
+  for (let pass = 1; pass <= MAX_RELINK_PASSES; pass++) {
+    const { fixed, detail } = await relinkPass(prisma)
+    console.log(`[phase3] pass ${pass}: fixed=${fixed}`, detail)
+    totalFixed += fixed
+    r.updated += fixed
+    if (fixed === 0) break
+  }
+
+  console.log(`[phase3] 完成，共補連 ${totalFixed} 筆`)
+  return r
+}
+
+// ─── Phase 4：AI 缺口分析 ────────────────────────────────────────────────────
+
+async function phase4_aiAudit(prisma: PrismaClient, jobId: number): Promise<SyncStepResult> {
+  const r: SyncStepResult = { created: 0, updated: 0, skipped: 0, errors: [] }
+
+  // 收集 re-link 後仍然存在的缺口
+  const gaps: string[] = []
+
+  const standalonePI = await prisma.sLS_PI.count({ where: { orderId: null } })
+  if (standalonePI > 0) gaps.push(`${standalonePI} 張 SLS_PI 找不到對應 SLS_Order（piNo 與 orderNo 不吻合）`)
+
+  const noPoShipments = await prisma.sLS_Shipment.count({ where: { poOrderId: null, source: 'PATISCO' } })
+  if (noPoShipments > 0) gaps.push(`${noPoShipments} 張出貨單無法連結採購訂單（PO_Order）`)
+
+  const unlinkedPIItems = await prisma.sLS_PIItem.count({ where: { slsItemId: null } })
+  if (unlinkedPIItems > 0) gaps.push(`${unlinkedPIItems} 筆 PI 品項找不到對應的訂單品項（SLS_Item）`)
+
+  const unlinkedShipItems = await prisma.sLS_ShipmentItem.count({ where: { slsItemId: null, rawSku: { not: null } } })
+  if (unlinkedShipItems > 0) gaps.push(`${unlinkedShipItems} 筆出貨品項找不到對應的 PI 品項`)
+
+  const pisWithoutPO = await prisma.sLS_PI.count({
+    where: { order: { purchaseOrders: { none: {} } } },
+  })
+  if (pisWithoutPO > 0) gaps.push(`${pisWithoutPO} 張 PI 的客戶訂單沒有對應的採購訂單`)
+
+  if (gaps.length === 0) {
+    console.log('[phase4] 無資料缺口，跳過 AI 分析')
+    return r
+  }
+
+  // 嘗試呼叫 AI 分析
+  try {
+    const sysUser = await prisma.sYS_User.findUnique({
+      where: { id: SYS_USER_ID },
+      select: { encryptedAiKey: true, aiProvider: true, aiParseModel: true },
+    })
+    if (sysUser?.encryptedAiKey && sysUser.aiProvider) {
+      const apiKey = decrypt(sysUser.encryptedAiKey)
+      const provider = sysUser.aiProvider
+      const model = sysUser.aiParseModel ?? (provider === 'anthropic' ? 'claude-haiku-4-5-20251001' : 'gpt-4o-mini')
+
+      const prompt = `你是 PAXIS 進銷存系統的資料品質分析師。以下是這次 Patisco 同步後，經過三次自動補連仍無法解決的資料缺口：
+
+${gaps.map((g, i) => `${i + 1}. ${g}`).join('\n')}
+
+請用繁體中文，針對每個缺口說明：
+1. 最可能的原因（從 Patisco 資料設計或 PAXIS 匹配邏輯角度分析）
+2. 建議的修復方向
+
+回答請保持簡潔，每個缺口不超過 3 句話。`
+
+      const aiHint = await callLLM(provider, apiKey, model, [
+        { role: 'user', content: prompt },
+      ], 1000)
+
+      await prisma.sYS_DataAlert.create({
+        data: {
+          type: 'AI_AUDIT',
+          refType: 'SYS_SyncJob',
+          refId: jobId,
+          refNo: `Job #${jobId}`,
+          message: `同步後仍有 ${gaps.length} 類資料缺口（AI 分析已完成）`,
+          detail: { gaps, hint: aiHint },
+          syncJobId: jobId,
+        },
+      })
+      r.created++
+      console.log('[phase4] AI 分析完成，已寫入 SYS_DataAlert')
+    } else {
+      // 沒有 AI 配置，只記錄缺口清單
+      await prisma.sYS_DataAlert.create({
+        data: {
+          type: 'AI_AUDIT',
+          refType: 'SYS_SyncJob',
+          refId: jobId,
+          refNo: `Job #${jobId}`,
+          message: `同步後仍有 ${gaps.length} 類資料缺口`,
+          detail: { gaps, hint: '尚未設定 AI，無法自動分析原因。請至設定 → AI 設定配置 API Key 後重新同步。' },
+          syncJobId: jobId,
+        },
+      })
+      r.created++
+    }
+  } catch (e) {
+    r.errors.push(`AI 分析失敗：${e instanceof Error ? e.message : String(e)}`)
+  }
+
+  return r
+}
+
 // ─── Step 9：資料品質告警 ──────────────────────────────────────────────────────
 
 async function step9_dataAlerts(prisma: PrismaClient, jobId: number): Promise<SyncStepResult> {
@@ -1385,6 +1597,8 @@ const PHASE2_STEPS: Array<{ name: string; fn: (p: PrismaClient, j: number) => Pr
   { name: 'po_supplier_pis', fn: step6_poSupplierPIs },
   { name: 'sls_pis',         fn: step7_slsPIs },
   { name: 'sls_shipments',   fn: step8_slsShipments },
+  { name: 'relink',          fn: phase3_relink },   // 補連孤兒資料（最多 3 次 pass）
+  { name: 'ai_audit',        fn: phase4_aiAudit },  // AI 分析剩餘缺口
   { name: 'data_alerts',     fn: step9_dataAlerts },
 ]
 

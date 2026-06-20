@@ -35,6 +35,7 @@ const ALERT_TYPE_LABEL: Record<string, { label: string; color: string }> = {
   MISSING_PI:   { label: '缺少 PI 品項',  color: 'text-amber-600' },
   WORKFLOW_GAP: { label: '流程缺口',      color: 'text-orange-600' },
   PI_CONFLICT:  { label: 'PI 衝突',       color: 'text-red-600' },
+  AI_AUDIT:     { label: 'AI 缺口分析',   color: 'text-blue-600' },
 }
 
 export default function NotificationBell() {
