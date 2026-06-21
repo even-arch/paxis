@@ -70,6 +70,7 @@ export async function GET() {
         include: {
           pi: {
             select: {
+              id: true,
               piNo: true,
               orderId: true,
               totalAmount: true,
