@@ -181,21 +181,17 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       }
     }
 
-    // ── 3. FIN_Payable（AP）：找出此出貨關聯的 PO_Receipt ────────────────
-    // 路徑A：SLS_PI → SLS_Order → PO_Order（salesOrderId）
-    // 路徑B（貿易商/Patisco standalone PI）：SLS_PI.piNo → PO_Order.poNo 模糊比對
+    // ── 3. FIN_Payable（AP）：找出此出貨關聯的 PO_Order ─────────────────
+    // 主路徑：SLS_PI.piNo → PO_Order.poNo（貿易商模式，我方 PI 號 = 對供應商採購號）
+    // 次路徑：SLS_PI → SLS_Order → PO_Order.salesOrderId（補充，有 SLS_Order 連結時用）
+    const allPiNos = shipment.pis.map(sp => sp.pi.piNo)
     const slsOrderIds = shipment.pis
       .map(sp => sp.pi.order?.id)
       .filter((id): id is number => id != null)
 
-    // 路徑B：standalone PI 用 piNo 比對 PO_Order.poNo
-    const standalonePiNos = shipment.pis
-      .filter(sp => !sp.pi.order)
-      .map(sp => sp.pi.piNo)
-
     const poOrderConditions: Record<string, unknown>[] = []
+    if (allPiNos.length > 0) poOrderConditions.push({ poNo: { in: allPiNos } })
     if (slsOrderIds.length > 0) poOrderConditions.push({ salesOrderId: { in: slsOrderIds } })
-    if (standalonePiNos.length > 0) poOrderConditions.push({ poNo: { in: standalonePiNos } })
 
     if (poOrderConditions.length > 0) {
       const poOrders = await prisma.pO_Order.findMany({
