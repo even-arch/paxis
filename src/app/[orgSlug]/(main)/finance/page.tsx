@@ -751,9 +751,11 @@ export default function FinancePage() {
 
       {/* 收款對話框 */}
       {recDialog && (() => {
-        // 可加入同批的：未收清、非當前這張
+        // 修改模式（recDialog 本身已收清）：顯示所有其他單子（含已收清），讓用戶重新連結同批
+        // 新增模式：只顯示未收清的
+        const isEditMode = recDialog.status === 2
         const batchCandidates = receivables.filter(r =>
-          r.id !== recDialog.id && r.status < 2
+          r.id !== recDialog.id && (isEditMode ? true : r.status < 2)
         )
         const batchSelected = batchCandidates.filter(r => batchIds.includes(r.id))
         const allIds = [recDialog.id, ...batchIds]
@@ -763,7 +765,7 @@ export default function FinancePage() {
         return (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 overflow-y-auto py-8">
             <div className="bg-white rounded-xl shadow-xl p-6 w-[480px] mx-4">
-              <h2 className="text-base font-semibold mb-1">記錄收款</h2>
+              <h2 className="text-base font-semibold mb-1">{isEditMode ? '修改收款紀錄' : '記錄收款'}</h2>
               <p className="text-sm text-gray-500 mb-4">
                 {recDialog.customer?.name ?? recDialog.customerName}
                 {recDialog.shipment.pis.length > 0 && (
@@ -805,7 +807,7 @@ export default function FinancePage() {
                   </div>
                   <div className="max-h-48 overflow-y-auto">
                     {batchCandidates.length === 0 ? (
-                      <p className="text-xs text-gray-400 px-3 py-3">目前無其他待收款的出貨單</p>
+                      <p className="text-xs text-gray-400 px-3 py-3">目前無其他出貨單可選</p>
                     ) : (
                       batchCandidates.map(r => {
                         const checked = batchIds.includes(r.id)
@@ -833,7 +835,9 @@ export default function FinancePage() {
                   </div>
                   {batchIds.length > 0 && (
                     <div className="bg-blue-50 px-3 py-2 border-t border-blue-100 text-xs text-blue-700">
-                      同批各出貨單將套用相同押匯匯率，各自以其應收金額標為已收清
+                      {isEditMode
+                        ? '同批各出貨單將套用相同押匯匯率，覆蓋現有收款記錄'
+                        : '同批各出貨單將套用相同押匯匯率，各自以其應收金額標為已收清'}
                     </div>
                   )}
                 </div>
