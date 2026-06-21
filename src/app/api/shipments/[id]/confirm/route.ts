@@ -58,43 +58,47 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   let confirmed = 0
   let skipped = 0
 
-  for (const item of shipment.items) {
-    const productId = item.slsItem?.product?.id
-      ?? (item.piId && item.rawSku ? piItemLookup.get(`${item.piId}:${item.rawSku}`) : undefined)
+  try {
+    for (const item of shipment.items) {
+      const productId = item.slsItem?.product?.id
+        ?? (item.piId && item.rawSku ? piItemLookup.get(`${item.piId}:${item.rawSku}`) : undefined)
 
-    if (!productId) { skipped++; continue }
+      if (!productId) { skipped++; continue }
 
-    const stock = await prisma.iNV_Stock.findUnique({ where: { productId } })
-    const currentQty = stock?.quantity ?? 0
-    const currentReserved = stock?.reservedQty ?? 0
-    const reservedDecrement = Math.min(item.quantity, Math.max(0, currentReserved))
+      const stock = await prisma.iNV_Stock.findUnique({ where: { productId } })
+      const currentQty = stock?.quantity ?? 0
+      const currentReserved = stock?.reservedQty ?? 0
+      const reservedDecrement = Math.min(item.quantity, Math.max(0, currentReserved))
 
-    await prisma.iNV_Stock.upsert({
-      where: { productId },
-      create: { productId, quantity: -item.quantity, reservedQty: 0, safetyStock: 0 },
-      update: {
-        quantity: { decrement: item.quantity },
-        ...(reservedDecrement > 0 ? { reservedQty: { decrement: reservedDecrement } } : {}),
-      },
-    })
+      await prisma.iNV_Stock.upsert({
+        where: { productId },
+        create: { productId, quantity: -item.quantity, reservedQty: 0, safetyStock: 0 },
+        update: {
+          quantity: { decrement: item.quantity },
+          ...(reservedDecrement > 0 ? { reservedQty: { decrement: reservedDecrement } } : {}),
+        },
+      })
 
-    const updatedStock = await prisma.iNV_Stock.findUnique({ where: { productId } })
-    await prisma.iNV_Movement.create({
-      data: {
-        productId,
-        type: 4,
-        qtyDelta: -item.quantity,
-        reservedDelta: -reservedDecrement,
-        quantityAfter: updatedStock?.quantity ?? currentQty - item.quantity,
-        reservedAfter: updatedStock?.reservedQty ?? currentReserved - reservedDecrement,
-        slsShipmentId: shipmentId,
-        source: 'MANUAL',
-        performedBy: ((session.user as unknown) as { id?: number }).id ?? null,
-        patiscoDocId: shipment.patiscoDocId ?? undefined,
-        patiscoDocNo: shipment.patiscoDocNo ?? undefined,
-      },
-    })
-    confirmed++
+      const updatedStock = await prisma.iNV_Stock.findUnique({ where: { productId } })
+      await prisma.iNV_Movement.create({
+        data: {
+          productId,
+          type: 4,
+          qtyDelta: -item.quantity,
+          reservedDelta: -reservedDecrement,
+          quantityAfter: updatedStock?.quantity ?? currentQty - item.quantity,
+          reservedAfter: updatedStock?.reservedQty ?? currentReserved - reservedDecrement,
+          slsShipmentId: shipmentId,
+          source: 'MANUAL',
+          performedBy: ((session.user as unknown) as { id?: number }).id ?? null,
+          patiscoDocId: shipment.patiscoDocId ?? undefined,
+          patiscoDocNo: shipment.patiscoDocNo ?? undefined,
+        },
+      })
+      confirmed++
+    }
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 })
   }
 
   return NextResponse.json({ ok: true, confirmed, skipped })
