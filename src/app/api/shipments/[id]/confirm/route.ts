@@ -2,11 +2,16 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getRequestPrisma } from '@/lib/request-db'
+import { Prisma } from '@prisma/client'
 
 /**
  * POST /api/shipments/[id]/confirm
- * 驅動出貨：為現有 SLS_Shipment 寫入 INV_Movement type=4（quantity--, reservedQty--）。
- * 冪等保護：若此出貨單已存在 type=4 的 Movement，拒絕重複執行。
+ * 驅動出貨的連鎖反應：
+ * 1. INV_Movement type=4（quantity--, reservedQty--）
+ * 2. SLS_Item.shippedQty 更新
+ * 3. FIN_Receivable 建立（AR：等客戶付款）
+ * 4. FIN_Payable 建立（AP：若 PO_Receipt 已存在）
+ * 冪等保護：已有 type=4 Movement 則拒絕重複。
  */
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
   const prisma = await getRequestPrisma()
@@ -16,13 +21,37 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   const shipmentId = parseInt(params.id, 10)
   if (isNaN(shipmentId)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
 
+  const performedBy = (() => {
+    const uid = ((session.user as unknown) as { id?: unknown }).id
+    return uid != null ? parseInt(String(uid), 10) : null
+  })()
+
+  // ── 讀取出貨單完整資料 ──────────────────────────────────────────────────
   const shipment = await prisma.sLS_Shipment.findUnique({
     where: { id: shipmentId },
     include: {
+      customer: { select: { id: true } },
       items: {
         include: {
-          slsItem: { select: { product: { select: { id: true } } } },
+          slsItem: { select: { id: true, product: { select: { id: true } } } },
           pi: { select: { id: true } },
+        },
+      },
+      pis: {
+        include: {
+          pi: {
+            select: {
+              id: true, piNo: true, orderId: true, totalAmount: true,
+              currencyCode: true, extraCharges: true,
+              order: {
+                select: {
+                  id: true, orderNo: true, exchangeRate: true,
+                  totalAmount: true, currencyCode: true,
+                  items: { select: { id: true, shippedQty: true, quantity: true } },
+                },
+              },
+            },
+          },
         },
       },
       stockMovements: { where: { type: 4 }, select: { id: true } },
@@ -30,14 +59,12 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   })
 
   if (!shipment) return NextResponse.json({ error: '找不到出貨單' }, { status: 404 })
-
-  if (shipment.stockMovements.length > 0) {
+  if (shipment.stockMovements.length > 0)
     return NextResponse.json({ error: '此出貨單已完成庫存扣減，請勿重複執行' }, { status: 409 })
-  }
 
-  // 建立 sku → productId map（從 piId 的 PIItem 補查）
+  // ── 補查 rawSku → productId ──────────────────────────────────────────
   const rawSkuItems = shipment.items.filter(i => !i.slsItem && i.rawSku && i.piId)
-  const piItemLookup = new Map<string, number>() // `${piId}:${sku}` → productId
+  const piItemLookup = new Map<string, number>()
 
   if (rawSkuItems.length > 0) {
     const piIds = Array.from(new Set(rawSkuItems.map(i => i.piId!)))
@@ -45,7 +72,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       where: { piId: { in: piIds } },
       select: {
         piId: true,
-        slsItem: { select: { product: { select: { id: true, sku: true } } } },
+        slsItem: { select: { id: true, product: { select: { id: true, sku: true } } } },
         product: { select: { id: true, sku: true } },
       },
     })
@@ -55,15 +82,15 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     }
   }
 
-  let confirmed = 0
-  let skipped = 0
+  const result = { invConfirmed: 0, invSkipped: 0, arCreated: false, apCreated: 0, apSkipped: 0 }
 
   try {
+    // ── 1. INV_Movement type=4 + SLS_Item.shippedQty ─────────────────────
     for (const item of shipment.items) {
       const productId = item.slsItem?.product?.id
         ?? (item.piId && item.rawSku ? piItemLookup.get(`${item.piId}:${item.rawSku}`) : undefined)
 
-      if (!productId) { skipped++; continue }
+      if (!productId) { result.invSkipped++; continue }
 
       const stock = await prisma.iNV_Stock.findUnique({ where: { productId } })
       const currentQty = stock?.quantity ?? 0
@@ -82,24 +109,112 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       const updatedStock = await prisma.iNV_Stock.findUnique({ where: { productId } })
       await prisma.iNV_Movement.create({
         data: {
-          productId,
-          type: 4,
+          productId, type: 4,
           qtyDelta: -item.quantity,
           reservedDelta: -reservedDecrement,
           quantityAfter: updatedStock?.quantity ?? currentQty - item.quantity,
           reservedAfter: updatedStock?.reservedQty ?? currentReserved - reservedDecrement,
           slsShipmentId: shipmentId,
-          source: 'MANUAL',
-          performedBy: (() => { const uid = ((session.user as unknown) as { id?: unknown }).id; return uid != null ? parseInt(String(uid), 10) : null })(),
+          source: 'MANUAL', performedBy,
           patiscoDocId: shipment.patiscoDocId ?? undefined,
           patiscoDocNo: shipment.patiscoDocNo ?? undefined,
         },
       })
-      confirmed++
+
+      // SLS_Item.shippedQty 更新
+      if (item.slsItem?.id) {
+        await prisma.sLS_Item.update({
+          where: { id: item.slsItem.id },
+          data: { shippedQty: { increment: item.quantity } },
+        })
+      }
+      result.invConfirmed++
     }
+
+    // ── 2. FIN_Receivable（AR）────────────────────────────────────────────
+    const existingAR = await prisma.fIN_Receivable.findUnique({ where: { shipmentId } })
+    if (!existingAR) {
+      const ciRate = Number(shipment.ciExchangeRate ?? 0)
+
+      const calcExtraCharges = (ec: unknown): number => {
+        if (!ec || !Array.isArray(ec)) return 1
+        let pct = 0
+        for (const c of ec as { type?: string; amount?: string }[]) {
+          if (c.amount && c.type !== '1') pct += Number(c.amount)
+        }
+        return 1 + pct / 100
+      }
+
+      // AR = SLS_PI 金額加總（PI 是主，SLS_Order 只做 fallback）
+      let amountTWD = 0
+      for (const sp of shipment.pis) {
+        const totalAmt = sp.pi.totalAmount
+        const currCode = sp.pi.currencyCode ?? 'TWD'
+        if (!totalAmt) continue
+        const base = currCode === 'TWD'
+          ? Number(totalAmt)
+          : (ciRate > 0 ? Number(totalAmt) / ciRate : Number(totalAmt))
+        amountTWD += base * calcExtraCharges(sp.pi.extraCharges)
+      }
+
+      if (amountTWD > 0 && ciRate > 0) {
+        const amountForeign = amountTWD * ciRate
+        const rateAtInvoice = 1 / ciRate
+        await prisma.fIN_Receivable.create({
+          data: {
+            shipmentId,
+            customerId: shipment.customerId ?? undefined,
+            currencyCode: 'EUR',
+            amountForeign: new Prisma.Decimal(amountForeign),
+            rateAtInvoice: new Prisma.Decimal(rateAtInvoice),
+            amountTWD: new Prisma.Decimal(amountTWD),
+            status: 0,
+          },
+        })
+        result.arCreated = true
+      }
+    }
+
+    // ── 3. FIN_Payable（AP）：找出此出貨關聯的 PO_Receipt ────────────────
+    // 路徑：SLS_PI → SLS_Order → PO_Order（salesOrderId）→ PO_Receipt
+    const slsOrderIds = shipment.pis
+      .map(sp => sp.pi.order?.id)
+      .filter((id): id is number => id != null)
+
+    if (slsOrderIds.length > 0) {
+      const poOrders = await prisma.pO_Order.findMany({
+        where: { salesOrderId: { in: slsOrderIds } },
+        include: {
+          receipts: { take: 1 },
+          supplier: { select: { id: true } },
+        },
+      })
+
+      for (const po of poOrders) {
+        const receipt = po.receipts[0]
+        if (!receipt) { result.apSkipped++; continue }
+        const existing = await prisma.fIN_Payable.findUnique({ where: { receiptId: receipt.id } })
+        if (existing) continue
+
+        const base = po.totalAmount ? Number(po.totalAmount) : 0
+        const amountTWD = base * Number(po.exchangeRate ?? 1)
+        if (amountTWD <= 0) { result.apSkipped++; continue }
+
+        await prisma.fIN_Payable.create({
+          data: {
+            supplierId: po.supplierId,
+            receiptId: receipt.id,
+            amountTWD: new Prisma.Decimal(amountTWD),
+            status: 0,
+          },
+        })
+        result.apCreated++
+      }
+    }
+
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 })
   }
 
-  return NextResponse.json({ ok: true, confirmed, skipped })
+  return NextResponse.json({ ok: true, ...result })
 }
