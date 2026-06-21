@@ -149,23 +149,47 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
         return 1 + pct / 100
       }
 
-      // AR = PI 金額加總（PI 是主，PO_CustomerCopy 只做 fallback）
+      // AR = 裝箱明細加總（quantity × unitPrice），反映本次實際出貨金額
+      // PI.totalAmount 是整張 PI 的總額，分批出貨時不能直接用，必須用明細。
+      // unitPrice 從 Patisco 拉入，幣別與出貨單 currencyCode 一致（通常 EUR）。
+      let amountForeignFromItems = 0
+      let itemsWithPrice = 0
+      for (const item of shipment.items) {
+        const up = (item as unknown as { unitPrice?: { toString(): string } | null }).unitPrice
+        if (up != null) {
+          amountForeignFromItems += item.quantity * Number(up)
+          itemsWithPrice++
+        }
+      }
+
       let amountTWD = 0
-      for (const sp of shipment.pis) {
-        const totalAmt = sp.pi.totalAmount
-        const currCode = sp.pi.currencyCode ?? 'TWD'
-        if (!totalAmt) continue
-        const base = currCode === 'TWD'
-          ? Number(totalAmt)
-          : (ciRate > 0 ? Number(totalAmt) / ciRate : Number(totalAmt))
-        amountTWD += base * calcExtraCharges(sp.pi.extraCharges)
+      let amountForeign = 0
+
+      if (itemsWithPrice > 0 && ciRate > 0) {
+        // 主路徑：明細加總（外幣）→ 換算 TWD
+        amountForeign = amountForeignFromItems
+        amountTWD = amountForeign / ciRate
+      } else if (itemsWithPrice > 0) {
+        // ciRate 未知：外幣金額先存，TWD 以外幣金額暫代
+        amountForeign = amountForeignFromItems
+        amountTWD = amountForeignFromItems
+      } else {
+        // fallback：沒有明細單價時，退回 PI.totalAmount 加總
+        for (const sp of shipment.pis) {
+          const totalAmt = sp.pi.totalAmount
+          const currCode = sp.pi.currencyCode ?? 'TWD'
+          if (!totalAmt) continue
+          const base = currCode === 'TWD'
+            ? Number(totalAmt)
+            : (ciRate > 0 ? Number(totalAmt) / ciRate : Number(totalAmt))
+          amountTWD += base * calcExtraCharges(sp.pi.extraCharges)
+        }
+        amountForeign = ciRate > 0 ? amountTWD * ciRate : amountTWD
       }
 
       if (amountTWD > 0) {
-        // ciRate=0 時（尚未同步 CI 文件），先用外幣金額原值存入，等待後續更新
-        const amountForeign = ciRate > 0 ? amountTWD * ciRate : amountTWD
         const rateAtInvoice = ciRate > 0 ? 1 / ciRate : 1
-        const currencyCode = ciRate > 0 ? 'EUR' : (shipment.pis[0]?.pi.currencyCode ?? 'TWD')
+        const currencyCode = shipment.currencyCode ?? (ciRate > 0 ? 'EUR' : 'TWD')
         await prisma.fIN_Receivable.create({
           data: {
             shipmentId,

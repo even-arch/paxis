@@ -5,6 +5,7 @@ import { getPagePrisma } from '@/lib/page-db'
 import { orgPath } from '@/lib/org-path'
 import { formatDate } from '@/lib/utils'
 import LinkPOButton from './LinkPOButton'
+import UnlinkPOButton from './UnlinkPOButton'
 
 type Props = { params: { orgSlug: string; piId: string } }
 
@@ -132,15 +133,17 @@ export default async function PIDetailPage({ params }: Props) {
         ) : (
           <div className="flex flex-wrap gap-2">
             {linkedPOs.map(po => (
-              <Link key={po.id} href={orgPath(params.orgSlug, `/purchases/${po.id}`)}
-                className="inline-flex items-center gap-2 bg-white border border-orange-200 rounded-lg px-3 py-2 hover:border-orange-400 transition-colors text-sm">
-                <span className="font-mono font-medium text-orange-700">{po.poNo}</span>
-                <span className="text-gray-500">{po.supplier.shortName ?? po.supplier.name}</span>
-                {po.totalAmount && (
-                  <span className="text-xs text-gray-400">{po.currencyCode} {Number(po.totalAmount).toLocaleString()}</span>
-                )}
-                <span className="text-xs text-gray-400">→ 查看 PO</span>
-              </Link>
+              <div key={po.id} className="inline-flex items-center gap-1 bg-white border border-orange-200 rounded-lg px-3 py-2 hover:border-orange-300 transition-colors text-sm">
+                <Link href={orgPath(params.orgSlug, `/purchases/${po.id}`)} className="inline-flex items-center gap-2">
+                  <span className="font-mono font-medium text-orange-700">{po.poNo}</span>
+                  <span className="text-gray-500">{po.supplier.shortName ?? po.supplier.name}</span>
+                  {po.totalAmount && (
+                    <span className="text-xs text-gray-400">{po.currencyCode} {Number(po.totalAmount).toLocaleString()}</span>
+                  )}
+                  <span className="text-xs text-gray-400">→ 查看 PO</span>
+                </Link>
+                <UnlinkPOButton poId={po.id} poNo={po.poNo} />
+              </div>
             ))}
           </div>
         )}

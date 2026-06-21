@@ -8,7 +8,7 @@ export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // 預載所有 PO（含品項金額）— 用於 slsPiId / poNo / salesOrderId 配對
+  // 預載所有 PO（含品項金額與 SKU）— 用於 slsPiId / poNo / salesOrderId 配對
   const allPOs = await prisma.pO.findMany({
     select: {
       id: true,
@@ -19,9 +19,28 @@ export async function GET() {
       slsPiId: true,
       salesOrderId: true,
       supplier: { select: { id: true, name: true, shortName: true } },
-      items: { select: { unitPrice: true, quantity: true } },
+      items: {
+        select: {
+          unitPrice: true,
+          quantity: true,
+          product: { select: { sku: true } },
+        },
+      },
     },
   })
+  // SKU → TWD 進價 map：piId → { sku → unitPrice }
+  // 用於品項級別比對：用本次出貨 SKU 找對應進價，計算實際出貨成本
+  const costBySku = new Map<number, Map<string, number>>() // piId → sku → unitPriceTWD
+  for (const po of allPOs) {
+    if (!po.slsPiId) continue
+    const skuMap = costBySku.get(po.slsPiId) ?? new Map<string, number>()
+    for (const item of po.items) {
+      if (item.product?.sku && item.unitPrice) {
+        skuMap.set(item.product.sku, Number(item.unitPrice))
+      }
+    }
+    costBySku.set(po.slsPiId, skuMap)
+  }
 
   function extractDocNo(str: string): string {
     const m = str.match(/\b([A-Z]{1,3}\d{5,})\b/)
@@ -57,12 +76,24 @@ export async function GET() {
     orderBy: { actualShipDate: 'desc' },
     include: {
       customer: { select: { id: true, name: true, shortName: true } },
+      items: {
+        select: {
+          piId: true,
+          quantity: true,
+          rawSku: true,
+          unitPrice: true,
+        },
+      },
       receivable: {
         select: {
           amountForeign: true,
           currencyCode: true,
           rateAtInvoice: true,
           amountTWD: true,
+          collectedForeign: true,
+          rateAtCollection: true,
+          collectedTWD: true,
+          fxGainLoss: true,
           status: true,
         },
       },
@@ -203,8 +234,26 @@ export async function GET() {
       }
     }
 
+    // ── 品項級別 AP 計算（主路徑）─────────────────────────────────────────
+    // 用本次出貨 SLS_Item（SKU + 數量）× 對應 PO 進價（TWD），只算實際出貨部分
+    let apFromItems = 0
+    let itemsMatchedCount = 0
+    for (const item of s.items) {
+      if (!item.piId || !item.rawSku) continue
+      const skuMap = costBySku.get(item.piId)
+      const costPrice = skuMap?.get(item.rawSku)
+      if (costPrice != null) {
+        apFromItems += item.quantity * costPrice
+        itemsMatchedCount++
+      }
+    }
+    const totalItems = s.items.filter(i => i.piId && i.rawSku).length
+    const useItemLevel = itemsMatchedCount > 0 && itemsMatchedCount >= totalItems * 0.5
+
     const apItems = Array.from(poMap.values())
-    const apTWD = apItems.reduce((sum, p) => sum + p.amountTWD, 0)
+    // 主路徑：品項比對（覆蓋率 >= 50%）；否則 fallback 到整張 PO 金額
+    const apTWD = useItemLevel ? apFromItems : apItems.reduce((sum, p) => sum + p.amountTWD, 0)
+    const apMatchType = useItemLevel ? `item-level (${itemsMatchedCount}/${totalItems})` : 'po-total'
     const grossTWD = arTWD - apTWD
     const grossPct = arTWD > 0 ? (grossTWD / arTWD) * 100 : null
 
@@ -242,6 +291,13 @@ export async function GET() {
     if (nullAmountPos.length > 0)
       warnings.push(`${nullAmountPos.length} 張 PO 金額為空：${nullAmountPos.join('、')}`)
 
+    const collectedTWD = s.receivable?.collectedTWD ? Number(s.receivable.collectedTWD) : null
+    const fxGainLoss = s.receivable?.fxGainLoss ? Number(s.receivable.fxGainLoss) : null
+    // 實際毛利 = 實收TWD - 應付TWD（只在已收款時計算）
+    const realGrossTWD = collectedTWD != null && apTWD > 0 ? collectedTWD - apTWD : null
+    // 全部毛利 = 實際毛利 + 匯差
+    const totalProfitTWD = realGrossTWD != null && fxGainLoss != null ? realGrossTWD + fxGainLoss : null
+
     return {
       shipmentId: s.id,
       shipmentNo: s.shipmentNo,
@@ -256,14 +312,21 @@ export async function GET() {
         twd: arTWD,
         fromRecord: arFromRecord,
         receivableStatus: s.receivable?.status ?? null,
+        collectedTWD,
+        fxGainLoss,
       },
       ap: {
         twd: apTWD,
         items: apItems,
+        matchType: apMatchType,
       },
       gross: {
         twd: grossTWD,
         pct: grossPct,
+      },
+      realGross: {
+        twd: realGrossTWD,
+        totalProfit: totalProfitTWD,
       },
       hasPoLink: apItems.length > 0,
       warnings,

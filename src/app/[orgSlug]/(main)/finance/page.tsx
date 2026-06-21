@@ -74,14 +74,29 @@ function isDueSoon(dueDate: string | null, status: number) {
   return diff > 0 && diff < 7 * 86400000
 }
 
+type ReconItem = {
+  sku: string; name: string
+  committed: number; shipped: number; remaining: number
+  committedEUR: number; shippedEUR: number; remainingEUR: number
+  status: 'done' | 'partial' | 'pending'
+}
+type ReconRow = {
+  piId: number; piNo: string; customer: string
+  piStatus: 'done' | 'partial' | 'pending'
+  shipments: { shipmentNo: string; actualShipDate: string | null; ciExchangeRate: string | null }[]
+  items: ReconItem[]
+  summary: { totalCommittedEUR: number; totalShippedEUR: number; totalRemainingEUR: number }
+}
+
 type EstimateRow = {
   shipmentId: number
   shipmentNo: string
   actualShipDate: string
   customer: { id: number | null; name: string }
-  ar: { foreign: number; currency: string; rate: number; twd: number; fromRecord: boolean; receivableStatus: number | null }
-  ap: { twd: number; items: { poNo: string; supplierName: string; amountTWD: number; currency: string; matchType: string }[] }
+  ar: { foreign: number; currency: string; rate: number; twd: number; fromRecord: boolean; receivableStatus: number | null; collectedTWD: number | null; fxGainLoss: number | null }
+  ap: { twd: number; items: { poNo: string; supplierName: string; amountTWD: number; currency: string; matchType: string }[]; matchType: string }
   gross: { twd: number; pct: number | null }
+  realGross: { twd: number | null; totalProfit: number | null }
   hasPoLink: boolean
   warnings: string[]
   unmatchedOrders: string[]
@@ -90,7 +105,7 @@ type EstimateRow = {
 
 export default function FinancePage() {
   const toOrgPath = useOrgPath()
-  const [tab, setTab] = useState<'pay' | 'rec' | 'est'>('pay')
+  const [tab, setTab] = useState<'pay' | 'rec' | 'est' | 'recon'>('pay')
   const [payFilter, setPayFilter] = useState('')
   const [recFilter, setRecFilter] = useState('')
   const [payables, setPayables] = useState<Payable[]>([])
@@ -100,6 +115,8 @@ export default function FinancePage() {
   const [backfillResult, setBackfillResult] = useState<{ ar: { created: number; skipped: number }; ap: { created: number; skipped: number } } | null>(null)
   const [estimates, setEstimates] = useState<EstimateRow[]>([])
   const [estimatesLoaded, setEstimatesLoaded] = useState(false)
+  const [recon, setRecon] = useState<ReconRow[]>([])
+  const [reconLoaded, setReconLoaded] = useState(false)
 
   // 付款對話框
   const [payDialog, setPayDialog] = useState<Payable | null>(null)
@@ -126,6 +143,8 @@ export default function FinancePage() {
   const [recRate, setRecRate] = useState('')
   const [recDateInput, setRecDateInput] = useState('')
   const [recNote, setRecNote] = useState('')
+  // 同批匯款
+  const [batchIds, setBatchIds] = useState<number[]>([])  // 其他一起收款的 receivable id
 
   async function loadEstimates() {
     if (estimatesLoaded) return
@@ -134,9 +153,17 @@ export default function FinancePage() {
     setEstimatesLoaded(true)
   }
 
-  function switchTab(t: 'pay' | 'rec' | 'est') {
+  async function loadRecon() {
+    if (reconLoaded) return
+    const data = await fetch('/api/finance/reconciliation').then(r => r.json())
+    setRecon(data)
+    setReconLoaded(true)
+  }
+
+  function switchTab(t: 'pay' | 'rec' | 'est' | 'recon') {
     setTab(t)
     if (t === 'est') loadEstimates()
+    if (t === 'recon') loadRecon()
   }
 
   async function handleBackfill() {
@@ -233,18 +260,31 @@ export default function FinancePage() {
   async function submitRec() {
     if (!recDialog) return
     setSaving(true)
+    const rate = Number(recRate)
+    const date = recDateInput || undefined
+    const note = recNote || undefined
+
+    // 主單：使用者填的金額
     await fetch(`/api/finance/receivables/${recDialog.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        collectedForeign: Number(recForeign),
-        rateAtCollection: Number(recRate),
-        collectedAt: recDateInput || undefined,
-        note: recNote || undefined,
-      }),
+      body: JSON.stringify({ collectedForeign: Number(recForeign), rateAtCollection: rate, collectedAt: date, note }),
     })
+
+    // 同批：各自用自己的 amountForeign 作為實收金額，套同一匯率
+    for (const id of batchIds) {
+      const r = receivables.find(r => r.id === id)
+      if (!r) continue
+      await fetch(`/api/finance/receivables/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ collectedForeign: Number(r.amountForeign), rateAtCollection: rate, collectedAt: date, note }),
+      })
+    }
+
     setSaving(false)
     setRecDialog(null)
+    setBatchIds([])
     load()
   }
 
@@ -312,9 +352,15 @@ export default function FinancePage() {
           className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === 'est' ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}>
           毛利估算
         </button>
+        <button onClick={() => switchTab('recon')}
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === 'recon' ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}>
+          出貨勾稽
+        </button>
       </div>
 
-      {tab === 'est' ? (
+      {tab === 'recon' ? (
+        <ReconTab rows={recon} onRefresh={() => { setReconLoaded(false); loadRecon() }} />
+      ) : tab === 'est' ? (
         <EstimatesTab estimates={estimates} loaded={estimatesLoaded} onRefresh={() => { setEstimatesLoaded(false); loadEstimates() }} />
       ) : loading ? <div className="text-sm text-gray-400">載入中…</div> : tab === 'pay' ? (
         <>
@@ -402,6 +448,7 @@ export default function FinancePage() {
                   <th className="text-left px-4 py-3 font-medium text-gray-600">出貨日</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">到期日</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-600">應收 (TWD)</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-600">實收 (TWD)</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-600">報帳匯率</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-600">押匯匯率</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-600">匯差 (TWD)</th>
@@ -687,60 +734,125 @@ export default function FinancePage() {
       })()}
 
       {/* 收款對話框 */}
-      {recDialog && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-96">
-            <h2 className="text-base font-semibold mb-1">記錄收款</h2>
-            <p className="text-sm text-gray-500 mb-4">
-              {recDialog.customer?.name ?? recDialog.customerName}
-              {recDialog.shipment.pis.length > 0 && (
-                <span className="ml-1 text-gray-500">— {recDialog.shipment.pis.map(sp => sp.pi.piNo).join(' / ')}</span>
-              )}
-            </p>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">實收歐元金額（EUR）</label>
-                <input type="number" step="0.01" value={recForeign} onChange={e => setRecForeign(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-                <p className="text-xs text-gray-400 mt-1">
-                  CI 報帳：TWD {fmt(String(rTWD(recDialog)), 0)} × {fmt(recDialog.rateAtInvoice, 4)} = EUR {(rTWD(recDialog) * Number(recDialog.rateAtInvoice)).toFixed(2)}
-                </p>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">押匯匯率（EUR → TWD）</label>
-                <input type="number" step="0.0001" value={recRate} onChange={e => setRecRate(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="如：36.00" />
-                <p className="text-xs text-gray-400 mt-1">報帳匯率（TWD→EUR）：{fmt(recDialog.rateAtInvoice, 4)}，倒算 EUR→TWD ≈ {recDialog.rateAtInvoice ? (1 / Number(recDialog.rateAtInvoice)).toFixed(2) : '—'}</p>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">收款日期</label>
-                <input type="date" value={recDateInput} onChange={e => setRecDateInput(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">備註</label>
-                <input type="text" value={recNote} onChange={e => setRecNote(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="押匯銀行、備忘…" />
-              </div>
-              {recForeign && recRate && (
-                <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
-                  <div>實收台幣：TWD {(Number(recForeign) * Number(recRate)).toFixed(0)}</div>
-                  <div>原始應收：TWD {fmt(String(rTWD(recDialog)), 0)}</div>
-                  <div className={Number(recForeign) * Number(recRate) >= rTWD(recDialog) ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                    匯差：TWD {(Number(recForeign) * Number(recRate) - rTWD(recDialog)).toFixed(0)}
-                  </div>
+      {recDialog && (() => {
+        // 可加入同批的：未收清、非當前這張
+        const batchCandidates = receivables.filter(r =>
+          r.id !== recDialog.id && r.status < 2
+        )
+        const batchSelected = batchCandidates.filter(r => batchIds.includes(r.id))
+        const allIds = [recDialog.id, ...batchIds]
+        const totalForeign = Number(recDialog.amountForeign) +
+          batchSelected.reduce((s, r) => s + Number(r.amountForeign), 0)
+
+        return (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 overflow-y-auto py-8">
+            <div className="bg-white rounded-xl shadow-xl p-6 w-[480px] mx-4">
+              <h2 className="text-base font-semibold mb-1">記錄收款</h2>
+              <p className="text-sm text-gray-500 mb-4">
+                {recDialog.customer?.name ?? recDialog.customerName}
+                {recDialog.shipment.pis.length > 0 && (
+                  <span className="ml-1">— {recDialog.shipment.pis.map(sp => sp.pi.piNo).join(' / ')}</span>
+                )}
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">實收歐元金額（EUR）— 本張</label>
+                  <input type="number" step="0.01" value={recForeign} onChange={e => setRecForeign(e.target.value)}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
+                  <p className="text-xs text-gray-400 mt-1">
+                    應收：EUR {Number(recDialog.amountForeign).toFixed(2)}
+                  </p>
                 </div>
-              )}
-            </div>
-            <div className="flex justify-end gap-2 mt-5">
-              <button onClick={() => setRecDialog(null)} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50">取消</button>
-              <button onClick={submitRec} disabled={saving} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">
-                {saving ? '儲存中…' : '確認收款'}
-              </button>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">押匯匯率（EUR → TWD）</label>
+                  <input type="number" step="0.0001" value={recRate} onChange={e => setRecRate(e.target.value)}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="如：36.00" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">收款日期</label>
+                  <input type="date" value={recDateInput} onChange={e => setRecDateInput(e.target.value)}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">備註</label>
+                  <input type="text" value={recNote} onChange={e => setRecNote(e.target.value)}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="押匯銀行、備忘…" />
+                </div>
+
+                {/* 同批匯款 */}
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="bg-gray-50 px-3 py-2 flex items-center justify-between">
+                    <span className="text-xs font-medium text-gray-600">同批匯款（選填）</span>
+                    {batchIds.length > 0 && (
+                      <span className="text-xs text-blue-600">已選 {batchIds.length} 張，合計 EUR {totalForeign.toFixed(2)}</span>
+                    )}
+                  </div>
+                  <div className="max-h-48 overflow-y-auto">
+                    {batchCandidates.length === 0 ? (
+                      <p className="text-xs text-gray-400 px-3 py-3">目前無其他待收款的出貨單</p>
+                    ) : (
+                      batchCandidates.map(r => {
+                        const checked = batchIds.includes(r.id)
+                        const custName = r.customer?.shortName ?? r.customer?.name ?? r.customerName ?? '—'
+                        return (
+                          <label key={r.id} className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-blue-50 border-b border-gray-50 last:border-0 ${checked ? 'bg-blue-50' : ''}`}>
+                            <input type="checkbox" checked={checked}
+                              onChange={e => setBatchIds(prev => e.target.checked ? [...prev, r.id] : prev.filter(id => id !== r.id))}
+                              className="rounded border-gray-300 text-blue-600" />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-xs font-medium text-gray-800">{r.shipment.shipmentNo}</span>
+                                <span className="text-xs text-gray-400">{custName}</span>
+                              </div>
+                              <div className="text-xs text-gray-400 mt-0.5">
+                                {r.shipment.pis.map(sp => sp.pi.piNo).join(' / ')}
+                                <span className="ml-2 font-mono">EUR {Number(r.amountForeign).toFixed(2)}</span>
+                              </div>
+                            </div>
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${STATUS_REC_COLOR[r.status]}`}>{STATUS_REC[r.status]}</span>
+                          </label>
+                        )
+                      })
+                    )}
+                  </div>
+                  {batchIds.length > 0 && (
+                    <div className="bg-blue-50 px-3 py-2 border-t border-blue-100 text-xs text-blue-700">
+                      同批各出貨單將套用相同押匯匯率，各自以其應收金額標為已收清
+                    </div>
+                  )}
+                </div>
+
+                {recForeign && recRate && (
+                  <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600 space-y-1">
+                    <div className="flex justify-between">
+                      <span>本張實收 TWD</span>
+                      <span className="font-mono">{(Number(recForeign) * Number(recRate)).toLocaleString('zh-TW', { maximumFractionDigits: 0 })}</span>
+                    </div>
+                    {batchIds.length > 0 && (
+                      <div className="flex justify-between text-blue-600">
+                        <span>同批合計應收 EUR</span>
+                        <span className="font-mono">{totalForeign.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className={`flex justify-between font-medium ${Number(recForeign) * Number(recRate) >= rTWD(recDialog) ? 'text-green-600' : 'text-red-600'}`}>
+                      <span>本張匯差 TWD</span>
+                      <span className="font-mono">{(Number(recForeign) * Number(recRate) - rTWD(recDialog)).toLocaleString('zh-TW', { maximumFractionDigits: 0 })}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end gap-2 mt-5">
+                <button onClick={() => { setRecDialog(null); setBatchIds([]) }}
+                  className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50">取消</button>
+                <button onClick={submitRec} disabled={saving}
+                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">
+                  {saving ? '儲存中…' : batchIds.length > 0 ? `確認收款（共 ${allIds.length} 張）` : '確認收款'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
@@ -758,21 +870,26 @@ function EstimatesTab({
   const totalApTWD = estimates.reduce((s, r) => s + r.ap.twd, 0)
   const totalGross = totalArTWD - totalApTWD
   const avgGrossPct = totalArTWD > 0 ? (totalGross / totalArTWD) * 100 : 0
+  const totalCollectedTWD = estimates.reduce((s, r) => s + (r.ar.collectedTWD ?? 0), 0)
+  const totalFxGainLoss = estimates.reduce((s, r) => s + (r.ar.fxGainLoss ?? 0), 0)
+  const collectedRows = estimates.filter(r => r.ar.collectedTWD != null && r.ap.twd > 0)
+  const totalRealGross = collectedRows.reduce((s, r) => s + (r.realGross.twd ?? 0), 0)
+  const totalTotalProfit = collectedRows.reduce((s, r) => s + (r.realGross.totalProfit ?? 0), 0)
 
   return (
     <div>
       {/* 摘要 */}
-      <div className="grid grid-cols-4 gap-4 mb-5">
+      <div className="grid grid-cols-4 gap-4 mb-3">
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-xs text-blue-500 font-medium">估算應收合計（TWD）</p>
+          <p className="text-xs text-blue-500 font-medium">應收合計（TWD）</p>
           <p className="text-xl font-bold text-blue-700 mt-1">{totalArTWD.toLocaleString('zh-TW', { maximumFractionDigits: 0 })}</p>
         </div>
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <p className="text-xs text-amber-500 font-medium">估算應付合計（TWD）</p>
+          <p className="text-xs text-amber-500 font-medium">應付合計（TWD）</p>
           <p className="text-xl font-bold text-amber-700 mt-1">{totalApTWD.toLocaleString('zh-TW', { maximumFractionDigits: 0 })}</p>
         </div>
         <div className={`border rounded-lg p-4 ${totalGross >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-          <p className={`text-xs font-medium ${totalGross >= 0 ? 'text-green-600' : 'text-red-600'}`}>估算毛利合計（TWD）</p>
+          <p className={`text-xs font-medium ${totalGross >= 0 ? 'text-green-600' : 'text-red-600'}`}>估算毛利（TWD）</p>
           <p className={`text-xl font-bold mt-1 ${totalGross >= 0 ? 'text-green-700' : 'text-red-700'}`}>
             {totalGross >= 0 ? '+' : ''}{totalGross.toLocaleString('zh-TW', { maximumFractionDigits: 0 })}
           </p>
@@ -782,6 +899,34 @@ function EstimatesTab({
           <p className="text-xl font-bold text-gray-700 mt-1">{avgGrossPct.toFixed(1)}%</p>
         </div>
       </div>
+      {/* 已收款摘要 */}
+      {collectedRows.length > 0 && (
+        <div className="grid grid-cols-4 gap-4 mb-5">
+          <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
+            <p className="text-xs text-teal-600 font-medium">實收合計（TWD）</p>
+            <p className="text-xl font-bold text-teal-700 mt-1">{totalCollectedTWD.toLocaleString('zh-TW', { maximumFractionDigits: 0 })}</p>
+            <p className="text-xs text-teal-400 mt-1">{collectedRows.length} 筆已收款</p>
+          </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <p className="text-xs text-amber-500 font-medium">已收應付合計（TWD）</p>
+            <p className="text-xl font-bold text-amber-700 mt-1">{collectedRows.reduce((s, r) => s + r.ap.twd, 0).toLocaleString('zh-TW', { maximumFractionDigits: 0 })}</p>
+          </div>
+          <div className={`border rounded-lg p-4 ${totalRealGross >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+            <p className={`text-xs font-medium ${totalRealGross >= 0 ? 'text-green-600' : 'text-red-600'}`}>實際毛利（TWD）</p>
+            <p className={`text-xl font-bold mt-1 ${totalRealGross >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+              {totalRealGross >= 0 ? '+' : ''}{totalRealGross.toLocaleString('zh-TW', { maximumFractionDigits: 0 })}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">實收 − 應付</p>
+          </div>
+          <div className={`border rounded-lg p-4 ${totalTotalProfit >= 0 ? 'bg-green-100 border-green-300' : 'bg-red-50 border-red-200'}`}>
+            <p className={`text-xs font-medium ${totalTotalProfit >= 0 ? 'text-green-700' : 'text-red-600'}`}>全部毛利（含匯差）</p>
+            <p className={`text-xl font-bold mt-1 ${totalTotalProfit >= 0 ? 'text-green-800' : 'text-red-700'}`}>
+              {totalTotalProfit >= 0 ? '+' : ''}{totalTotalProfit.toLocaleString('zh-TW', { maximumFractionDigits: 0 })}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">毛利 + 匯差 {totalFxGainLoss !== 0 ? `(${totalFxGainLoss >= 0 ? '+' : ''}${totalFxGainLoss.toLocaleString('zh-TW', { maximumFractionDigits: 0 })})` : ''}</p>
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center justify-between mb-3">
         <p className="text-xs text-gray-400">以出貨單為基準，從銷售訂單→採購訂單鏈估算。無採購訂單連結的出貨顯示為「—」。</p>
@@ -795,19 +940,21 @@ function EstimatesTab({
               <th className="text-left px-4 py-3 font-medium text-gray-600">出貨單號</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">客戶</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">出貨日</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-600">估算應收 (TWD)</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-600">估算應付 (TWD)</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-600">毛利 (TWD)</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-600">毛利率</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-600">應收 (TWD)</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-600">實收 (TWD)</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-600">應付 (TWD)</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-600">毛利</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-600">匯差</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-600">全部毛利</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">供應商</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {!loaded && (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">載入中…</td></tr>
+              <tr><td colSpan={11} className="px-4 py-8 text-center text-gray-400">載入中…</td></tr>
             )}
             {loaded && estimates.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">無出貨資料</td></tr>
+              <tr><td colSpan={11} className="px-4 py-8 text-center text-gray-400">無出貨資料</td></tr>
             )}
             {estimates.map(r => {
               const grossColor = r.gross.twd >= 0 ? 'text-green-700' : 'text-red-600'
@@ -832,22 +979,38 @@ function EstimatesTab({
                         : <span className="text-gray-400">{r.customer.name}</span>}
                     </td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(r.actualShipDate)}</td>
-                    <td className="px-4 py-3 text-right font-mono">
-                      <span title={`${r.ar.foreign.toFixed(2)} ${r.ar.currency} × ${r.ar.rate}`}>
+                    <td className="px-4 py-3 text-right font-mono text-xs">
+                      <span title={`${r.ar.foreign.toFixed(2)} ${r.ar.currency}`}>
                         {r.ar.twd > 0 ? r.ar.twd.toLocaleString('zh-TW', { maximumFractionDigits: 0 }) : '—'}
                       </span>
-                      {r.ar.fromRecord && <span className="ml-1 text-xs text-gray-400">✓</span>}
+                      {r.ar.fromRecord && <span className="ml-1 text-gray-300">✓</span>}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono">
+                    <td className="px-4 py-3 text-right font-mono text-xs text-teal-700">
+                      {r.ar.collectedTWD != null
+                        ? r.ar.collectedTWD.toLocaleString('zh-TW', { maximumFractionDigits: 0 })
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono text-xs">
                       {r.ap.twd > 0 ? r.ap.twd.toLocaleString('zh-TW', { maximumFractionDigits: 0 }) : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className={`px-4 py-3 text-right font-mono font-medium ${r.ap.twd > 0 ? grossColor : 'text-gray-300'}`}>
-                      {r.ap.twd > 0
-                        ? `${r.gross.twd >= 0 ? '+' : ''}${r.gross.twd.toLocaleString('zh-TW', { maximumFractionDigits: 0 })}`
-                        : '—'}
+                    <td className={`px-4 py-3 text-right font-mono text-xs font-medium ${r.realGross.twd != null ? (r.realGross.twd >= 0 ? 'text-green-700' : 'text-red-600') : r.ap.twd > 0 ? grossColor : 'text-gray-300'}`}>
+                      {r.realGross.twd != null
+                        ? `${r.realGross.twd >= 0 ? '+' : ''}${r.realGross.twd.toLocaleString('zh-TW', { maximumFractionDigits: 0 })}`
+                        : r.ap.twd > 0
+                          ? <span className="text-gray-400" title="估算">{r.gross.twd >= 0 ? '+' : ''}{r.gross.twd.toLocaleString('zh-TW', { maximumFractionDigits: 0 })} 估</span>
+                          : '—'}
                     </td>
-                    <td className={`px-4 py-3 text-right text-xs ${r.ap.twd > 0 ? grossColor : 'text-gray-300'}`}>
-                      {r.gross.pct != null && r.ap.twd > 0 ? `${r.gross.pct.toFixed(1)}%` : '—'}
+                    <td className="px-4 py-3 text-right font-mono text-xs">
+                      {r.ar.fxGainLoss != null
+                        ? <span className={r.ar.fxGainLoss >= 0 ? 'text-green-600' : 'text-red-500'}>
+                            {r.ar.fxGainLoss >= 0 ? '+' : ''}{r.ar.fxGainLoss.toLocaleString('zh-TW', { maximumFractionDigits: 0 })}
+                          </span>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className={`px-4 py-3 text-right font-mono text-xs font-bold ${r.realGross.totalProfit != null ? (r.realGross.totalProfit >= 0 ? 'text-green-800' : 'text-red-700') : 'text-gray-300'}`}>
+                      {r.realGross.totalProfit != null
+                        ? `${r.realGross.totalProfit >= 0 ? '+' : ''}${r.realGross.totalProfit.toLocaleString('zh-TW', { maximumFractionDigits: 0 })}`
+                        : '—'}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-500">
                       {r.ap.items.length > 0
@@ -857,7 +1020,7 @@ function EstimatesTab({
                   </tr>
                   {isExpanded && (
                     <tr key={`${r.shipmentId}-detail`} className="bg-gray-50">
-                      <td colSpan={8} className="px-6 py-4 text-xs">
+                      <td colSpan={11} className="px-6 py-4 text-xs">
                         <div className="grid grid-cols-2 gap-6">
                           {/* AR 明細 */}
                           <div>
@@ -870,7 +1033,12 @@ function EstimatesTab({
                           </div>
                           {/* AP 明細 */}
                           <div>
-                            <p className="font-semibold text-amber-700 mb-2">應付明細（AP）</p>
+                            <p className="font-semibold text-amber-700 mb-2">
+                            應付明細（AP）
+                            <span className="ml-2 text-xs font-normal text-gray-400">
+                              {r.ap.matchType?.startsWith('item-level') ? `✓ 品項比對 ${r.ap.matchType.match(/\(.*\)/)?.[0] ?? ''}` : '整張 PO 金額'}
+                            </span>
+                          </p>
                             {r.ap.items.length > 0 ? (
                               <table className="w-full text-xs mb-2">
                                 <thead><tr className="text-gray-400">
@@ -904,6 +1072,152 @@ function EstimatesTab({
                             )}
                           </div>
                         </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function ReconTab({ rows, onRefresh }: { rows: ReconRow[]; onRefresh: () => void }) {
+  const [expandedPi, setExpandedPi] = useState<number | null>(null)
+
+  const total = rows.length
+  const done = rows.filter(r => r.piStatus === 'done').length
+  const partial = rows.filter(r => r.piStatus === 'partial').length
+  const pending = rows.filter(r => r.piStatus === 'pending').length
+
+  const statusLabel = (s: 'done' | 'partial' | 'pending') =>
+    s === 'done' ? '已完成' : s === 'partial' ? '部分出貨' : '待出貨'
+  const statusColor = (s: 'done' | 'partial' | 'pending') =>
+    s === 'done'
+      ? 'bg-green-100 text-green-700'
+      : s === 'partial'
+      ? 'bg-orange-100 text-orange-700'
+      : 'bg-gray-100 text-gray-500'
+  const itemStatusColor = (s: 'done' | 'partial' | 'pending') =>
+    s === 'done' ? 'text-green-600' : s === 'partial' ? 'text-orange-500' : 'text-gray-400'
+
+  const fmt2 = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+  return (
+    <div>
+      {/* 摘要卡 */}
+      <div className="flex items-center gap-4 mb-4">
+        <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-sm">
+          <span className="text-gray-400 mr-1">全部</span>
+          <span className="font-bold text-gray-700">{total}</span>
+        </div>
+        <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2 text-sm">
+          <span className="text-green-500 mr-1">已完成</span>
+          <span className="font-bold text-green-700">{done}</span>
+        </div>
+        <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-2 text-sm">
+          <span className="text-orange-400 mr-1">部分出貨</span>
+          <span className="font-bold text-orange-600">{partial}</span>
+        </div>
+        <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-sm">
+          <span className="text-gray-400 mr-1">待出貨</span>
+          <span className="font-bold text-gray-600">{pending}</span>
+        </div>
+        <button onClick={onRefresh} className="ml-auto text-xs px-3 py-1.5 rounded border border-gray-200 text-gray-500 hover:bg-gray-50">
+          重新整理
+        </button>
+      </div>
+
+      {/* 主表格 */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 w-32">PI 號</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">客戶</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">關聯出貨單</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-600">承諾 EUR</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-600">已出 EUR</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-600">待出 EUR</th>
+              <th className="text-center px-4 py-3 font-medium text-gray-600 w-24">狀態</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {rows.length === 0 && (
+              <tr><td colSpan={7} className="text-center py-10 text-gray-400">無資料</td></tr>
+            )}
+            {rows.map(r => {
+              const isExpanded = expandedPi === r.piId
+              return (
+                <>
+                  <tr
+                    key={r.piId}
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => setExpandedPi(isExpanded ? null : r.piId)}
+                  >
+                    <td className="px-4 py-3 font-mono text-xs text-blue-600">{r.piNo}</td>
+                    <td className="px-4 py-3 text-gray-700">{r.customer}</td>
+                    <td className="px-4 py-3">
+                      {r.shipments.length === 0
+                        ? <span className="text-gray-300 text-xs">無</span>
+                        : r.shipments.map(s => (
+                          <span key={s.shipmentNo} className="inline-block mr-2 text-xs font-mono text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">
+                            {s.shipmentNo}
+                          </span>
+                        ))
+                      }
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono text-gray-700">{fmt2(r.summary.totalCommittedEUR)}</td>
+                    <td className="px-4 py-3 text-right font-mono text-green-700">{fmt2(r.summary.totalShippedEUR)}</td>
+                    <td className="px-4 py-3 text-right font-mono text-orange-600">
+                      {r.summary.totalRemainingEUR > 0 ? fmt2(r.summary.totalRemainingEUR) : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusColor(r.piStatus)}`}>
+                        {statusLabel(r.piStatus)}
+                      </span>
+                    </td>
+                  </tr>
+                  {isExpanded && (
+                    <tr key={`${r.piId}-detail`} className="bg-gray-50">
+                      <td colSpan={7} className="px-6 py-4">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="text-gray-400 border-b border-gray-200">
+                              <th className="text-left pb-1 font-medium">SKU</th>
+                              <th className="text-left pb-1 font-medium pl-2">品名</th>
+                              <th className="text-right pb-1 font-medium">承諾數量</th>
+                              <th className="text-right pb-1 font-medium">已出數量</th>
+                              <th className="text-right pb-1 font-medium">待出數量</th>
+                              <th className="text-right pb-1 font-medium">承諾 EUR</th>
+                              <th className="text-right pb-1 font-medium">已出 EUR</th>
+                              <th className="text-center pb-1 font-medium">狀態</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {r.items.map(item => (
+                              <tr key={item.sku} className="border-t border-gray-100">
+                                <td className="py-1 font-mono text-gray-600">{item.sku}</td>
+                                <td className="py-1 pl-2 text-gray-700">{item.name}</td>
+                                <td className="py-1 text-right text-gray-600">{item.committed.toLocaleString()}</td>
+                                <td className="py-1 text-right text-green-600">{item.shipped.toLocaleString()}</td>
+                                <td className="py-1 text-right text-orange-500">
+                                  {item.remaining > 0 ? item.remaining.toLocaleString() : <span className="text-gray-300">—</span>}
+                                </td>
+                                <td className="py-1 text-right font-mono text-gray-600">{fmt2(item.committedEUR)}</td>
+                                <td className="py-1 text-right font-mono text-green-600">{fmt2(item.shippedEUR)}</td>
+                                <td className="py-1 text-center">
+                                  <span className={`font-medium ${itemStatusColor(item.status)}`}>
+                                    {statusLabel(item.status)}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </td>
                     </tr>
                   )}
