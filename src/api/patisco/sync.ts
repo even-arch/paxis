@@ -1497,8 +1497,11 @@ async function relinkPass(prisma: PrismaClient): Promise<{ fixed: number; detail
       if (!link.pi) continue
       // 優先：PO.slsPiId FK
       po = await prisma.pO.findFirst({ where: { slsPiId: link.pi.id }, select: { id: true } })
-      // 次要：poNo = piNo 字串比對
+      // 次要：poNo 精確比對
       if (!po) po = await prisma.pO.findFirst({ where: { poNo: link.pi.piNo }, select: { id: true } })
+      // 三級：模糊前綴比對（poNo 以 piNo 為前綴，含 -1/-2/-A 等拆單後綴）
+      if (!po) po = await prisma.pO.findFirst({ where: { poNo: { startsWith: link.pi.piNo + '-' } }, select: { id: true } })
+      if (!po) po = await prisma.pO.findFirst({ where: { poNo: { startsWith: link.pi.piNo, not: link.pi.piNo } }, select: { id: true } })
       if (po) break
     }
     if (!po) continue

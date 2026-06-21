@@ -109,7 +109,7 @@ export default async function ShipmentDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {(() => {
+      {await (async () => {
         // 優先用 SLS_PI_Link junction table；若空（舊資料或 UPS 流程漏建），
         // 從 items.pi 推導唯一 PI 清單作為 fallback
         type PiEntry = { piId: number; piNo: string; orderId?: number | null; orderNo?: string | null; etd?: Date | null; poOrders: { id: number; poNo: string; supplier: { shortName: string | null; name: string } }[] }
@@ -131,6 +131,25 @@ export default async function ShipmentDetailPage({ params }: Props) {
           }
         }
         if (piList.length === 0) return null
+
+        // 模糊補查：poNo 以 piNo 為前綴（含精確相等），補上 slsPiId FK 沒有抓到的拆單 PO
+        // 例如 PI "E2620048" → 可對應 PO "E2620048-1"、"E2620048-2"、"E2620048-A"
+        const fuzzyPOs = await prisma.pO.findMany({
+          where: {
+            OR: piList.map(p => ({ poNo: { startsWith: p.piNo } })),
+            slsPiId: null,  // 已有 FK 連結的不重複撈
+          },
+          select: { id: true, poNo: true, slsPiId: true, supplier: { select: { shortName: true, name: true } } },
+        })
+        for (const pi of piList) {
+          const matched = fuzzyPOs.filter(po => po.poNo === pi.piNo || po.poNo.startsWith(pi.piNo + '-') || /^[A-Z]$/.test(po.poNo.slice(pi.piNo.length)))
+          for (const po of matched) {
+            if (!pi.poOrders.find(p => p.id === po.id)) {
+              pi.poOrders.push({ id: po.id, poNo: po.poNo, supplier: po.supplier })
+            }
+          }
+        }
+
         const missingPO = piList.filter(p => p.poOrders.length === 0)
         return (
           <div className="bg-white rounded-lg shadow p-5 mb-6">
