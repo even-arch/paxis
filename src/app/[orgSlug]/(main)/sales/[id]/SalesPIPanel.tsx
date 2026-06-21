@@ -189,7 +189,9 @@ export default function SalesPIPanel({ orderId, orderStatus, items, pis }: Props
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="font-mono font-medium text-gray-800">{pi.piNo}</span>
-                  {pi.status === 0
+                  {pi.status === 2
+                    ? <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded">已出貨</span>
+                    : pi.status === 0
                     ? <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">有效</span>
                     : <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded">已取消</span>
                   }

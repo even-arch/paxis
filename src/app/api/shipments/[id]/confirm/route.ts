@@ -177,6 +177,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
     // ── 3. FIN_Payable（AP）：找出此出貨關聯的 PO_Receipt ────────────────
     // 路徑：SLS_PI → SLS_Order → PO_Order（salesOrderId）→ PO_Receipt
+    // 貿易商模式：若 PO_Order 沒有 PO_Receipt，自動建立一筆虛擬入庫記錄
     const slsOrderIds = shipment.pis
       .map(sp => sp.pi.order?.id)
       .filter((id): id is number => id != null)
@@ -191,8 +192,23 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       })
 
       for (const po of poOrders) {
-        const receipt = po.receipts[0]
-        if (!receipt) { result.apSkipped++; continue }
+        let receipt = po.receipts[0]
+
+        // 貿易商模式：沒有入庫記錄時，以出貨日自動建立虛擬 PO_Receipt
+        if (!receipt) {
+          const receiptNo = `VIRTUAL-${shipment.shipmentNo}-${po.id}`
+          receipt = await prisma.pO_Receipt.create({
+            data: {
+              orderId: po.id,
+              receiptNo,
+              receiptDate: shipment.actualShipDate ?? new Date(),
+              source: 'MANUAL',
+              performedBy,
+              note: `貿易商出貨自動建立（出貨單 ${shipment.shipmentNo}）`,
+            },
+          })
+        }
+
         const existing = await prisma.fIN_Payable.findUnique({ where: { receiptId: receipt.id } })
         if (existing) continue
 
@@ -210,6 +226,15 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
         })
         result.apCreated++
       }
+    }
+
+    // ── 4. SLS_PI.status = 2（已出貨）────────────────────────────────────
+    const piIds = shipment.pis.map(sp => sp.pi.id)
+    if (piIds.length > 0) {
+      await prisma.sLS_PI.updateMany({
+        where: { id: { in: piIds }, status: 0 },
+        data: { status: 2 },
+      })
     }
 
   } catch (e) {

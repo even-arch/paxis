@@ -49,6 +49,8 @@ export default async function PIDetailPage({ params }: Props) {
           <div className="flex items-center gap-3 mt-1">
             {pi.status === 1
               ? <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">已取消</span>
+              : pi.status === 2
+              ? <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-700">已出貨</span>
               : <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">有效</span>
             }
             <span className="text-xs text-gray-400">來源：Patisco</span>
