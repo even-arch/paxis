@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
     data: {
       poNo: body.poNo?.trim() || generatePoNo(),
       supplierId: Number(body.supplierId),
+      slsPiId: body.slsPiId ? Number(body.slsPiId) : null,
       salesOrderId: body.salesOrderId ? Number(body.salesOrderId) : null,
       status: 0,
       sourceType: body.sourceType !== undefined ? Number(body.sourceType) : 0,

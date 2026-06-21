@@ -46,7 +46,8 @@ export async function GET() {
 
   const allPOs = await prisma.pO_Order.findMany({
     select: {
-      id: true, poNo: true, totalAmount: true, currencyCode: true, exchangeRate: true, salesOrderId: true,
+      id: true, poNo: true, totalAmount: true, currencyCode: true, exchangeRate: true,
+      slsPiId: true, salesOrderId: true,
       items: { select: { unitPrice: true, quantity: true } },
     },
   })
@@ -57,16 +58,17 @@ export async function GET() {
     return str.split(' ')[0]
   }
 
+  const poByPiId = new Map<number, typeof allPOs[0]>()
   const poBySlsId = new Map<number, typeof allPOs>()
   const poByPoNo = new Map<string, typeof allPOs[0]>()
   for (const po of allPOs) {
+    if (po.slsPiId) poByPiId.set(po.slsPiId, po)
     if (po.salesOrderId) {
       const arr = poBySlsId.get(po.salesOrderId) ?? []
       arr.push(po)
       poBySlsId.set(po.salesOrderId, arr)
     }
     poByPoNo.set(po.poNo, po)
-    // 同時以 extractDocNo 結果建索引，讓 "E2620037 YABAN" 也能被 "E2620037" 查到
     const docNo = extractDocNo(po.poNo)
     if (docNo !== po.poNo) poByPoNo.set(docNo, po)
   }
@@ -102,23 +104,37 @@ export async function GET() {
     }, 0)
 
     // AP = PO_Order.totalAmount（付給供應商的採購金額）
-    // 找法：SLS_PI → SLS_Order → PO_Order（via salesOrderId 或 poNo = orderNo）
+    // 主路徑A：PO.slsPiId = SLS_PI.id；主路徑B：PO.poNo = SLS_PI.piNo；次路徑：salesOrderId
     let apTWD = 0
-    const unmatchedPIs: string[] = []   // 找不到對應 PO 的 PI
+    const unmatchedPIs: string[] = []
     const nullAmountPos: string[] = []
 
     for (const sp of s.pis) {
+      // 主路徑A
+      const byPiId = poByPiId.get(sp.pi.id)
+      if (byPiId) {
+        const amt = poAmountTWD(byPiId)
+        if (amt <= 0) nullAmountPos.push(byPiId.poNo)
+        else apTWD += amt
+        continue
+      }
+
+      // 主路徑B：piNo = poNo
+      const piDocNo = extractDocNo(sp.pi.piNo)
+      const byPiNo = poByPoNo.get(sp.pi.piNo) ?? poByPoNo.get(piDocNo)
+      if (byPiNo) {
+        const amt = poAmountTWD(byPiNo)
+        if (amt <= 0) nullAmountPos.push(byPiNo.poNo)
+        else apTWD += amt
+        continue
+      }
+
+      // 次路徑：salesOrderId
       const slsOrder = sp.pi.order
-      // 優先用 salesOrderId 連結；若 SLS_PI 沒有 orderId，嘗試用 piNo 對 poNo
       const bySlsId = slsOrder ? (poBySlsId.get(slsOrder.id) ?? []) : []
-
-      // 查詢時也套 extractDocNo，避免 "E2620037 Prime Aero" 查不到 "E2620037 YABAN"
       const lookupKey = slsOrder ? slsOrder.orderNo : sp.pi.piNo
-      const lookupDocNo = extractDocNo(lookupKey)
-      const found = poByPoNo.get(lookupKey) ?? poByPoNo.get(lookupDocNo)
-      const byNo = found ? [found] : []
-
-      const candidates = bySlsId.length > 0 ? bySlsId : byNo
+      const byNo = poByPoNo.get(lookupKey) ?? poByPoNo.get(extractDocNo(lookupKey))
+      const candidates = bySlsId.length > 0 ? bySlsId : (byNo ? [byNo] : [])
 
       if (candidates.length === 0) {
         unmatchedPIs.push(sp.pi.piNo)

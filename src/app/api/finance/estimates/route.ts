@@ -8,7 +8,7 @@ export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // 預載所有 PO_Order（含品項金額）— 用於 poNo 配對
+  // 預載所有 PO_Order（含品項金額）— 用於 slsPiId / poNo / salesOrderId 配對
   const allPOs = await prisma.pO_Order.findMany({
     select: {
       id: true,
@@ -16,6 +16,7 @@ export async function GET() {
       totalAmount: true,
       currencyCode: true,
       exchangeRate: true,
+      slsPiId: true,
       salesOrderId: true,
       supplier: { select: { id: true, name: true, shortName: true } },
       items: { select: { unitPrice: true, quantity: true } },
@@ -28,10 +29,12 @@ export async function GET() {
     return str.split(' ')[0]
   }
 
-  // 建立兩個查詢 map：salesOrderId → PO，及 poNo → PO（含 extractDocNo 索引）
+  // 建立三個查詢 map：slsPiId → PO（主）、salesOrderId → PO（次）、poNo → PO（備援）
+  const poByPiId = new Map<number, typeof allPOs[0]>()
   const poBySlsId = new Map<number, typeof allPOs>()
   const poByPoNo = new Map<string, typeof allPOs[0]>()
   for (const po of allPOs) {
+    if (po.slsPiId) poByPiId.set(po.slsPiId, po)
     if (po.salesOrderId) {
       const arr = poBySlsId.get(po.salesOrderId) ?? []
       arr.push(po)
@@ -137,55 +140,64 @@ export async function GET() {
     }
 
     // ── AP：三層 fallback ──────────────────────────────────────────────────
-    // 1. salesOrderId 直連（最準確）
-    // 2. poNo = SLS_Order.orderNo（大多數 Patisco 資料）
-    // 3. 找不到 → 顯示 —
+    // 主路徑A：PO.slsPiId = SLS_PI.id（正式 FK，貿易商模式核心連結）
+    // 主路徑B：PO.poNo = SLS_PI.piNo（號碼一致時的 fallback）
+    // 次路徑：PO.salesOrderId = SLS_Order.id（有 SLS_Order 連結時補充）
     const poMap = new Map<number, { poNo: string; supplierName: string; amountTWD: number; currency: string; matchType: string }>()
 
     for (const sp of s.pis) {
-      const slsOrder = sp.pi.order
-
-      if (!slsOrder) {
-        // standalone PI（Patisco 流程）：直接用 piNo 對 poNo
-        const piDocNo = extractDocNo(sp.pi.piNo)
-        const po = poByPoNo.get(sp.pi.piNo) ?? poByPoNo.get(piDocNo)
-        if (po && !poMap.has(po.id)) {
-          poMap.set(po.id, {
-            poNo: po.poNo,
-            supplierName: po.supplier.shortName ?? po.supplier.name,
-            amountTWD: poAmountTWD(po),
-            currency: po.currencyCode,
-            matchType: 'byPiNo',
-          })
-        }
+      // 主路徑A：slsPiId 直連
+      const byPiId = poByPiId.get(sp.pi.id)
+      if (byPiId && !poMap.has(byPiId.id)) {
+        poMap.set(byPiId.id, {
+          poNo: byPiId.poNo,
+          supplierName: byPiId.supplier.shortName ?? byPiId.supplier.name,
+          amountTWD: poAmountTWD(byPiId),
+          currency: byPiId.currencyCode,
+          matchType: 'bySlsPiId',
+        })
         continue
       }
 
-      // fallback 1：salesOrderId
-      const bySlsId = poBySlsId.get(slsOrder.id) ?? []
-      for (const po of bySlsId) {
-        if (poMap.has(po.id)) continue
-        poMap.set(po.id, {
-          poNo: po.poNo,
-          supplierName: po.supplier.shortName ?? po.supplier.name,
-          amountTWD: poAmountTWD(po),
-          currency: po.currencyCode,
-          matchType: 'linked',
+      // 主路徑B：piNo = poNo
+      const piDocNo = extractDocNo(sp.pi.piNo)
+      const byPiNo = poByPoNo.get(sp.pi.piNo) ?? poByPoNo.get(piDocNo)
+      if (byPiNo && !poMap.has(byPiNo.id)) {
+        poMap.set(byPiNo.id, {
+          poNo: byPiNo.poNo,
+          supplierName: byPiNo.supplier.shortName ?? byPiNo.supplier.name,
+          amountTWD: poAmountTWD(byPiNo),
+          currency: byPiNo.currencyCode,
+          matchType: 'byPiNo',
         })
+        continue
       }
 
-      // fallback 2：poNo = orderNo（含 extractDocNo 模糊比對）
-      if (bySlsId.length === 0) {
-        const lookupKey = slsOrder.orderNo
-        const po = poByPoNo.get(lookupKey) ?? poByPoNo.get(extractDocNo(lookupKey))
-        if (po && !poMap.has(po.id)) {
+      // 次路徑：salesOrderId（有關聯 SLS_Order 時）
+      const slsOrder = sp.pi.order
+      if (slsOrder) {
+        const bySlsId = poBySlsId.get(slsOrder.id) ?? []
+        for (const po of bySlsId) {
+          if (poMap.has(po.id)) continue
           poMap.set(po.id, {
             poNo: po.poNo,
             supplierName: po.supplier.shortName ?? po.supplier.name,
             amountTWD: poAmountTWD(po),
             currency: po.currencyCode,
-            matchType: 'byOrderNo',
+            matchType: 'bySalesOrderId',
           })
+        }
+        if (bySlsId.length === 0) {
+          const po = poByPoNo.get(slsOrder.orderNo) ?? poByPoNo.get(extractDocNo(slsOrder.orderNo))
+          if (po && !poMap.has(po.id)) {
+            poMap.set(po.id, {
+              poNo: po.poNo,
+              supplierName: po.supplier.shortName ?? po.supplier.name,
+              amountTWD: poAmountTWD(po),
+              currency: po.currencyCode,
+              matchType: 'byOrderNo',
+            })
+          }
         }
       }
     }

@@ -182,14 +182,17 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     }
 
     // ── 3. FIN_Payable（AP）：找出此出貨關聯的 PO_Order ─────────────────
-    // 主路徑：SLS_PI.piNo → PO_Order.poNo（貿易商模式，我方 PI 號 = 對供應商採購號）
-    // 次路徑：SLS_PI → SLS_Order → PO_Order.salesOrderId（補充，有 SLS_Order 連結時用）
+    // 主路徑 A：PO_Order.slsPiId → SLS_PI.id（正式 FK，最可靠）
+    // 主路徑 B：PO_Order.poNo = SLS_PI.piNo（號碼相同時的 fallback）
+    // 次路徑：PO_Order.salesOrderId → SLS_Order（最後手段，有 SLS_Order 連結時）
+    const allPiIds = shipment.pis.map(sp => sp.pi.id)
     const allPiNos = shipment.pis.map(sp => sp.pi.piNo)
     const slsOrderIds = shipment.pis
       .map(sp => sp.pi.order?.id)
       .filter((id): id is number => id != null)
 
     const poOrderConditions: Record<string, unknown>[] = []
+    if (allPiIds.length > 0) poOrderConditions.push({ slsPiId: { in: allPiIds } })
     if (allPiNos.length > 0) poOrderConditions.push({ poNo: { in: allPiNos } })
     if (slsOrderIds.length > 0) poOrderConditions.push({ salesOrderId: { in: slsOrderIds } })
 

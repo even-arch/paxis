@@ -15,17 +15,18 @@ export default async function NewPurchasePage({ params }: { params: { orgSlug: s
       select: { id: true, name: true, sku: true, unit: true, specification: true },
       orderBy: [{ sku: 'asc' }, { name: 'asc' }],
     }),
-    // 進行中的客戶訂單（排除已完成/取消），供接單後採購選擇
-    prisma.sLS_Order.findMany({
-      where: { status: { in: [0, 1, 2, 3] } },
+    // 有效的我方 PI（供接單後採購連結用）
+    prisma.sLS_PI.findMany({
+      where: { status: { in: [0, 2] } },  // 有效或已出貨
       select: {
         id: true,
-        orderNo: true,
-        patiscoBuyerName: true,
-        customer: { select: { name: true } },
-        _count: { select: { items: true } },
+        piNo: true,
+        totalAmount: true,
+        currencyCode: true,
+        customer: { select: { name: true, shortName: true } },
+        order: { select: { id: true, orderNo: true } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { performedAt: 'desc' },
       take: 200,
     }),
   ])
@@ -42,7 +43,7 @@ export default async function NewPurchasePage({ params }: { params: { orgSlug: s
           ✨ 改用 AI 匯入
         </a>
       </div>
-      <PurchaseForm suppliers={suppliers} products={products} salesOrders={openSalesOrders} />
+      <PurchaseForm suppliers={suppliers} products={products} slsPIs={openSalesOrders} />
     </div>
   )
 }

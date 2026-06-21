@@ -8,7 +8,7 @@ import ProductPicker from '@/components/ProductPicker'
 
 type Supplier    = { id: number; name: string; shortName: string | null; currencyCode: string | null }
 type Product     = { id: number; name: string; sku: string | null; unit: string | null; specification: string | null }
-type SalesOrder  = { id: number; orderNo: string; patiscoBuyerName: string | null; customer: { name: string } | null; _count: { items: number } }
+type SlsPI       = { id: number; piNo: string; totalAmount: { toString(): string } | null; currencyCode: string | null; customer: { name: string; shortName: string | null } | null; order: { id: number; orderNo: string } | null }
 type LineItem    = { productId: string; quantity: string; unitPrice: string; unit: string; note: string }
 
 const emptyLine = (): LineItem => ({ productId: '', quantity: '', unitPrice: '', unit: '', note: '' })
@@ -16,20 +16,20 @@ const emptyLine = (): LineItem => ({ productId: '', quantity: '', unitPrice: '',
 export default function PurchaseForm({
   suppliers,
   products,
-  salesOrders,
+  slsPIs,
 }: {
   suppliers:   Supplier[]
   products:    Product[]
-  salesOrders: SalesOrder[]
+  slsPIs:      SlsPI[]
 }) {
   const router = useRouter()
   const toOrgPath = useOrgPath()
 
   const [supplierId,    setSupplierId]    = useState('')
   const [sourceType,    setSourceType]    = useState('0')
-  const [salesOrderId,  setSalesOrderId]  = useState('')   // 來源客戶訂單 ID
-  const [salesOrderNo,  setSalesOrderNo]  = useState('')   // 同步顯示用
-  const [poNoOverride,  setPoNoOverride]  = useState('')   // 用戶可自訂後綴（空=沿用銷售單號）
+  const [slsPiId,       setSlsPiId]       = useState('')   // 關聯我方 PI ID
+  const [linkedPiNo,    setLinkedPiNo]    = useState('')   // 同步顯示用
+  const [poNoOverride,  setPoNoOverride]  = useState('')   // 用戶可自訂後綴（空=沿用 PI 號）
   const [docRefNo,      setDocRefNo]      = useState('')
   const [currencyCode,  setCurrencyCode]  = useState('USD')
   const [exchangeRate,  setExchangeRate]  = useState('')
@@ -41,22 +41,22 @@ export default function PurchaseForm({
   const [error,         setError]         = useState('')
   const [saving,        setSaving]        = useState(false)
 
-  // sourceType 切換到「接單後採購」時，清除已選客戶訂單
+  // sourceType 切換到「接單後採購」時，清除已選 PI
   function handleSourceTypeChange(val: string) {
     setSourceType(val)
-    if (val !== '1') { setSalesOrderId(''); setSalesOrderNo(''); setPoNoOverride('') }
+    if (val !== '1') { setSlsPiId(''); setLinkedPiNo(''); setPoNoOverride('') }
   }
 
-  // 選擇客戶訂單：同步填入供應商訂單號預設值
-  function handleSalesOrderChange(id: string) {
-    setSalesOrderId(id)
-    const so = salesOrders.find(s => String(s.id) === id)
-    setSalesOrderNo(so?.orderNo ?? '')
-    setPoNoOverride('')   // 清空覆蓋，預設用原始單號
+  // 選擇我方 PI：同步填入採購單號預設值（用 PI 號）
+  function handleSlsPiChange(id: string) {
+    setSlsPiId(id)
+    const pi = slsPIs.find(p => String(p.id) === id)
+    setLinkedPiNo(pi?.piNo ?? '')
+    setPoNoOverride('')
   }
 
-  // 最終供應商訂單號：poNoOverride 有填用覆蓋值；否則用銷售單號；否則留空讓後端 generatePoNo()
-  const finalPoNo = poNoOverride.trim() || salesOrderNo || ''
+  // 最終採購單號：poNoOverride 有填用覆蓋值；否則用 PI 號；否則留空讓後端 generatePoNo()
+  const finalPoNo = poNoOverride.trim() || linkedPiNo || ''
 
   function handleSupplierChange(id: string) {
     setSupplierId(id)
@@ -83,7 +83,7 @@ export default function PurchaseForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!supplierId) { setError('請選擇供應商'); return }
-    if (sourceType === '1' && !salesOrderId) { setError('接單後採購必須選擇來源客戶訂單'); return }
+    if (sourceType === '1' && !slsPiId) { setError('接單後採購必須選擇關聯的我方 PI'); return }
     const valid = items.filter(i => i.productId && i.quantity && i.unitPrice)
     if (!valid.length) { setError('請至少輸入一項採購明細'); return }
     setSaving(true); setError('')
@@ -92,7 +92,7 @@ export default function PurchaseForm({
       body: JSON.stringify({
         poNo: finalPoNo || undefined,
         supplierId, sourceType: Number(sourceType),
-        salesOrderId: salesOrderId ? Number(salesOrderId) : null,
+        slsPiId: slsPiId ? Number(slsPiId) : null,
         currencyCode, exchangeRate: exchangeRate || '1',
         expectedDate, port, shipVia,
         note: [docRefNo ? `單據號：${docRefNo}` : '', note].filter(Boolean).join('\n'),
@@ -121,34 +121,32 @@ export default function PurchaseForm({
             </select>
           </Field>
 
-          {/* 接單後採購：選擇來源客戶訂單 */}
+          {/* 接單後採購：選擇我方 PI */}
           {sourceType === '1' && (
-            <Field label="來源客戶訂單" required>
-              <select value={salesOrderId} onChange={e => handleSalesOrderChange(e.target.value)} className={inp} required>
-                <option value="">請選擇客戶訂單</option>
-                {salesOrders.map(so => (
-                  <option key={so.id} value={so.id}>
-                    {so.orderNo}
-                    {so.customer?.name || so.patiscoBuyerName
-                      ? ` — ${so.customer?.name ?? so.patiscoBuyerName}`
-                      : ''}
-                    {` (${so._count.items} 項)`}
+            <Field label="關聯我方 PI（形式發票）" required>
+              <select value={slsPiId} onChange={e => handleSlsPiChange(e.target.value)} className={inp} required>
+                <option value="">請選擇我方 PI</option>
+                {slsPIs.map(pi => (
+                  <option key={pi.id} value={pi.id}>
+                    {pi.piNo}
+                    {pi.customer ? ` — ${pi.customer.shortName ?? pi.customer.name}` : ''}
+                    {pi.totalAmount ? ` (${pi.currencyCode} ${Number(pi.totalAmount).toLocaleString()})` : ''}
                   </option>
                 ))}
               </select>
-              {salesOrderNo && (
+              {linkedPiNo && (
                 <div className="mt-2 space-y-1">
                   <p className="text-xs text-gray-500">
-                    供應商訂單號預設為：
+                    採購單號預設同 PI 號：
                     <span className="font-mono font-medium text-gray-700 ml-1">{finalPoNo}</span>
-                    （拆單時請加後綴，如 <span className="font-mono">{salesOrderNo}-1</span>）
+                    （拆單時請加後綴，如 <span className="font-mono">{linkedPiNo}-1</span>）
                   </p>
                   <input
                     type="text"
                     value={poNoOverride}
                     onChange={e => setPoNoOverride(e.target.value)}
                     className={inp}
-                    placeholder={`預設：${salesOrderNo}（需要拆單時手動填入後綴）`}
+                    placeholder={`預設：${linkedPiNo}（需要拆單時手動填入後綴）`}
                   />
                 </div>
               )}

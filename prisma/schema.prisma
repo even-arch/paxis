@@ -569,8 +569,13 @@ model PO_Order {
   supplier      SUP_Supplier @relation(fields: [supplierId], references: [id])
 
   // ── 交易鏈關聯（核心勾稽欄位）──────────────────────────────────────────
-  // 這張採購單是為了哪張客戶銷售訂單而發出的？
-  // sourceType=1（接單後採購）時必填；sourceType=0（主動補貨）時為 null。
+  // 【主要連結】這張採購單是為了哪張我方 PI 而發出的？
+  // 貿易商模式：PI 是對客戶的承諾，採購單是對應的進貨動作，兩者直接掛鉤。
+  // sourceType=1（接單後採購）時通常填寫；sourceType=0（主動補貨）時為 null。
+  slsPiId       Int?
+  slsPi         SLS_PI? @relation("SLS_PI_PO_Link", fields: [slsPiId], references: [id])
+
+  // 【次要連結】客戶原始訂單（副本，僅供參考，不用於財務計算）
   // 一張 SLS_Order 可以對應多張 PO_Order（拆單給不同供應商時，
   // poNo 會加上後綴：ABC-2025-001-1、ABC-2025-001-2…）
   salesOrderId  Int?
@@ -619,6 +624,7 @@ model PO_Order {
 
   @@index([supplierId, status])
   @@index([poNo])
+  @@index([slsPiId])
   @@index([salesOrderId])
   @@index([archivedAt])
   @@map("PO_Order")
@@ -887,6 +893,7 @@ model SLS_PI {
   shipmentItems  SLS_ShipmentItem[]
   stockMovements INV_Movement[]
   deliveryNotes  SLS_DeliveryNote[]
+  poOrders       PO_Order[] @relation("SLS_PI_PO_Link")
 
   @@index([orderId])
   @@map("SLS_PI")
