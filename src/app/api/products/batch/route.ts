@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
         prisma.iNV_Stock.deleteMany({ where: { productId: { in: ids } } }),
         prisma.cOST_Sheet.deleteMany({ where: { productId: { in: ids } } }),
         prisma.pO_Item.deleteMany({ where: { productId: { in: ids } } }),
-        prisma.sLS_Item.deleteMany({ where: { productId: { in: ids } } }),
+        prisma.pO_CustomerCopy_Item.deleteMany({ where: { productId: { in: ids } } }),
         prisma.pRD_Product.deleteMany({ where: { id: { in: ids } } }),
       ])
       return NextResponse.json({ ok: true, affected: ids.length })

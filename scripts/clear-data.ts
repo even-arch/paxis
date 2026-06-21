@@ -13,30 +13,30 @@ async function main() {
   console.log('開始清除資料...')
 
   // 銷售側（由子到父）
-  const slsShipItem = await prisma.sLS_ShipmentItem.deleteMany()
-  console.log(`✓ SLS_ShipmentItem: ${slsShipItem.count} 筆`)
+  const slsShipItem = await prisma.sLS_Item.deleteMany()
+  console.log(`✓ SLS_Item: ${slsShipItem.count} 筆`)
 
-  const slsShipment = await prisma.sLS_Shipment.deleteMany()
-  console.log(`✓ SLS_Shipment: ${slsShipment.count} 筆`)
+  const slsShipment = await prisma.sLS.deleteMany()
+  console.log(`✓ SLS: ${slsShipment.count} 筆`)
 
-  const slsPiItem = await prisma.sLS_PIItem.deleteMany()
-  console.log(`✓ SLS_PIItem: ${slsPiItem.count} 筆`)
+  const slsPiItem = await prisma.pI_Item.deleteMany()
+  console.log(`✓ PI_Item: ${slsPiItem.count} 筆`)
 
-  const slsPi = await prisma.sLS_PI.deleteMany()
-  console.log(`✓ SLS_PI: ${slsPi.count} 筆`)
+  const slsPi = await prisma.pI.deleteMany()
+  console.log(`✓ PI: ${slsPi.count} 筆`)
 
-  const slsItem = await prisma.sLS_Item.deleteMany()
-  console.log(`✓ SLS_Item: ${slsItem.count} 筆`)
+  const slsItem = await prisma.pO_CustomerCopy_Item.deleteMany()
+  console.log(`✓ PO_CustomerCopy_Item: ${slsItem.count} 筆`)
 
-  const slsOrder = await prisma.sLS_Order.deleteMany()
-  console.log(`✓ SLS_Order: ${slsOrder.count} 筆`)
+  const slsOrder = await prisma.pO_CustomerCopy.deleteMany()
+  console.log(`✓ PO_CustomerCopy: ${slsOrder.count} 筆`)
 
   // 採購側（由子到父）
-  const supPiItem = await prisma.pO_SupplierPIItem.deleteMany()
-  console.log(`✓ PO_SupplierPIItem: ${supPiItem.count} 筆`)
+  const supPiItem = await prisma.pI_SupplierCopy_Item.deleteMany()
+  console.log(`✓ PI_SupplierCopy_Item: ${supPiItem.count} 筆`)
 
-  const supPi = await prisma.pO_SupplierPI.deleteMany()
-  console.log(`✓ PO_SupplierPI: ${supPi.count} 筆`)
+  const supPi = await prisma.pI_SupplierCopy.deleteMany()
+  console.log(`✓ PI_SupplierCopy: ${supPi.count} 筆`)
 
   const recItem = await prisma.pO_ReceiptItem.deleteMany()
   console.log(`✓ PO_ReceiptItem: ${recItem.count} 筆`)
@@ -47,8 +47,8 @@ async function main() {
   const poItem = await prisma.pO_Item.deleteMany()
   console.log(`✓ PO_Item: ${poItem.count} 筆`)
 
-  const poOrder = await prisma.pO_Order.deleteMany()
-  console.log(`✓ PO_Order: ${poOrder.count} 筆`)
+  const poOrder = await prisma.pO.deleteMany()
+  console.log(`✓ PO: ${poOrder.count} 筆`)
 
   // 庫存
   const invMovement = await prisma.iNV_Movement.deleteMany()

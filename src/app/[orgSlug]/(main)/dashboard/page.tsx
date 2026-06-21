@@ -39,14 +39,14 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
       stocks.filter(s => s.product.safetyStock > 0 && (s.quantity - s.reservedQty) <= s.product.safetyStock)
     ),
 
-    prisma.pO_Order.findMany({
+    prisma.pO.findMany({
       where: { status: { in: [1, 2] } },
       include: { supplier: { select: { name: true } } },
       orderBy: { expectedDate: 'asc' },
       take: 5,
     }),
 
-    prisma.sLS_Order.findMany({
+    prisma.pO_CustomerCopy.findMany({
       where: { status: 1 },
       include: {
         customer: { select: { name: true } },
@@ -56,7 +56,7 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
       take: 5,
     }),
 
-    prisma.sLS_PI.findMany({
+    prisma.pI.findMany({
       where: { status: 0, estimatedShipDate: { lte: in14Days } },
       include: {
         order: { include: { customer: { select: { name: true } } } },

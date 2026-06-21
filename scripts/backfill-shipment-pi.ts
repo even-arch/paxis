@@ -1,5 +1,5 @@
 /**
- * 補建出貨單 ↔ PI 關聯（SLS_ShipmentPI）
+ * 補建出貨單 ↔ PI 關聯（SLS_PI_Link）
  * 執行：npx ts-node --project tsconfig.json scripts/backfill-shipment-pi.ts
  */
 import { PrismaClient } from '@prisma/client'
@@ -13,7 +13,7 @@ async function main() {
   if (!creds) { console.error('無法取得 Patisco 憑證，請確認設定'); return }
 
   // 2. 找所有沒有 PI 關聯的出貨單
-  const shipments = await prisma.sLS_Shipment.findMany({
+  const shipments = await prisma.sLS.findMany({
     where: {
       pis: { none: {} },
       patiscoDocId: { not: null },
@@ -57,12 +57,12 @@ async function main() {
 
     const linkedPiIds = new Set<number>()
 
-    // 策略一：orders[].no / orders[].id → SLS_PI
+    // 策略一：orders[].no / orders[].id → PI
     for (const ord of ordersList) {
       const piNo = ord.no?.trim()
       const srcId = ord.id?.trim()
       if (!piNo && !srcId) continue
-      const pi = await prisma.sLS_PI.findFirst({
+      const pi = await prisma.pI.findFirst({
         where: piNo
           ? { OR: [{ piNo }, ...(srcId ? [{ patiscoDocId: srcId }] : [])] }
           : { patiscoDocId: srcId! },
@@ -76,11 +76,11 @@ async function main() {
       }
     }
 
-    // 策略二：packings[].sourceOrderID → SLS_PI
+    // 策略二：packings[].sourceOrderID → PI
     for (const p of packingItems) {
       const sid = (p as any).sourceOrderID
       if (!sid) continue
-      const pi = await prisma.sLS_PI.findFirst({
+      const pi = await prisma.pI.findFirst({
         where: { patiscoDocId: sid },
         select: { id: true, piNo: true },
       })
@@ -95,9 +95,9 @@ async function main() {
       continue
     }
 
-    // 4. 建立 SLS_ShipmentPI
+    // 4. 建立 SLS_PI_Link
     for (const piId of Array.from(linkedPiIds)) {
-      await prisma.sLS_ShipmentPI.upsert({
+      await prisma.sLS_PI_Link.upsert({
         where: { shipmentId_piId: { shipmentId: s.id, piId } },
         create: { shipmentId: s.id, piId },
         update: {},
@@ -106,8 +106,8 @@ async function main() {
     console.log(`  ✓ 建立 ${linkedPiIds.size} 個 PI 關聯`)
   }
 
-  const withPi = await prisma.sLS_Shipment.count({ where: { pis: { some: {} } } })
-  const total = await prisma.sLS_Shipment.count()
+  const withPi = await prisma.sLS.count({ where: { pis: { some: {} } } })
+  const total = await prisma.sLS.count()
   console.log(`\n完成。${total} 筆出貨單，${withPi} 筆有 PI 關聯，${total - withPi} 筆仍無`)
 }
 

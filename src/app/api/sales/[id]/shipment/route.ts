@@ -15,7 +15,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const shipmentId = Number(searchParams.get('shipmentId'))
   if (!shipmentId) return NextResponse.json({ error: '缺少 shipmentId' }, { status: 400 })
 
-  const shipment = await prisma.sLS_Shipment.findUnique({
+  const shipment = await prisma.sLS.findUnique({
     where: { id: shipmentId },
     include: {
       items: {
@@ -70,9 +70,9 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
       },
     })
 
-    // 還原 SLS_Item 已出貨數
+    // 還原 PO_CustomerCopy_Item 已出貨數
     if (si.slsItem?.id) {
-      await prisma.sLS_Item.update({
+      await prisma.pO_CustomerCopy_Item.update({
         where: { id: si.slsItem.id },
         data: { shippedQty: { decrement: si.quantity } },
       })
@@ -82,18 +82,18 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   // 刪除應收帳款
   await prisma.fIN_Receivable.deleteMany({ where: { shipmentId } })
 
-  // 刪除出貨品項、PI 關聯、出貨記錄（SLS_ShipmentPI cascade delete 會自動處理）
-  await prisma.sLS_ShipmentItem.deleteMany({ where: { shipmentId } })
-  await prisma.sLS_Shipment.delete({ where: { id: shipmentId } })
+  // 刪除出貨品項、PI 關聯、出貨記錄（SLS_PI_Link cascade delete 會自動處理）
+  await prisma.sLS_Item.deleteMany({ where: { shipmentId } })
+  await prisma.sLS.delete({ where: { id: shipmentId } })
 
   // 重新計算所有受影響訂單的狀態
   const affectedOrderIds = Array.from(new Set(shipment.items.map(si => si.slsItem?.orderId).filter((id): id is number => id != null)))
   for (const affOrderId of affectedOrderIds) {
-    const updatedItems = await prisma.sLS_Item.findMany({ where: { orderId: affOrderId } })
+    const updatedItems = await prisma.pO_CustomerCopy_Item.findMany({ where: { orderId: affOrderId } })
     const anyShipped = updatedItems.some(i => i.shippedQty > 0)
-    const hasActivePi = await prisma.sLS_PI.count({ where: { orderId: affOrderId, status: 0 } })
+    const hasActivePi = await prisma.pI.count({ where: { orderId: affOrderId, status: 0 } })
     const newStatus = anyShipped ? 3 : hasActivePi > 0 ? 2 : 1
-    await prisma.sLS_Order.update({ where: { id: affOrderId }, data: { status: newStatus } })
+    await prisma.pO_CustomerCopy.update({ where: { id: affOrderId }, data: { status: newStatus } })
   }
 
   void activePiIds  // suppress unused warning
@@ -146,7 +146,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     // 以 orderId 取出主要訂單（用於驗證客戶、取得幣別）
-    const order = await prisma.sLS_Order.findUnique({
+    const order = await prisma.pO_CustomerCopy.findUnique({
       where: { id: orderId },
       include: {
         items: { include: { product: true } },
@@ -165,7 +165,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     // 驗證 piIds：每張 PI 必須屬於同一個客戶（order.customerId），且狀態有效
     const piIds = body.piIds ?? []
     if (piIds.length > 0) {
-      const pis = await prisma.sLS_PI.findMany({
+      const pis = await prisma.pI.findMany({
         where: { id: { in: piIds } },
         select: { id: true, status: true, customerId: true, order: { select: { customerId: true } } },
       })
@@ -183,14 +183,14 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     // 產生出貨單號：SHP-YYYYMMDD-XXXX（系統內部識別號，不對外）
     const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-    const count = await prisma.sLS_Shipment.count()
+    const count = await prisma.sLS.count()
     const shipmentNo = `SHP-${datePart}-${String(count + 1).padStart(4, '0')}`
 
     const now = new Date()
     const actualShipDate = new Date(body.actualShipDate)
 
     // 建立出貨記錄（含 PI 多對多關聯）
-    const shipment = await prisma.sLS_Shipment.create({
+    const shipment = await prisma.sLS.create({
       data: {
         customerId:      order.customerId ?? null,
         currencyCode:    order.currencyCode ?? 'USD',
@@ -266,7 +266,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         },
       })
 
-      await prisma.sLS_Item.update({
+      await prisma.pO_CustomerCopy_Item.update({
         where: { id: shipItem.slsItemId },
         data: { shippedQty: { increment: shipItem.quantity } },
       })
@@ -281,11 +281,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!affectedOrderIds.includes(orderId)) affectedOrderIds.push(orderId)
 
     for (const affOrderId of affectedOrderIds) {
-      const updatedItems = await prisma.sLS_Item.findMany({ where: { orderId: affOrderId } })
+      const updatedItems = await prisma.pO_CustomerCopy_Item.findMany({ where: { orderId: affOrderId } })
       const allShipped = updatedItems.every(i => i.shippedQty >= i.quantity)
       const anyShipped = updatedItems.some(i => i.shippedQty > 0)
-      const affOrder = affOrderId === orderId ? order : await prisma.sLS_Order.findUnique({ where: { id: affOrderId } })
-      await prisma.sLS_Order.update({
+      const affOrder = affOrderId === orderId ? order : await prisma.pO_CustomerCopy.findUnique({ where: { id: affOrderId } })
+      await prisma.pO_CustomerCopy.update({
         where: { id: affOrderId },
         data: { status: allShipped ? 4 : anyShipped ? 3 : (affOrder?.status ?? 1) },
       })

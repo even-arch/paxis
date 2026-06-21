@@ -11,7 +11,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const id = Number(params.id)
-  const order = await prisma.sLS_Order.findUnique({
+  const order = await prisma.pO_CustomerCopy.findUnique({
     where: { id },
     include: { items: { select: { id: true } } },
   })
@@ -20,6 +20,6 @@ export async function POST(_req: NextRequest, { params }: Params) {
   if (order.items.length === 0)
     return NextResponse.json({ error: '訂單沒有品項，無法送出' }, { status: 400 })
 
-  await prisma.sLS_Order.update({ where: { id }, data: { status: 1 } })
+  await prisma.pO_CustomerCopy.update({ where: { id }, data: { status: 1 } })
   return NextResponse.json({ ok: true })
 }

@@ -18,13 +18,13 @@ export default async function CustomerDetailPage({
         chargeTemplate: { select: { id: true, name: true, description: true } },
       },
     }),
-    prisma.sLS_Order.findMany({
+    prisma.pO_CustomerCopy.findMany({
       where: { customerId: Number(params.id) },
       orderBy: { createdAt: 'desc' },
       take: 20,
       include: { _count: { select: { items: true } } },
     }),
-    prisma.sLS_Item.findMany({
+    prisma.pO_CustomerCopy_Item.findMany({
       where: { order: { customerId: Number(params.id) } },
       distinct: ['productId'],
       include: { product: { select: { id: true, name: true, sku: true } } },

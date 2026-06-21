@@ -68,7 +68,7 @@ export default async function CommerceOrdersPage({ params }: { params: { orgSlug
 
   const orders = buildMockMarketplaceOrders(snapshots)
   const imported = orders.length
-    ? await prisma.sLS_Order.findMany({
+    ? await prisma.pO_CustomerCopy.findMany({
         where: { orderNo: { in: orders.map(order => order.platformOrderNo) } },
         select: { id: true, orderNo: true },
       })

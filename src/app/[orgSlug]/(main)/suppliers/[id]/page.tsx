@@ -23,7 +23,7 @@ export default async function SupplierDetailPage({
         },
       },
     }),
-    prisma.pO_Order.findMany({
+    prisma.pO.findMany({
       where: { supplierId: Number(params.id) },
       orderBy: { createdAt: 'desc' },
       take: 20,

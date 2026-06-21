@@ -8,7 +8,7 @@ import { Prisma } from '@prisma/client'
  * POST /api/shipments/[id]/confirm
  * 驅動出貨的連鎖反應：
  * 1. INV_Movement type=4（quantity--, reservedQty--）
- * 2. SLS_Item.shippedQty 更新
+ * 2. PO_CustomerCopy_Item.shippedQty 更新
  * 3. FIN_Receivable 建立（AR：等客戶付款）
  * 4. FIN_Payable 建立（AP：若 PO_Receipt 已存在）
  * 冪等保護：已有 type=4 Movement 則拒絕重複。
@@ -27,7 +27,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   })()
 
   // ── 讀取出貨單完整資料 ──────────────────────────────────────────────────
-  const shipment = await prisma.sLS_Shipment.findUnique({
+  const shipment = await prisma.sLS.findUnique({
     where: { id: shipmentId },
     include: {
       customer: { select: { id: true } },
@@ -69,7 +69,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
   if (rawSkuItems.length > 0) {
     const piIds = Array.from(new Set(rawSkuItems.map(i => i.piId!)))
-    const piItems = await prisma.sLS_PIItem.findMany({
+    const piItems = await prisma.pI_Item.findMany({
       where: { piId: { in: piIds } },
       select: {
         piId: true,
@@ -86,7 +86,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   const result = { invConfirmed: 0, invSkipped: 0, arCreated: false, apCreated: 0, apSkipped: 0 }
 
   try {
-    // ── 1. INV_Movement type=4 + SLS_Item.shippedQty ─────────────────────
+    // ── 1. INV_Movement type=4 + PO_CustomerCopy_Item.shippedQty ─────────────────────
     if (invAlreadyDone) {
       result.invSkipped = shipment.items.length
     }
@@ -125,9 +125,9 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
         },
       })
 
-      // SLS_Item.shippedQty 更新
+      // PO_CustomerCopy_Item.shippedQty 更新
       if (item.slsItem?.id) {
-        await prisma.sLS_Item.update({
+        await prisma.pO_CustomerCopy_Item.update({
           where: { id: item.slsItem.id },
           data: { shippedQty: { increment: item.quantity } },
         })
@@ -149,7 +149,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
         return 1 + pct / 100
       }
 
-      // AR = SLS_PI 金額加總（PI 是主，SLS_Order 只做 fallback）
+      // AR = PI 金額加總（PI 是主，PO_CustomerCopy 只做 fallback）
       let amountTWD = 0
       for (const sp of shipment.pis) {
         const totalAmt = sp.pi.totalAmount
@@ -181,10 +181,10 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       }
     }
 
-    // ── 3. FIN_Payable（AP）：找出此出貨關聯的 PO_Order ─────────────────
-    // 主路徑 A：PO_Order.slsPiId → SLS_PI.id（正式 FK，最可靠）
-    // 主路徑 B：PO_Order.poNo = SLS_PI.piNo（號碼相同時的 fallback）
-    // 次路徑：PO_Order.salesOrderId → SLS_Order（最後手段，有 SLS_Order 連結時）
+    // ── 3. FIN_Payable（AP）：找出此出貨關聯的 PO ─────────────────
+    // 主路徑 A：PO.slsPiId → PI.id（正式 FK，最可靠）
+    // 主路徑 B：PO.poNo = PI.piNo（號碼相同時的 fallback）
+    // 次路徑：PO.salesOrderId → PO_CustomerCopy（最後手段，有 PO_CustomerCopy 連結時）
     const allPiIds = shipment.pis.map(sp => sp.pi.id)
     const allPiNos = shipment.pis.map(sp => sp.pi.piNo)
     const slsOrderIds = shipment.pis
@@ -197,7 +197,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     if (slsOrderIds.length > 0) poOrderConditions.push({ salesOrderId: { in: slsOrderIds } })
 
     if (poOrderConditions.length > 0) {
-      const poOrders = await prisma.pO_Order.findMany({
+      const poOrders = await prisma.pO.findMany({
         where: { OR: poOrderConditions },
         include: {
           receipts: { take: 1 },
@@ -242,10 +242,10 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       }
     }
 
-    // ── 4. SLS_PI.status = 2（已出貨）────────────────────────────────────
+    // ── 4. PI.status = 2（已出貨）────────────────────────────────────
     const piIds = shipment.pis.map(sp => sp.pi.id)
     if (piIds.length > 0) {
-      await prisma.sLS_PI.updateMany({
+      await prisma.pI.updateMany({
         where: { id: { in: piIds }, status: 0 },
         data: { status: 2 },
       })

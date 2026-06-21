@@ -61,7 +61,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
   const order = findMockMarketplaceOrder(params.orderId, snapshots)
   if (!order) return NextResponse.json({ error: '找不到平台訂單' }, { status: 404 })
 
-  const existing = await prisma.sLS_Order.findUnique({
+  const existing = await prisma.pO_CustomerCopy.findUnique({
     where: { orderNo: order.platformOrderNo },
     select: { id: true, orderNo: true },
   })
@@ -107,7 +107,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
       select: { id: true },
     })
 
-    const slsOrder = await tx.sLS_Order.create({
+    const slsOrder = await tx.pO_CustomerCopy.create({
       data: {
         orderNo: order.platformOrderNo,
         customerId: customer.id,
@@ -127,7 +127,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
     const createdItems = []
     for (const item of order.items) {
-      const slsItem = await tx.sLS_Item.create({
+      const slsItem = await tx.pO_CustomerCopy_Item.create({
         data: {
           orderId: slsOrder.id,
           productId: item.productId,
@@ -141,7 +141,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
       createdItems.push({ commerceItem: item, slsItem })
     }
 
-    const pi = await tx.sLS_PI.create({
+    const pi = await tx.pI.create({
       data: {
         orderId: slsOrder.id,
         piNo,
@@ -154,7 +154,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
     })
 
     for (const item of createdItems) {
-      await tx.sLS_PIItem.create({
+      await tx.pI_Item.create({
         data: {
           piId: pi.id,
           slsItemId: item.slsItem.id,

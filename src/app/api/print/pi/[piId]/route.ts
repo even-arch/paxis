@@ -14,7 +14,7 @@ export async function GET(
   const piId = Number(params.piId)
   if (isNaN(piId)) return NextResponse.json({ error: 'Invalid piId' }, { status: 400 })
 
-  const pi = await prisma.sLS_PI.findUnique({
+  const pi = await prisma.pI.findUnique({
     where: { id: piId },
     include: {
       order: { include: { customer: true } },

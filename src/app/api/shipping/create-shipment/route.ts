@@ -25,7 +25,7 @@ interface CreateShipmentBody {
   declaredCurrency?: string
   piId?: number
   piNo?: string
-  /** 若要將 trackingNo 寫回 SLS_Shipment 記錄，傳入其 id */
+  /** 若要將 trackingNo 寫回 SLS 記錄，傳入其 id */
   slsShipmentId?: number | null
   labelFormat?: 'GIF' | 'PNG' | 'PDF'
 }
@@ -98,15 +98,15 @@ export async function POST(req: NextRequest) {
 
     const logRow = Array.isArray(log) ? log[0] : log
 
-    // 若有關聯的 SLS_Shipment，寫回 trackingNo
+    // 若有關聯的 SLS，寫回 trackingNo
     if (body.slsShipmentId) {
-      await prisma.sLS_Shipment.update({
+      await prisma.sLS.update({
         where: { id: body.slsShipmentId },
         data: {
           trackingNo: result.trackingNumber,
           shippingMethod: body.serviceCode.startsWith('11') ? 'AIR' : 'COURIER',
         },
-      }).catch(e => console.warn('[create-shipment] update SLS_Shipment trackingNo failed:', e))
+      }).catch(e => console.warn('[create-shipment] update SLS trackingNo failed:', e))
     }
 
     return NextResponse.json({

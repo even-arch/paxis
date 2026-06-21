@@ -11,7 +11,7 @@ export async function GET(req: NextRequest, { params }: Ctx) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const customerId = Number(params.id)
-  const docType = req.nextUrl.searchParams.get('docType') ?? 'SLS_PI'
+  const docType = req.nextUrl.searchParams.get('docType') ?? 'PI'
 
   const record = await prisma.pRN_CustomerDefault.findUnique({
     where: { customerId_docType: { customerId, docType } },
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const customerId = Number(params.id)
-  const { docType = 'SLS_PI', freeFields } = await req.json() as {
+  const { docType = 'PI', freeFields } = await req.json() as {
     docType?: string
     freeFields: Record<string, string>
   }

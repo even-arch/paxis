@@ -14,7 +14,7 @@ export async function GET(
   const poId = Number(params.poId)
   if (isNaN(poId)) return NextResponse.json({ error: 'Invalid poId' }, { status: 400 })
 
-  const po = await prisma.pO_Order.findUnique({
+  const po = await prisma.pO.findUnique({
     where: { id: poId },
     include: {
       supplier: true,

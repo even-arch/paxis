@@ -17,7 +17,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const singleId = searchParams.get('id') ? Number(searchParams.get('id')) : null
 
-  const pis = await prisma.sLS_PI.findMany({
+  const pis = await prisma.pI.findMany({
     where: singleId ? { id: singleId } : { status: 0 },
     orderBy: { performedAt: 'desc' },
     take: 30,
@@ -71,7 +71,7 @@ export async function GET(req: Request) {
     const cust = pi.order?.customer ?? pi.customer
     const currCode = pi.order?.currencyCode ?? pi.currencyCode ?? ''
     const totalAmt = pi.order?.totalAmount ?? pi.totalAmount
-    // Use SLS_Order items if available, otherwise fall back to PI's own items
+    // Use PO_CustomerCopy items if available, otherwise fall back to PI's own items
     const orderItems = pi.order?.items ?? []
     const piItems = pi.items ?? []
     const mappedItems = orderItems.length > 0

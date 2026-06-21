@@ -71,8 +71,8 @@ export default async function SalesPage({ params, searchParams }: Props) {
   }
 
   const [total, orders, customers] = await Promise.all([
-    prisma.sLS_Order.count({ where }),
-    prisma.sLS_Order.findMany({
+    prisma.pO_CustomerCopy.count({ where }),
+    prisma.pO_CustomerCopy.findMany({
       where,
       orderBy: { [sort]: dir },
       skip: (page - 1) * limit,

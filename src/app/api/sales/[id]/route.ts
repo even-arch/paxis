@@ -11,7 +11,7 @@ export async function GET(_req: NextRequest, {
     const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const order = await prisma.sLS_Order.findUnique({
+  const order = await prisma.pO_CustomerCopy.findUnique({
     where: { id: Number(params.id) },
     include: {
       customer: true,
@@ -52,7 +52,7 @@ export async function PATCH(req: NextRequest, {
   if (body.customerRequestedShipDate !== undefined)
     data.customerRequestedShipDate = body.customerRequestedShipDate ? new Date(body.customerRequestedShipDate) : null
 
-  const order = await prisma.sLS_Order.update({ where: { id }, data })
+  const order = await prisma.pO_CustomerCopy.update({ where: { id }, data })
   return NextResponse.json({ ok: true, order })
 }
 
@@ -63,7 +63,7 @@ export async function DELETE(_req: NextRequest, {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const id = Number(params.id)
-  const order = await prisma.sLS_Order.findUnique({
+  const order = await prisma.pO_CustomerCopy.findUnique({
     where: { id },
     include: { pis: { select: { id: true } } },
   })
@@ -73,8 +73,8 @@ export async function DELETE(_req: NextRequest, {
     return NextResponse.json({ error: '此訂單已有 PI，無法刪除' }, { status: 400 })
   }
 
-  await prisma.sLS_Item.deleteMany({ where: { orderId: id } })
-  await prisma.sLS_Order.delete({ where: { id } })
+  await prisma.pO_CustomerCopy_Item.deleteMany({ where: { orderId: id } })
+  await prisma.pO_CustomerCopy.delete({ where: { id } })
 
   return NextResponse.json({ ok: true })
 }

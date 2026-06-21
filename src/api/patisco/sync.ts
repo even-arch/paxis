@@ -8,11 +8,11 @@
  *   Step 1: 客戶主檔 (CUS_Customer)   ← 從 PO_COPY 的 buyer
  *   Step 2: 供應商主檔 (SUP_Supplier) ← 從 PI_COPY 的 seller
  *   Step 3: 產品主檔 (PRD_Product)    ← 所有文件的 SKU（只存基本資料，不存價格）
- *   Step 4: 銷售訂單 (SLS_Order)      ← 從 PO_COPY
- *   Step 5: 採購訂單 (PO_Order)       ← 從 PO，嘗試連結 SLS_Order
- *   Step 6: 供應商 PI (PO_SupplierPI) ← 從 PI_COPY，連結 PO_Order
- *   Step 7: 我方 PI (SLS_PI)          ← 從 PI，連結 SLS_Order（含客戶賣價）
- *   Step 8: 出貨單 (SLS_Shipment)     ← 從 DO，只連 SLS_PI，不連 PO
+ *   Step 4: 銷售訂單 (PO_CustomerCopy)      ← 從 PO_COPY
+ *   Step 5: 採購訂單 (PO)       ← 從 PO，嘗試連結 PO_CustomerCopy
+ *   Step 6: 供應商 PI (PI_SupplierCopy) ← 從 PI_COPY，連結 PO
+ *   Step 7: 我方 PI (PI)          ← 從 PI，連結 PO_CustomerCopy（含客戶賣價）
+ *   Step 8: 出貨單 (SLS)     ← 從 DO，只連 PI，不連 PO
  */
 
 import type { PrismaClient } from '@prisma/client'
@@ -605,7 +605,7 @@ export async function step3_products(prisma: PrismaClient, jobId: number): Promi
   return r
 }
 
-// ─── Step 4：SLS_Order ────────────────────────────────────────────────────────
+// ─── Step 4：PO_CustomerCopy ────────────────────────────────────────────────────────
 
 export async function step4_slsOrders(prisma: PrismaClient, jobId: number): Promise<SyncStepResult> {
   const r: SyncStepResult = { created: 0, updated: 0, skipped: 0, errors: [] }
@@ -621,13 +621,13 @@ export async function step4_slsOrders(prisma: PrismaClient, jobId: number): Prom
       const orderNo = rec.patiscoDocNo?.trim() || rec.patiscoDocId
       if (!orderNo) { r.skipped++; continue }
 
-      const existing = await prisma.sLS_Order.findUnique({
+      const existing = await prisma.pO_CustomerCopy.findUnique({
         where: { orderNo },
         select: { id: true, source: true },
       })
       if (existing) {
         if (existing.source === 'PATISCO') {
-          await prisma.sLS_Order.update({
+          await prisma.pO_CustomerCopy.update({
             where: { orderNo },
             data: { patiscoDocId: rec.patiscoDocId },
           })
@@ -642,7 +642,7 @@ export async function step4_slsOrders(prisma: PrismaClient, jobId: number): Prom
         ? await prisma.cUS_Customer.findFirst({ where: { name: buyerName }, select: { id: true } })
         : null
 
-      const order = await prisma.sLS_Order.create({
+      const order = await prisma.pO_CustomerCopy.create({
         data: {
           orderNo,
           customerId: customer?.id ?? undefined,
@@ -666,7 +666,7 @@ export async function step4_slsOrders(prisma: PrismaClient, jobId: number): Prom
         const product = await prisma.pRD_Product.findUnique({ where: { sku }, select: { id: true } })
         if (!product) continue
 
-        await prisma.sLS_Item.create({
+        await prisma.pO_CustomerCopy_Item.create({
           data: {
             orderId: order.id,
             productId: product.id,
@@ -686,7 +686,7 @@ export async function step4_slsOrders(prisma: PrismaClient, jobId: number): Prom
   return r
 }
 
-// ─── Step 5：PO_Order ─────────────────────────────────────────────────────────
+// ─── Step 5：PO ─────────────────────────────────────────────────────────
 
 export async function step5_poOrders(prisma: PrismaClient, jobId: number): Promise<SyncStepResult> {
   const r: SyncStepResult = { created: 0, updated: 0, skipped: 0, errors: [] }
@@ -720,13 +720,13 @@ export async function step5_poOrders(prisma: PrismaClient, jobId: number): Promi
         continue
       }
 
-      const existing = await prisma.pO_Order.findUnique({
+      const existing = await prisma.pO.findUnique({
         where: { poNo },
         select: { id: true },
       })
 
-      // 嘗試連結 SLS_Order（同訂單號碼）
-      const salesOrder = await prisma.sLS_Order.findFirst({
+      // 嘗試連結 PO_CustomerCopy（同訂單號碼）
+      const salesOrder = await prisma.pO_CustomerCopy.findFirst({
         where: { orderNo: poNo },
         select: { id: true },
       })
@@ -740,7 +740,7 @@ export async function step5_poOrders(prisma: PrismaClient, jobId: number): Promi
 
       if (existing) {
         // 既有記錄：更新幣別、金額、狀態（不改 source/supplier/poNo）
-        await prisma.pO_Order.update({
+        await prisma.pO.update({
           where: { id: existing.id },
           data: {
             currencyCode,
@@ -757,7 +757,7 @@ export async function step5_poOrders(prisma: PrismaClient, jobId: number): Promi
         continue
       }
 
-      const order = await prisma.pO_Order.create({
+      const order = await prisma.pO.create({
         data: {
           poNo,
           supplierId: supplier.id,
@@ -803,7 +803,7 @@ export async function step5_poOrders(prisma: PrismaClient, jobId: number): Promi
   return r
 }
 
-// ─── Step 6：PO_SupplierPI ────────────────────────────────────────────────────
+// ─── Step 6：PI_SupplierCopy ────────────────────────────────────────────────────
 
 export async function step6_poSupplierPIs(prisma: PrismaClient, jobId: number): Promise<SyncStepResult> {
   const r: SyncStepResult = { created: 0, updated: 0, skipped: 0, errors: [] }
@@ -819,19 +819,19 @@ export async function step6_poSupplierPIs(prisma: PrismaClient, jobId: number): 
       const piNo = rec.patiscoDocNo?.trim() || rec.patiscoDocId
       if (!piNo) { r.skipped++; continue }
 
-      const existingPI = await prisma.pO_SupplierPI.findFirst({
+      const existingPI = await prisma.pI_SupplierCopy.findFirst({
         where: { piNo },
         select: { id: true },
       })
       if (existingPI) { r.skipped++; continue }
 
-      // 找對應 PO_Order：用供應商名稱找最近的
+      // 找對應 PO：用供應商名稱找最近的
       const supplier = sellerName
         ? await prisma.sUP_Supplier.findFirst({ where: { name: sellerName }, select: { id: true } })
         : null
 
       const poOrder = supplier
-        ? await prisma.pO_Order.findFirst({
+        ? await prisma.pO.findFirst({
             where: { supplierId: supplier.id },
             orderBy: { createdAt: 'desc' },
             select: { id: true },
@@ -839,11 +839,11 @@ export async function step6_poSupplierPIs(prisma: PrismaClient, jobId: number): 
         : null
 
       if (!poOrder) {
-        r.errors.push(`PI_COPY ${rec.patiscoDocId}: 找不到對應的 PO_Order，供應商="${sellerName}"`)
+        r.errors.push(`PI_COPY ${rec.patiscoDocId}: 找不到對應的 PO，供應商="${sellerName}"`)
         continue
       }
 
-      await prisma.pO_SupplierPI.create({
+      await prisma.pI_SupplierCopy.create({
         data: {
           orderId: poOrder.id,
           piNo,
@@ -863,7 +863,7 @@ export async function step6_poSupplierPIs(prisma: PrismaClient, jobId: number): 
   return r
 }
 
-// ─── Step 7：SLS_PI ───────────────────────────────────────────────────────────
+// ─── Step 7：PI ───────────────────────────────────────────────────────────
 
 export async function step7_slsPIs(prisma: PrismaClient, jobId: number): Promise<SyncStepResult> {
   const r: SyncStepResult = { created: 0, updated: 0, skipped: 0, errors: [], conflicts: [] }
@@ -873,8 +873,8 @@ export async function step7_slsPIs(prisma: PrismaClient, jobId: number): Promise
   const [allProducts, allCustomers, allOrders, allPIs] = await Promise.all([
     prisma.pRD_Product.findMany({ select: { id: true, sku: true } }),
     prisma.cUS_Customer.findMany({ select: { id: true, name: true } }),
-    prisma.sLS_Order.findMany({ select: { id: true, orderNo: true } }),
-    prisma.sLS_PI.findMany({ select: { id: true, piNo: true, source: true, orderId: true } }),
+    prisma.pO_CustomerCopy.findMany({ select: { id: true, orderNo: true } }),
+    prisma.pI.findMany({ select: { id: true, piNo: true, source: true, orderId: true } }),
   ])
   const productMap = new Map(allProducts.map(p => [p.sku, p.id]))
   const customerMap = new Map(allCustomers.map(c => [c.name, c.id]))
@@ -944,7 +944,7 @@ export async function step7_slsPIs(prisma: PrismaClient, jobId: number): Promise
       if (existing) {
         if (existing.source === 'PATISCO') {
           // 更新幣別 + Patisco 元資料（修正舊記錄的錯誤幣別）
-          await prisma.sLS_PI.update({
+          await prisma.pI.update({
             where: { piNo },
             data: {
               patiscoDocId: rec.patiscoDocId,
@@ -961,12 +961,12 @@ export async function step7_slsPIs(prisma: PrismaClient, jobId: number): Promise
       }
       const customerId = buyerName ? customerMap.get(buyerName) ?? undefined : undefined
 
-      // 如果 PO_COPY 已在 step4 建立了 SLS_Order，則連結；否則 PI 獨立存在
+      // 如果 PO_COPY 已在 step4 建立了 PO_CustomerCopy，則連結；否則 PI 獨立存在
       const orderId = orderMap.get(piNo) ?? undefined
 
       if (orderId) {
         // 補齊 step4 建立時缺少的幣別、客戶、日期
-        await prisma.sLS_Order.update({
+        await prisma.pO_CustomerCopy.update({
           where: { id: orderId },
           data: {
             currencyCode,
@@ -976,9 +976,9 @@ export async function step7_slsPIs(prisma: PrismaClient, jobId: number): Promise
           },
         })
       }
-      // 不建假的 SLS_Order：PI 自帶 customerId/currencyCode/totalAmount
+      // 不建假的 PO_CustomerCopy：PI 自帶 customerId/currencyCode/totalAmount
 
-      // 建立品項 lookup：有 orderId 時走 SLS_Item，否則只用 productId
+      // 建立品項 lookup：有 orderId 時走 PO_CustomerCopy_Item，否則只用 productId
       const skuToItemId = new Map<string, number>()
       const skuToProductId = new Map<string, number>()
       for (const p of (raw.products ?? [])) {
@@ -988,14 +988,14 @@ export async function step7_slsPIs(prisma: PrismaClient, jobId: number): Promise
         if (!productId) continue
         skuToProductId.set(sku, productId)
         if (orderId) {
-          const existingItem = await prisma.sLS_Item.findFirst({
+          const existingItem = await prisma.pO_CustomerCopy_Item.findFirst({
             where: { orderId, productId },
             select: { id: true },
           })
           if (existingItem) {
             skuToItemId.set(sku, existingItem.id)
           } else {
-            const newItem = await prisma.sLS_Item.create({
+            const newItem = await prisma.pO_CustomerCopy_Item.create({
               data: {
                 orderId,
                 productId,
@@ -1014,7 +1014,7 @@ export async function step7_slsPIs(prisma: PrismaClient, jobId: number): Promise
       const rawPrice = raw.price as { amount?: string } | null
       const totalAmount = rawPrice?.amount ? toDecimal(rawPrice.amount) : undefined
 
-      const pi = await prisma.sLS_PI.create({
+      const pi = await prisma.pI.create({
         data: {
           orderId: orderId ?? undefined,
           customerId: orderId ? undefined : customerId,
@@ -1035,14 +1035,14 @@ export async function step7_slsPIs(prisma: PrismaClient, jobId: number): Promise
       })
       piMap.set(piNo, { id: pi.id, piNo, source: 'PATISCO', orderId: null })
 
-      // 建立 SLS_PIItem
+      // 建立 PI_Item
       for (const p of (raw.products ?? [])) {
         const sku = p.sku?.trim()
         if (!sku) continue
         const slsItemId = skuToItemId.get(sku)
         const productId = skuToProductId.get(sku)
         if (!slsItemId && !productId) continue
-        await prisma.sLS_PIItem.create({
+        await prisma.pI_Item.create({
           data: {
             piId: pi.id,
             slsItemId: slsItemId ?? undefined,
@@ -1061,7 +1061,7 @@ export async function step7_slsPIs(prisma: PrismaClient, jobId: number): Promise
   return r
 }
 
-// ─── 衝突解決：從指定 SYS_PatiscoSync docId 建立單筆 SLS_PI ─────────────────
+// ─── 衝突解決：從指定 SYS_PatiscoSync docId 建立單筆 PI ─────────────────
 
 export async function step7_buildOnePIFromDocId(
   prisma: PrismaClient,
@@ -1082,11 +1082,11 @@ export async function step7_buildOnePIFromDocId(
   const piNo = rec.patiscoDocNo?.trim()
   if (!piNo) throw new Error('此記錄沒有 PI 號碼')
 
-  // 若 SLS_PI 已存在，刪除後重建（用戶選擇覆蓋）
-  const existingPI = await prisma.sLS_PI.findUnique({ where: { piNo } })
+  // 若 PI 已存在，刪除後重建（用戶選擇覆蓋）
+  const existingPI = await prisma.pI.findUnique({ where: { piNo } })
   if (existingPI) {
-    await prisma.sLS_PIItem.deleteMany({ where: { piId: existingPI.id } })
-    await prisma.sLS_PI.delete({ where: { piNo } })
+    await prisma.pI_Item.deleteMany({ where: { piId: existingPI.id } })
+    await prisma.pI.delete({ where: { piNo } })
   }
 
   await initSelfKeywords(prisma)
@@ -1100,10 +1100,10 @@ export async function step7_buildOnePIFromDocId(
     ? await prisma.cUS_Customer.findFirst({ where: { name: buyerName }, select: { id: true } })
     : null
 
-  // PI 獨立存在，不建 SLS_Order。若 PO_COPY 已建立對應的 SLS_Order，只連結不新增。
-  const existingOrder = await prisma.sLS_Order.findFirst({ where: { orderNo: piNo }, select: { id: true } })
+  // PI 獨立存在，不建 PO_CustomerCopy。若 PO_COPY 已建立對應的 PO_CustomerCopy，只連結不新增。
+  const existingOrder = await prisma.pO_CustomerCopy.findFirst({ where: { orderNo: piNo }, select: { id: true } })
 
-  const pi = await prisma.sLS_PI.create({
+  const pi = await prisma.pI.create({
     data: {
       orderId: existingOrder?.id ?? undefined,
       customerId: existingOrder ? undefined : (customer?.id ?? undefined),
@@ -1124,12 +1124,12 @@ export async function step7_buildOnePIFromDocId(
     const sku = p.sku?.trim()
     if (!sku) continue
     const product = await prisma.pRD_Product.findUnique({ where: { sku }, select: { id: true } })
-    await prisma.sLS_PIItem.create({
+    await prisma.pI_Item.create({
       data: { piId: pi.id, productId: product?.id ?? undefined, quantity: toInt(p.quantity), unitPrice: toDecimal(p.price), unit: p.unit?.trim() ?? undefined },
     })
   }
 
-  // 補連結：找出 Patisco DO 裡引用此 piNo 的出貨單，若出貨單已在 DB 就補建 SLS_ShipmentPI
+  // 補連結：找出 Patisco DO 裡引用此 piNo 的出貨單，若出貨單已在 DB 就補建 SLS_PI_Link
   const doRecords = await prisma.sYS_PatiscoSync.findMany({ where: { docType: 'DO' } })
   for (const doRec of doRecords) {
     const doRaw = doRec.result as { packingList?: { no?: string; orders?: { no?: string }[] }; commercialInvoice?: { no?: string; orders?: { no?: string }[] } }
@@ -1141,10 +1141,10 @@ export async function step7_buildOnePIFromDocId(
 
     const shipmentNo = detail.no?.trim()
     if (!shipmentNo) continue
-    const shipment = await prisma.sLS_Shipment.findUnique({ where: { shipmentNo }, select: { id: true } })
+    const shipment = await prisma.sLS.findUnique({ where: { shipmentNo }, select: { id: true } })
     if (!shipment) continue
 
-    await prisma.sLS_ShipmentPI.upsert({
+    await prisma.sLS_PI_Link.upsert({
       where: { shipmentId_piId: { shipmentId: shipment.id, piId: pi.id } },
       create: { shipmentId: shipment.id, piId: pi.id },
       update: {},
@@ -1152,7 +1152,7 @@ export async function step7_buildOnePIFromDocId(
   }
 }
 
-// ─── Step 8：SLS_Shipment ─────────────────────────────────────────────────────
+// ─── Step 8：SLS ─────────────────────────────────────────────────────
 
 export async function step8_slsShipments(prisma: PrismaClient, jobId: number): Promise<SyncStepResult> {
   const r: SyncStepResult = { created: 0, updated: 0, skipped: 0, errors: [] }
@@ -1169,7 +1169,7 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
       const shipmentNo = (detail.no ?? rec.patiscoDocNo ?? '').trim()
       if (!shipmentNo) { r.skipped++; continue }
 
-      const existing = await prisma.sLS_Shipment.findUnique({
+      const existing = await prisma.sLS.findUnique({
         where: { shipmentNo },
         select: { id: true, source: true, archivedAt: true },
       })
@@ -1188,7 +1188,7 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
       const allPiNosToSearch = Array.from(new Set([...rawOrderNos, ...basePiNos]))
 
       const linkedPIs = allPiNosToSearch.length > 0
-        ? await prisma.sLS_PI.findMany({
+        ? await prisma.pI.findMany({
             where: { piNo: { in: allPiNosToSearch } },
             select: { id: true, piNo: true, orderId: true },
           })
@@ -1197,8 +1197,8 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
       // 回查採購訂單：優先用 slsPiId FK，次用 poNo=piNo 字串比對
       let poOrderId: number | undefined = undefined
       for (const lpi of linkedPIs) {
-        const po = await prisma.pO_Order.findFirst({ where: { slsPiId: lpi.id }, select: { id: true } })
-          ?? await prisma.pO_Order.findFirst({ where: { poNo: lpi.piNo }, select: { id: true } })
+        const po = await prisma.pO.findFirst({ where: { slsPiId: lpi.id }, select: { id: true } })
+          ?? await prisma.pO.findFirst({ where: { poNo: lpi.piNo }, select: { id: true } })
         if (po) { poOrderId = po.id; break }
       }
 
@@ -1217,17 +1217,17 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
       const shipmentCurrency: string | undefined =
         doExRate?.oriCurrency?.trim() ||
         (detail.currencyCode ? PATISCO_CURRENCY[parseInt(detail.currencyCode)] : undefined) ||
-        (linkedPIs.length > 0 ? await prisma.sLS_PI.findFirst({
+        (linkedPIs.length > 0 ? await prisma.pI.findFirst({
           where: { id: { in: linkedPIs.map(p => p.id) }, currencyCode: { not: null } },
           select: { currencyCode: true },
         }).then(pi => pi?.currencyCode ?? undefined) : undefined) ||
         undefined
 
-      // 預載 piId → (sku → slsItemId) Map，用於建立 SLS_ShipmentItem
+      // 預載 piId → (sku → slsItemId) Map，用於建立 SLS_Item
       const piSkuToSlsItemId = new Map<string, number>()
       const piSkuToPriceUnit = new Map<string, { unitPrice: import('@prisma/client').Prisma.Decimal | null, unit: string | null }>()
       if (linkedPIs.length > 0) {
-        const piItems = await prisma.sLS_PIItem.findMany({
+        const piItems = await prisma.pI_Item.findMany({
           where: { piId: { in: linkedPIs.map(p => p.id) } },
           select: {
             piId: true, slsItemId: true, unitPrice: true, unit: true,
@@ -1309,7 +1309,7 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
         // 從 CI 取定價：先嘗試 orderNo+sku，再 fallback 到純 sku
         const ciKey = sku ? (`${sourceOrderNo ?? ''}::${sku}`) : ''
         const ciData = (sku && ciPriceMap.get(ciKey)) || (sku && ciPriceMap.get(`::${sku}`)) || undefined
-        // 最終 fallback：SLS_PIItem lookup（舊路徑，CI 沒有時才用）
+        // 最終 fallback：PI_Item lookup（舊路徑，CI 沒有時才用）
         const piLookup = (piId && sku) ? piSkuToPriceUnit.get(`${piId}:${sku}`) : undefined
         const finalUnit = ciData?.unit || piLookup?.unit || undefined
         const finalPrice = ciData?.price || (piLookup?.unitPrice != null ? String(piLookup.unitPrice) : null)
@@ -1365,7 +1365,7 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
       if (existing) {
         if (existing.source === 'PATISCO') {
           // 既有記錄：更新幣別 + PI 連結 + 品項（全部重建，修正舊 sync 的錯誤）
-          await prisma.sLS_Shipment.update({
+          await prisma.sLS.update({
             where: { shipmentNo },
             data: {
               customerId: customer?.id ?? undefined,
@@ -1375,13 +1375,13 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
               archivedAt: null,
             },
           })
-          await prisma.sLS_ShipmentPI.deleteMany({ where: { shipmentId: existing.id } })
+          await prisma.sLS_PI_Link.deleteMany({ where: { shipmentId: existing.id } })
           for (const pi of linkedPIs) {
-            await prisma.sLS_ShipmentPI.create({ data: { shipmentId: existing.id, piId: pi.id } })
+            await prisma.sLS_PI_Link.create({ data: { shipmentId: existing.id, piId: pi.id } })
           }
-          await prisma.sLS_ShipmentItem.deleteMany({ where: { shipmentId: existing.id } })
+          await prisma.sLS_Item.deleteMany({ where: { shipmentId: existing.id } })
           for (const row of toItemRows(existing.id)) {
-            await prisma.sLS_ShipmentItem.create({ data: row })
+            await prisma.sLS_Item.create({ data: row })
           }
           r.updated++
         } else {
@@ -1390,7 +1390,7 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
         continue
       }
 
-      const shipment = await prisma.sLS_Shipment.create({
+      const shipment = await prisma.sLS.create({
         data: {
           shipmentNo,
           customerId: customer?.id ?? undefined,
@@ -1413,14 +1413,14 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
         },
       })
 
-      // 建立 SLS_ShipmentPI
+      // 建立 SLS_PI_Link
       for (const pi of linkedPIs) {
-        await prisma.sLS_ShipmentPI.create({ data: { shipmentId: shipment.id, piId: pi.id } })
+        await prisma.sLS_PI_Link.create({ data: { shipmentId: shipment.id, piId: pi.id } })
       }
 
-      // 建立 SLS_ShipmentItem（已 group by piId+sku，不重複）
+      // 建立 SLS_Item（已 group by piId+sku，不重複）
       for (const row of toItemRows(shipment.id)) {
-        await prisma.sLS_ShipmentItem.create({ data: row })
+        await prisma.sLS_Item.create({ data: row })
       }
       r.created++
     } catch (e) {
@@ -1428,14 +1428,14 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
     }
   }
 
-  // 修復舊資料：補查所有 slsItemId = null 但 rawSku 有值的 SLS_ShipmentItem
-  const broken = await prisma.sLS_ShipmentItem.findMany({
+  // 修復舊資料：補查所有 slsItemId = null 但 rawSku 有值的 SLS_Item
+  const broken = await prisma.sLS_Item.findMany({
     where: { slsItemId: null, rawSku: { not: null } },
     select: { id: true, piId: true, rawSku: true },
   })
   for (const item of broken) {
     if (!item.piId || !item.rawSku) continue
-    const piItem = await prisma.sLS_PIItem.findFirst({
+    const piItem = await prisma.pI_Item.findFirst({
       where: {
         piId: item.piId,
         slsItem: { product: { sku: item.rawSku } },
@@ -1443,7 +1443,7 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
       select: { slsItemId: true },
     })
     if (piItem) {
-      await prisma.sLS_ShipmentItem.update({
+      await prisma.sLS_Item.update({
         where: { id: item.id },
         data: { slsItemId: piItem.slsItemId },
       })
@@ -1463,28 +1463,28 @@ async function relinkPass(prisma: PrismaClient): Promise<{ fixed: number; detail
   const detail: Record<string, number> = {}
   let fixed = 0
 
-  // 1. SLS_PI 獨立存在，不再透過 piNo=orderNo 補連 SLS_Order。
-  //    若 PO_COPY 已建立 SLS_Order，step7 會在建 PI 時直接查找並連結，這裡不重複。
+  // 1. PI 獨立存在，不再透過 piNo=orderNo 補連 PO_CustomerCopy。
+  //    若 PO_COPY 已建立 PO_CustomerCopy，step7 會在建 PI 時直接查找並連結，這裡不重複。
 
-  // 2. PO_SupplierPI → PO_Order：目前已在 step6 用 poNo 配對，只補 orderId 真的缺失的情況
+  // 2. PI_SupplierCopy → PO：目前已在 step6 用 poNo 配對，只補 orderId 真的缺失的情況
   // （PI_COPY 的 piNo = PO 上的 poNo）
-  const orphanSupplierPIs = await prisma.pO_SupplierPI.findMany({
+  const orphanSupplierPIs = await prisma.pI_SupplierCopy.findMany({
     where: { orderId: 0 },  // orderId 是 required，理論上不存在 null，但保留以防萬一
     select: { id: true, piNo: true },
   })
   for (const spi of orphanSupplierPIs) {
-    const order = await prisma.pO_Order.findFirst({
+    const order = await prisma.pO.findFirst({
       where: { poNo: spi.piNo },
       select: { id: true },
     })
     if (!order) continue
-    await prisma.pO_SupplierPI.update({ where: { id: spi.id }, data: { orderId: order.id } })
+    await prisma.pI_SupplierCopy.update({ where: { id: spi.id }, data: { orderId: order.id } })
     fixed++
     detail['po_supplier_pi_order'] = (detail['po_supplier_pi_order'] ?? 0) + 1
   }
 
-  // 3. SLS_Shipment.poOrderId = null → 透過 SLS_PI.piNo 或 slsPiId → PO_Order 補連
-  const orphanShipments = await prisma.sLS_Shipment.findMany({
+  // 3. SLS.poOrderId = null → 透過 PI.piNo 或 slsPiId → PO 補連
+  const orphanShipments = await prisma.sLS.findMany({
     where: { poOrderId: null },
     select: {
       id: true,
@@ -1495,31 +1495,31 @@ async function relinkPass(prisma: PrismaClient): Promise<{ fixed: number; detail
     let po: { id: number } | null = null
     for (const link of sh.pis) {
       if (!link.pi) continue
-      // 優先：PO_Order.slsPiId FK
-      po = await prisma.pO_Order.findFirst({ where: { slsPiId: link.pi.id }, select: { id: true } })
+      // 優先：PO.slsPiId FK
+      po = await prisma.pO.findFirst({ where: { slsPiId: link.pi.id }, select: { id: true } })
       // 次要：poNo = piNo 字串比對
-      if (!po) po = await prisma.pO_Order.findFirst({ where: { poNo: link.pi.piNo }, select: { id: true } })
+      if (!po) po = await prisma.pO.findFirst({ where: { poNo: link.pi.piNo }, select: { id: true } })
       if (po) break
     }
     if (!po) continue
-    await prisma.sLS_Shipment.update({ where: { id: sh.id }, data: { poOrderId: po.id } })
+    await prisma.sLS.update({ where: { id: sh.id }, data: { poOrderId: po.id } })
     fixed++
     detail['sls_shipment_po'] = (detail['sls_shipment_po'] ?? 0) + 1
   }
 
-  // 4. SLS_ShipmentItem.slsItemId = null → 找 SLS_PIItem by piId + sku
-  const orphanShipItems = await prisma.sLS_ShipmentItem.findMany({
+  // 4. SLS_Item.slsItemId = null → 找 PI_Item by piId + sku
+  const orphanShipItems = await prisma.sLS_Item.findMany({
     where: { slsItemId: null, rawSku: { not: null } },
     select: { id: true, piId: true, rawSku: true },
   })
   for (const item of orphanShipItems) {
     if (!item.piId || !item.rawSku) continue
-    const piItem = await prisma.sLS_PIItem.findFirst({
+    const piItem = await prisma.pI_Item.findFirst({
       where: { piId: item.piId, slsItem: { product: { sku: item.rawSku } } },
       select: { slsItemId: true },
     })
     if (!piItem?.slsItemId) continue
-    await prisma.sLS_ShipmentItem.update({ where: { id: item.id }, data: { slsItemId: piItem.slsItemId } })
+    await prisma.sLS_Item.update({ where: { id: item.id }, data: { slsItemId: piItem.slsItemId } })
     fixed++
     detail['sls_shipment_item'] = (detail['sls_shipment_item'] ?? 0) + 1
   }
@@ -1551,10 +1551,10 @@ async function phase4_aiAudit(prisma: PrismaClient, jobId: number): Promise<Sync
   // 收集 re-link 後仍然存在的缺口
   const gaps: string[] = []
 
-  const noPoShipments = await prisma.sLS_Shipment.count({ where: { poOrderId: null, source: 'PATISCO' } })
-  if (noPoShipments > 0) gaps.push(`${noPoShipments} 張出貨單無法連結採購訂單（PO_Order）`)
+  const noPoShipments = await prisma.sLS.count({ where: { poOrderId: null, source: 'PATISCO' } })
+  if (noPoShipments > 0) gaps.push(`${noPoShipments} 張出貨單無法連結採購訂單（PO）`)
 
-  const unlinkedShipItems = await prisma.sLS_ShipmentItem.count({ where: { slsItemId: null, rawSku: { not: null } } })
+  const unlinkedShipItems = await prisma.sLS_Item.count({ where: { slsItemId: null, rawSku: { not: null } } })
   if (unlinkedShipItems > 0) gaps.push(`${unlinkedShipItems} 筆出貨品項找不到對應的 PI 品項`)
 
   if (gaps.length === 0) {
@@ -1632,7 +1632,7 @@ async function step9_dataAlerts(prisma: PrismaClient, jobId: number): Promise<Sy
 
   // ① 出貨單引用了不存在的 PI（MISSING_PI）
   // 真正異常：rawSku 有值但連 piId 都是 null（PI 完全對不上）
-  const shipmentItems = await prisma.sLS_ShipmentItem.findMany({
+  const shipmentItems = await prisma.sLS_Item.findMany({
     where: { slsItemId: null, piId: null, rawSku: { not: null } },
     select: {
       id: true, rawSku: true,
@@ -1651,7 +1651,7 @@ async function step9_dataAlerts(prisma: PrismaClient, jobId: number): Promise<Sy
     await prisma.sYS_DataAlert.create({
       data: {
         type: 'MISSING_PI',
-        refType: 'SLS_Shipment',
+        refType: 'SLS',
         refId: shipmentId,
         refNo: shipmentNo,
         message: `出貨單 ${shipmentNo} 有 ${skus.length} 個品項找不到對應的 PI（${skus.slice(0, 3).join('、')}${skus.length > 3 ? '…' : ''}）`,
@@ -1662,7 +1662,7 @@ async function step9_dataAlerts(prisma: PrismaClient, jobId: number): Promise<Sy
     r.created++
   }
 
-  // ② 出貨單引用了 Patisco 有但 PAXIS 沒有建立的 PI（shipmentPI 有 piNo 但查無 SLS_PI）
+  // ② 出貨單引用了 Patisco 有但 PAXIS 沒有建立的 PI（shipmentPI 有 piNo 但查無 PI）
   // 已由 ① 涵蓋（slsItemId=null 代表 PI 缺失），不重複 alert
 
   return r
@@ -1802,21 +1802,21 @@ export async function runPatiscoSync(
 // ─── 回滾（取消 sync job）────────────────────────────────────────────────────
 
 export async function rollbackSyncJob(prisma: PrismaClient, jobId: number): Promise<void> {
-  await prisma.sLS_ShipmentPI.deleteMany({ where: { shipment: { syncJobId: jobId } } })
-  await prisma.sLS_ShipmentItem.deleteMany({ where: { shipment: { syncJobId: jobId } } })
-  await prisma.sLS_Shipment.deleteMany({ where: { syncJobId: jobId } })
+  await prisma.sLS_PI_Link.deleteMany({ where: { shipment: { syncJobId: jobId } } })
+  await prisma.sLS_Item.deleteMany({ where: { shipment: { syncJobId: jobId } } })
+  await prisma.sLS.deleteMany({ where: { syncJobId: jobId } })
 
-  await prisma.sLS_PIItem.deleteMany({ where: { pi: { syncJobId: jobId } } })
-  await prisma.sLS_PI.deleteMany({ where: { syncJobId: jobId } })
+  await prisma.pI_Item.deleteMany({ where: { pi: { syncJobId: jobId } } })
+  await prisma.pI.deleteMany({ where: { syncJobId: jobId } })
 
-  await prisma.pO_SupplierPIItem.deleteMany({ where: { supplierPI: { syncJobId: jobId } } })
-  await prisma.pO_SupplierPI.deleteMany({ where: { syncJobId: jobId } })
+  await prisma.pI_SupplierCopy_Item.deleteMany({ where: { supplierPI: { syncJobId: jobId } } })
+  await prisma.pI_SupplierCopy.deleteMany({ where: { syncJobId: jobId } })
 
   await prisma.pO_Item.deleteMany({ where: { order: { syncJobId: jobId } } })
-  await prisma.pO_Order.deleteMany({ where: { syncJobId: jobId } })
+  await prisma.pO.deleteMany({ where: { syncJobId: jobId } })
 
-  await prisma.sLS_Item.deleteMany({ where: { order: { syncJobId: jobId } } })
-  await prisma.sLS_Order.deleteMany({ where: { syncJobId: jobId } })
+  await prisma.pO_CustomerCopy_Item.deleteMany({ where: { order: { syncJobId: jobId } } })
+  await prisma.pO_CustomerCopy.deleteMany({ where: { syncJobId: jobId } })
 
   await prisma.pRD_Product.deleteMany({ where: { syncJobId: jobId } })
   await prisma.sUP_Supplier.deleteMany({ where: { syncJobId: jobId } })

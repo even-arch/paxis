@@ -282,7 +282,7 @@ export default function ShippingPage() {
   const [piLoaded, setPiLoaded] = useState(false)
   const [selectedPiId, setSelectedPiId] = useState<number | null>(null)
 
-  // 從 SLS_Shipment 帶入（?slsShipmentId=）
+  // 從 SLS 帶入（?slsShipmentId=）
   const [linkedSlsShipmentId, setLinkedSlsShipmentId] = useState<number | null>(null)
   const [linkedShipmentNo, setLinkedShipmentNo] = useState<string | null>(null)
 
@@ -1075,7 +1075,7 @@ export default function ShippingPage() {
         <h1 className="text-lg font-semibold text-gray-800">UPS 出貨</h1>
       </div>
 
-      {/* 從 SLS_Shipment 帶入時的提示 banner */}
+      {/* 從 SLS 帶入時的提示 banner */}
       {linkedSlsShipmentId && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm flex items-center justify-between">
           <div>
@@ -1708,7 +1708,7 @@ export default function ShippingPage() {
           <div>
             <h2 className="text-sm font-semibold text-indigo-800">記錄出貨到 PAXIS</h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              將本次出貨資料（箱數、毛重、材積）儲存為 SLS_Shipment，
+              將本次出貨資料（箱數、毛重、材積）儲存為 SLS，
               並自動扣減庫存及建立應收帳款。
             </p>
           </div>

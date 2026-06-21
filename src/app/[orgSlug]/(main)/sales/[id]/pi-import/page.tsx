@@ -116,7 +116,7 @@ export default function PIImportPage() {
     setMappings(m => m.map(x => x.parsedIdx === parsedIdx ? { ...x, quantity: qty } : x))
   }
 
-  // ── Step 2: 確認建立 SLS_PI ────────────────────────────────────────────
+  // ── Step 2: 確認建立 PI ────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true); setSaveError('')

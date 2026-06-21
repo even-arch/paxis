@@ -23,7 +23,7 @@ export default async function ShipmentDetailPage({ params }: Props) {
   const id = parseInt(params.id, 10)
   if (isNaN(id)) notFound()
 
-  const shipment = await prisma.sLS_Shipment.findUnique({
+  const shipment = await prisma.sLS.findUnique({
     where: { id },
     include: {
       customer: { select: { id: true, name: true, shortName: true } },
@@ -109,7 +109,7 @@ export default async function ShipmentDetailPage({ params }: Props) {
       </div>
 
       {(() => {
-        // 優先用 SLS_ShipmentPI junction table；若空（舊資料或 UPS 流程漏建），
+        // 優先用 SLS_PI_Link junction table；若空（舊資料或 UPS 流程漏建），
         // 從 items.pi 推導唯一 PI 清單作為 fallback
         type PiEntry = { piId: number; piNo: string; orderId?: number | null; orderNo?: string | null; etd?: Date | null }
         let piList: PiEntry[] = shipment.pis.map(sp => ({

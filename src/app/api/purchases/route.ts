@@ -29,8 +29,8 @@ export async function GET(req: NextRequest) {
   }
 
   const [total, orders] = await Promise.all([
-    prisma.pO_Order.count({ where }),
-    prisma.pO_Order.findMany({
+    prisma.pO.count({ where }),
+    prisma.pO.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * limit,
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
 
-  const order = await prisma.pO_Order.create({
+  const order = await prisma.pO.create({
     data: {
       poNo: body.poNo?.trim() || generatePoNo(),
       supplierId: Number(body.supplierId),

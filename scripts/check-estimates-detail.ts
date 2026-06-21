@@ -3,7 +3,7 @@ const prisma = new PrismaClient()
 
 async function main() {
   // 1. 看所有 Shipment 的 ciExchangeRate 分佈
-  const shipments = await prisma.sLS_Shipment.findMany({
+  const shipments = await prisma.sLS.findMany({
     orderBy: { actualShipDate: 'desc' },
     select: {
       id: true,

@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 async function main() {
-  const shipments = await prisma.sLS_Shipment.findMany({
+  const shipments = await prisma.sLS.findMany({
     take: 5,
     orderBy: { actualShipDate: 'desc' },
     include: {
@@ -37,14 +37,14 @@ async function main() {
       console.log(`    PI items sum: ${piItemsTotal}`)
     }
     const shipItemsTotal = s.items.reduce((sum, i) => sum + Number(i.slsItem?.unitPrice ?? 0) * (i.quantity ?? 0), 0)
-    console.log(`  SLS_ShipmentItem → slsItem prices total: ${shipItemsTotal}`)
-    console.log(`  SLS_ShipmentItem count: ${s.items.length}`)
+    console.log(`  SLS_Item → slsItem prices total: ${shipItemsTotal}`)
+    console.log(`  SLS_Item count: ${s.items.length}`)
   }
 
-  // 有多少 SLS_Order.totalAmount 是 null？
-  const nullTotal = await prisma.sLS_Order.count({ where: { totalAmount: null } })
-  const total = await prisma.sLS_Order.count()
-  console.log(`\n=== SLS_Order totalAmount null: ${nullTotal} / ${total} ===`)
+  // 有多少 PO_CustomerCopy.totalAmount 是 null？
+  const nullTotal = await prisma.pO_CustomerCopy.count({ where: { totalAmount: null } })
+  const total = await prisma.pO_CustomerCopy.count()
+  console.log(`\n=== PO_CustomerCopy totalAmount null: ${nullTotal} / ${total} ===`)
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect())

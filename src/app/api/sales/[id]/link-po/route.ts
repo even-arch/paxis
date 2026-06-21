@@ -21,7 +21,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const orderId = Number(params.id)
-    const order = await prisma.sLS_Order.findUnique({
+    const order = await prisma.pO_CustomerCopy.findUnique({
       where: { id: orderId },
       include: { items: { include: { product: { select: { id: true, name: true, sku: true } } } } },
     })
@@ -32,7 +32,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     // ── 模式 1：只更新 PO 號（JSON body）────────────────────────────────────
     if (!contentType.includes('multipart/form-data')) {
       const body = await req.json() as { customerPoNo?: string | null }
-      await prisma.sLS_Order.update({
+      await prisma.pO_CustomerCopy.update({
         where: { id: orderId },
         data: { customerPoNo: body.customerPoNo?.trim() || null },
       })
@@ -113,7 +113,7 @@ ${ourSkuList}
 
     // 儲存 customerPoNo 到訂單
     const customerPoNo = parsed.poNo?.trim() || null
-    await prisma.sLS_Order.update({
+    await prisma.pO_CustomerCopy.update({
       where: { id: orderId },
       data: { customerPoNo },
     })
@@ -129,7 +129,7 @@ ${ourSkuList}
         i.product.sku && i.product.sku.toLowerCase() === pi.ourSku!.toLowerCase()
       )
       if (orderItem) {
-        await prisma.sLS_Item.update({
+        await prisma.pO_CustomerCopy_Item.update({
           where: { id: orderItem.id },
           data: { customerSkuRef: pi.customerSku?.trim() || null },
         })

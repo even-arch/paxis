@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
 
   const archivedAt = action === 'archive' ? new Date() : null
 
-  const result = await prisma.sLS_Order.updateMany({
+  const result = await prisma.pO_CustomerCopy.updateMany({
     where: { id: { in: ids } },
     data: { archivedAt },
   })

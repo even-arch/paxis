@@ -2,10 +2,10 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 async function main() {
-  const totalPO = await prisma.pO_Order.count()
-  const linkedPO = await prisma.pO_Order.count({ where: { salesOrderId: { not: null } } })
+  const totalPO = await prisma.pO.count()
+  const linkedPO = await prisma.pO.count({ where: { salesOrderId: { not: null } } })
 
-  const sample = await prisma.sLS_ShipmentPI.findFirst({
+  const sample = await prisma.sLS_PI_Link.findFirst({
     include: {
       pi: {
         include: {
@@ -22,7 +22,7 @@ async function main() {
 
   const sampleOrderNo = sample?.pi.order?.orderNo
   const poByPatisco = sampleOrderNo
-    ? await prisma.pO_Order.findMany({
+    ? await prisma.pO.findMany({
         where: { patiscoOrderNo: sampleOrderNo },
         select: { poNo: true, patiscoOrderNo: true },
       })

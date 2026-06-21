@@ -2,12 +2,12 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 async function main() {
-  const pos = await prisma.pO_Order.findMany({
+  const pos = await prisma.pO.findMany({
     select: { id: true, poNo: true, patiscoOrderNo: true, totalAmount: true, currencyCode: true },
     orderBy: { createdAt: 'desc' },
     take: 10,
   })
-  const sls = await prisma.sLS_Order.findMany({
+  const sls = await prisma.pO_CustomerCopy.findMany({
     select: { id: true, orderNo: true, totalAmount: true, currencyCode: true },
     orderBy: { createdAt: 'desc' },
     take: 10,

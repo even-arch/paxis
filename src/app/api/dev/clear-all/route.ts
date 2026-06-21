@@ -30,10 +30,10 @@ export async function POST(req: NextRequest) {
     const sql = neon(process.env.DATABASE_URL!)
     const tables = [
       'FIN_Payable', 'FIN_Receivable',
-      'SLS_ShipmentItem', 'SLS_ShipmentPI', 'SLS_Shipment',
-      'SLS_PIItem', 'SLS_PI', 'SLS_Item', 'SLS_Order',
-      'PO_SupplierPIItem', 'PO_SupplierPI',
-      'PO_ReceiptItem', 'PO_Receipt', 'PO_Item', 'PO_Order',
+      'SLS_Item', 'SLS_PI_Link', 'SLS',
+      'PI_Item', 'PI', 'PO_CustomerCopy_Item', 'PO_CustomerCopy',
+      'PI_SupplierCopy_Item', 'PI_SupplierCopy',
+      'PO_ReceiptItem', 'PO_Receipt', 'PO_Item', 'PO',
       'INV_Movement', 'INV_Stock',
       'SYS_PatiscoSync',
       'COST_Sheet', 'PRD_ProductHistory', 'PRD_CategoryMapping',

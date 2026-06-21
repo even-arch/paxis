@@ -35,13 +35,13 @@ const PAXIS_FIELDS = `
 {{customer.contactPerson}} 客戶聯絡人
 {{customer.email}}        客戶 Email
 
-### PI 資訊（SLS_PI）
+### PI 資訊（PI）
 {{pi.piNo}}               PI 號碼
 {{pi.piDate}}             PI 日期
 {{pi.estimatedShipDate}}  預計出貨日
 {{pi.tradeTerms}}         交易條件（FOB / FOR / CIF…）
 
-### 訂單資訊（SLS_Order）
+### 訂單資訊（PO_CustomerCopy）
 {{order.orderNo}}         我方訂單號
 {{order.customerPoNo}}    客戶 PO 號
 {{order.currencyCode}}    幣別
@@ -65,7 +65,7 @@ const PAXIS_FIELDS = `
 {{totals.grossWeightKg}}  總毛重（kg）
 {{totals.cbm}}            總材積（CBM）
 
-### 採購單（PO_Order）專用
+### 採購單（PO）專用
 {{supplier.name}}         供應商名稱
 {{supplier.address}}      供應商地址
 {{supplier.contactPerson}} 供應商聯絡人

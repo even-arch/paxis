@@ -21,7 +21,7 @@ export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const shipments = await prisma.sLS_Shipment.findMany({
+  const shipments = await prisma.sLS.findMany({
     orderBy: { actualShipDate: 'desc' },
     take: 60,  // 只看近 60 張，避免太慢
     include: {
@@ -45,7 +45,7 @@ export async function GET() {
     },
   })
 
-  const allPOs = await prisma.pO_Order.findMany({
+  const allPOs = await prisma.pO.findMany({
     select: {
       id: true, poNo: true, totalAmount: true, currencyCode: true, exchangeRate: true,
       slsPiId: true, salesOrderId: true,
@@ -95,7 +95,7 @@ export async function GET() {
   for (const s of shipments) {
     const issues: string[] = []
 
-    // AR = SLS_PI.totalAmount（我方 PI 金額，最終確認的客戶價格）
+    // AR = PI.totalAmount（我方 PI 金額，最終確認的客戶價格）
     const arTWD = s.pis.reduce((sum, sp) => {
       const totalAmt = sp.pi.totalAmount
       const currCode = sp.pi.currencyCode ?? 'TWD'
@@ -104,8 +104,8 @@ export async function GET() {
       return sum + base * calcExtraCharges(sp.pi.extraCharges)
     }, 0)
 
-    // AP = PO_Order.totalAmount（付給供應商的採購金額）
-    // 主路徑A：PO.slsPiId = SLS_PI.id；主路徑B：PO.poNo = SLS_PI.piNo；次路徑：salesOrderId
+    // AP = PO.totalAmount（付給供應商的採購金額）
+    // 主路徑A：PO.slsPiId = PI.id；主路徑B：PO.poNo = PI.piNo；次路徑：salesOrderId
     let apTWD = 0
     const unmatchedPIs: string[] = []
     const nullAmountPos: string[] = []

@@ -26,7 +26,7 @@ export async function POST(req: NextRequest, {
   const body = await req.json()
   const orderId = Number(params.id)
 
-  const order = await prisma.pO_Order.findUnique({
+  const order = await prisma.pO.findUnique({
     where: { id: orderId },
     include: { items: { include: { product: true } } },
   })
@@ -144,7 +144,7 @@ export async function POST(req: NextRequest, {
   const allReceived = updatedItems.every(i => i.receivedQty >= i.quantity)
   const anyReceived = updatedItems.some(i => i.receivedQty > 0)
 
-  await prisma.pO_Order.update({
+  await prisma.pO.update({
     where: { id: orderId },
     data: {
       status: allReceived ? 3 : anyReceived ? 2 : order.status,

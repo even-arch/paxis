@@ -16,7 +16,7 @@ export default async function NewPurchasePage({ params }: { params: { orgSlug: s
       orderBy: [{ sku: 'asc' }, { name: 'asc' }],
     }),
     // 有效的我方 PI（供接單後採購連結用）
-    prisma.sLS_PI.findMany({
+    prisma.pI.findMany({
       where: { status: { in: [0, 2] } },  // 有效或已出貨
       select: {
         id: true,

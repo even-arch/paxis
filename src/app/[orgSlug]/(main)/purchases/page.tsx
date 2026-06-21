@@ -45,8 +45,8 @@ export default async function PurchasesPage({ params, searchParams }: Props) {
   }
 
   const [total, orders, suppliers] = await Promise.all([
-    prisma.pO_Order.count({ where }),
-    prisma.pO_Order.findMany({
+    prisma.pO.count({ where }),
+    prisma.pO.findMany({
       where,
       orderBy: { [sort]: dir },
       skip: (page - 1) * limit,

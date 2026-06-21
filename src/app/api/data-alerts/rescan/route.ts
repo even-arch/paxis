@@ -18,14 +18,14 @@ export async function POST() {
     if (a.refType === 'SYS_SyncJob') continue  // 保留 sync job 類告警
 
     let exists = false
-    if (a.refType === 'SLS_Shipment') {
-      exists = !!(await prisma.sLS_Shipment.findUnique({ where: { id: a.refId }, select: { id: true } }))
-    } else if (a.refType === 'SLS_PI') {
-      exists = !!(await prisma.sLS_PI.findUnique({ where: { id: a.refId }, select: { id: true } }))
-    } else if (a.refType === 'SLS_Order') {
-      exists = !!(await prisma.sLS_Order.findUnique({ where: { id: a.refId }, select: { id: true } }))
-    } else if (a.refType === 'PO_Order') {
-      exists = !!(await prisma.pO_Order.findUnique({ where: { id: a.refId }, select: { id: true } }))
+    if (a.refType === 'SLS') {
+      exists = !!(await prisma.sLS.findUnique({ where: { id: a.refId }, select: { id: true } }))
+    } else if (a.refType === 'PI') {
+      exists = !!(await prisma.pI.findUnique({ where: { id: a.refId }, select: { id: true } }))
+    } else if (a.refType === 'PO_CustomerCopy') {
+      exists = !!(await prisma.pO_CustomerCopy.findUnique({ where: { id: a.refId }, select: { id: true } }))
+    } else if (a.refType === 'PO') {
+      exists = !!(await prisma.pO.findUnique({ where: { id: a.refId }, select: { id: true } }))
     }
 
     if (!exists) staleIds.push(a.id)

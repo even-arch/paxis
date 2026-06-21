@@ -29,8 +29,8 @@ export default async function ProductDetailPage({
 
   const stock = product.inventoryItems[0]
 
-  // 從 SLS_Item 取得買過這個產品的客戶（含訂單資訊）
-  const salesItems = await prisma.sLS_Item.findMany({
+  // 從 PO_CustomerCopy_Item 取得買過這個產品的客戶（含訂單資訊）
+  const salesItems = await prisma.pO_CustomerCopy_Item.findMany({
     where: { productId: product.id },
     select: {
       id: true,

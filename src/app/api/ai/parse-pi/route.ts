@@ -1,7 +1,7 @@
 /**
  * POST /api/ai/parse-pi
  * 上傳我方發出的 PI 文件（PDF/Excel），用 AI 解析出 PI 號、出貨日、品項。
- * 解析結果由前端在 /sales/[id]/pi-import 頁預覽確認後，再 POST 建立 SLS_PI。
+ * 解析結果由前端在 /sales/[id]/pi-import 頁預覽確認後，再 POST 建立 PI。
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'

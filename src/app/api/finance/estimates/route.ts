@@ -8,8 +8,8 @@ export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // 預載所有 PO_Order（含品項金額）— 用於 slsPiId / poNo / salesOrderId 配對
-  const allPOs = await prisma.pO_Order.findMany({
+  // 預載所有 PO（含品項金額）— 用於 slsPiId / poNo / salesOrderId 配對
+  const allPOs = await prisma.pO.findMany({
     select: {
       id: true,
       poNo: true,
@@ -53,7 +53,7 @@ export async function GET() {
     return base * Number(po.exchangeRate ?? 1)
   }
 
-  const shipments = await prisma.sLS_Shipment.findMany({
+  const shipments = await prisma.sLS.findMany({
     orderBy: { actualShipDate: 'desc' },
     include: {
       customer: { select: { id: true, name: true, shortName: true } },
@@ -110,7 +110,7 @@ export async function GET() {
   const rows = shipments.map(s => {
     // ── AR ────────────────────────────────────────────────────────────────
     // ciExchangeRate 是 TWD→EUR 的方向（例如 0.0278 = 1 TWD = 0.0278 EUR）
-    // SLS_Order.totalAmount 是台幣金額，不需再乘匯率
+    // PO_CustomerCopy.totalAmount 是台幣金額，不需再乘匯率
     let arTWD = 0
     let arForeign = 0  // EUR 顯示用
     let arCurrency = 'EUR'
@@ -127,7 +127,7 @@ export async function GET() {
     } else {
       // 從 PI → Order 計算，加上 PI 層級的 extraCharges（百分比 + 固定金額）
       arTWD = s.pis.reduce((sum, sp) => {
-        // SLS_PI 是主，SLS_Order 只做 fallback
+        // PI 是主，PO_CustomerCopy 只做 fallback
         const totalAmt = sp.pi.totalAmount ?? sp.pi.order?.totalAmount
         const currCode = sp.pi.currencyCode ?? sp.pi.order?.currencyCode ?? 'TWD'
         if (!totalAmt) return sum
@@ -141,9 +141,9 @@ export async function GET() {
     }
 
     // ── AP：三層 fallback ──────────────────────────────────────────────────
-    // 主路徑A：PO.slsPiId = SLS_PI.id（正式 FK，貿易商模式核心連結）
-    // 主路徑B：PO.poNo = SLS_PI.piNo（號碼一致時的 fallback）
-    // 次路徑：PO.salesOrderId = SLS_Order.id（有 SLS_Order 連結時補充）
+    // 主路徑A：PO.slsPiId = PI.id（正式 FK，貿易商模式核心連結）
+    // 主路徑B：PO.poNo = PI.piNo（號碼一致時的 fallback）
+    // 次路徑：PO.salesOrderId = PO_CustomerCopy.id（有 PO_CustomerCopy 連結時補充）
     const poMap = new Map<number, { poNo: string; supplierName: string; amountTWD: number; currency: string; matchType: string }>()
 
     for (const sp of s.pis) {
@@ -174,7 +174,7 @@ export async function GET() {
         continue
       }
 
-      // 次路徑：salesOrderId（有關聯 SLS_Order 時）
+      // 次路徑：salesOrderId（有關聯 PO_CustomerCopy 時）
       const slsOrder = sp.pi.order
       if (slsOrder) {
         const bySlsId = poBySlsId.get(slsOrder.id) ?? []

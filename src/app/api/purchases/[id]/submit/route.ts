@@ -14,7 +14,7 @@ export async function POST(_req: NextRequest, {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const id = Number(params.id)
-  const order = await prisma.pO_Order.findUnique({
+  const order = await prisma.pO.findUnique({
     where: { id },
     include: { items: true },
   })
@@ -23,7 +23,7 @@ export async function POST(_req: NextRequest, {
   if (order.status !== 0) return NextResponse.json({ error: '只有草稿可以送出' }, { status: 400 })
   if (order.items.length === 0) return NextResponse.json({ error: '供應商訂單沒有明細' }, { status: 400 })
 
-  const updated = await prisma.pO_Order.update({
+  const updated = await prisma.pO.update({
     where: { id },
     data: { status: 1 },
   })

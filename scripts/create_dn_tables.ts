@@ -6,7 +6,7 @@ async function main() {
       "id" SERIAL PRIMARY KEY,
       "docNo" TEXT NOT NULL UNIQUE,
       "supplierId" INTEGER REFERENCES "SUP_Supplier"(id),
-      "poOrderId" INTEGER REFERENCES "PO_Order"(id),
+      "poOrderId" INTEGER REFERENCES "PO"(id),
       "issueDate" TIMESTAMP(3) NOT NULL,
       "deliveryDate" TIMESTAMP(3),
       "contactName" TEXT,

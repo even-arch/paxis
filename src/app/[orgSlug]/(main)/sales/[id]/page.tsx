@@ -28,7 +28,7 @@ const SOURCE_LABELS: Record<string, string> = {
 export default async function SalesDetailPage({
   params }: Props) {
   const prisma = await getPagePrisma(params.orgSlug)
-  const order = await prisma.sLS_Order.findUnique({
+  const order = await prisma.pO_CustomerCopy.findUnique({
     where: { id: Number(params.id) },
     include: {
       customer: true,
@@ -47,8 +47,8 @@ export default async function SalesDetailPage({
 
   if (!order) notFound()
 
-  // 出貨記錄：透過出貨品項 → SLS_Item.orderId 反查（SLS_Order 已不直接關聯 SLS_Shipment）
-  const shipments = await prisma.sLS_Shipment.findMany({
+  // 出貨記錄：透過出貨品項 → PO_CustomerCopy_Item.orderId 反查（PO_CustomerCopy 已不直接關聯 SLS）
+  const shipments = await prisma.sLS.findMany({
     where: { items: { some: { slsItem: { orderId: order.id } } } },
     orderBy: { performedAt: 'desc' },
     include: {
@@ -64,7 +64,7 @@ export default async function SalesDetailPage({
   })
 
   // 關聯供應商訂單：優先用 salesOrderId FK，fallback 用單號前綴比對
-  const linkedPurchaseOrders = await prisma.pO_Order.findMany({
+  const linkedPurchaseOrders = await prisma.pO.findMany({
     where: {
       OR: [
         { salesOrderId: order.id },

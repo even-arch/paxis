@@ -13,7 +13,7 @@ export async function GET(_req: NextRequest, {
 
   const shipmentId = Number(params.shipmentId)
 
-  const shipment = await prisma.sLS_Shipment.findUnique({
+  const shipment = await prisma.sLS.findUnique({
     where: { id: shipmentId },
     include: {
       items: {

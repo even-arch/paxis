@@ -207,7 +207,7 @@ export default function PrintPIPage() {
         setData(d)
         if (d.pi?.piNo) document.title = d.pi.piNo
         if (d.customer?.id) {
-          const res = await fetch(`/api/customers/${d.customer.id}/print-defaults?docType=SLS_PI`)
+          const res = await fetch(`/api/customers/${d.customer.id}/print-defaults?docType=PI`)
           const json = await res.json() as { freeFields: FreeFields | null }
           if (json.freeFields) setFreeFields({ ...EMPTY_FREE, ...json.freeFields })
         }
@@ -215,7 +215,7 @@ export default function PrintPIPage() {
       })
 
     // 載入可用模板清單
-    fetch('/api/print/templates?docType=SLS_PI')
+    fetch('/api/print/templates?docType=PI')
       .then(r => r.json())
       .then((list: TemplateOption[]) => {
         setTemplates(list)
@@ -253,7 +253,7 @@ export default function PrintPIPage() {
     await fetch(`/api/customers/${data.customer.id}/print-defaults`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ docType: 'SLS_PI', freeFields }),
+      body: JSON.stringify({ docType: 'PI', freeFields }),
     })
     setSaving(false)
     setSavedMsg('已儲存')

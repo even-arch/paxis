@@ -36,23 +36,23 @@ export async function GET(req: NextRequest) {
       const rows = await sql`
         SELECT
           (SELECT COUNT(*) FROM "PRD_Product") AS products,
-          (SELECT COUNT(*) FROM "SLS_Order") AS orders,
-          (SELECT COUNT(*) FROM "SLS_PI") AS pis,
-          (SELECT COUNT(*) FROM "SLS_Item") AS items,
+          (SELECT COUNT(*) FROM "PO_CustomerCopy") AS orders,
+          (SELECT COUNT(*) FROM "PI") AS pis,
+          (SELECT COUNT(*) FROM "PO_CustomerCopy_Item") AS items,
           (SELECT COUNT(*) FROM "SYS_PatiscoSync") AS sync_records,
           (SELECT COUNT(*) FROM "SYS_PatiscoSync" WHERE status='ok') AS sync_ok,
           (SELECT COUNT(*) FROM "SYS_PatiscoSync" WHERE status='error') AS sync_error
       `
       const skus = await sql`SELECT id, sku, name, "patiscoProductId", "isActive" FROM "PRD_Product" ORDER BY id LIMIT 20`
-      // Show which PI doc IDs are in SLS_PI and what patiscoDocId they used for getOrderDetail
+      // Show which PI doc IDs are in PI and what patiscoDocId they used for getOrderDetail
       const piDocs = await sql`
         SELECT p."piNo", p."patiscoDocId",
                COUNT(si.id) AS "itemCount",
                string_agg(pr.sku, ',') AS "skus",
                string_agg(si.quantity::text, ',') AS "qtys"
-        FROM "SLS_PI" p
-        JOIN "SLS_Order" o ON o.id = p."orderId"
-        LEFT JOIN "SLS_Item" si ON si."orderId" = o.id
+        FROM "PI" p
+        JOIN "PO_CustomerCopy" o ON o.id = p."orderId"
+        LEFT JOIN "PO_CustomerCopy_Item" si ON si."orderId" = o.id
         LEFT JOIN "PRD_Product" pr ON pr.id = si."productId"
         GROUP BY p."piNo", p."patiscoDocId"
         LIMIT 20
@@ -148,10 +148,10 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // 將缺 patiscoCreatedAt 的 SLS_Order 對應的 SYS_PatiscoSync 重設為 pending，讓下次 sync 重新處理
+    // 將缺 patiscoCreatedAt 的 PO_CustomerCopy 對應的 SYS_PatiscoSync 重設為 pending，讓下次 sync 重新處理
     if (action === 'backfillCreatedAt') {
       const sql = neon(process.env.DATABASE_URL!)
-      const missing = await prisma.sLS_Order.findMany({
+      const missing = await prisma.pO_CustomerCopy.findMany({
         where: { patiscoCreatedAt: null, source: 'PATISCO', patiscoDocId: { not: null } },
         select: { id: true, orderNo: true, patiscoDocId: true },
       })
@@ -172,10 +172,10 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // 將缺 etd 的 SLS_PI 對應的 SYS_PatiscoSync 重設為 pending，讓下次 sync 補填 ETD
+    // 將缺 etd 的 PI 對應的 SYS_PatiscoSync 重設為 pending，讓下次 sync 補填 ETD
     if (action === 'backfillEtd') {
       const sql = neon(process.env.DATABASE_URL!)
-      const missing = await prisma.sLS_PI.findMany({
+      const missing = await prisma.pI.findMany({
         where: { etd: null, source: 'PATISCO', patiscoDocId: { not: null } },
         select: { id: true, piNo: true, patiscoDocId: true },
       })

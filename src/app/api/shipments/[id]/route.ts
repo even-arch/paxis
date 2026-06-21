@@ -1,6 +1,6 @@
 /**
  * GET /api/shipments/[id]
- * 取得單一 SLS_Shipment 的完整資料，供 /shipping 頁面預填使用
+ * 取得單一 SLS 的完整資料，供 /shipping 頁面預填使用
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -17,7 +17,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const id = Number(params.id)
   if (isNaN(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
 
-  const shipment = await prisma.sLS_Shipment.findUnique({
+  const shipment = await prisma.sLS.findUnique({
     where: { id },
     include: {
       // 客戶資料（直接存在 Shipment 上）

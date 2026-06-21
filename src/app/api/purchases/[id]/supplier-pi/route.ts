@@ -26,7 +26,7 @@ export async function POST(req: NextRequest, {
     return NextResponse.json({ error: '供應商 PI 單號為必填' }, { status: 400 })
   }
 
-  const order = await prisma.pO_Order.findUnique({
+  const order = await prisma.pO.findUnique({
     where: { id: orderId },
     select: { id: true, status: true },
   })
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest, {
     return NextResponse.json({ error: '供應商訂單已完成或取消' }, { status: 400 })
   }
 
-  const supplierPI = await prisma.pO_SupplierPI.create({
+  const supplierPI = await prisma.pI_SupplierCopy.create({
     data: {
       orderId,
       piNo: body.piNo.trim(),
@@ -62,7 +62,7 @@ export async function GET(_req: NextRequest, {
     const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const pis = await prisma.pO_SupplierPI.findMany({
+  const pis = await prisma.pI_SupplierCopy.findMany({
     where: { orderId: Number(params.id) },
     include: {
       items: { include: { poItem: { include: { product: { select: { name: true, sku: true } } } } } },

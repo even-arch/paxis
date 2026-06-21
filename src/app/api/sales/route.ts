@@ -30,8 +30,8 @@ export async function GET(req: NextRequest) {
   }
 
   const [total, orders] = await Promise.all([
-    prisma.sLS_Order.count({ where }),
-    prisma.sLS_Order.findMany({
+    prisma.pO_CustomerCopy.count({ where }),
+    prisma.pO_CustomerCopy.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * limit,
@@ -82,11 +82,11 @@ export async function POST(req: NextRequest) {
   if (!orderNo) {
     const today = new Date()
     const datePart = today.toISOString().slice(0, 10).replace(/-/g, '')
-    const count = await prisma.sLS_Order.count()
+    const count = await prisma.pO_CustomerCopy.count()
     orderNo = `SLS-${datePart}-${String(count + 1).padStart(4, '0')}`
   }
 
-  const order = await prisma.sLS_Order.create({
+  const order = await prisma.pO_CustomerCopy.create({
     data: {
       orderNo,
       customerId: body.customerId ?? null,
@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
   if (body.customerId && body.items.length > 0) {
     const now = new Date()
     // 先取建立後的 items（含 id），批次 upsert
-    const createdItems = await prisma.sLS_Item.findMany({
+    const createdItems = await prisma.pO_CustomerCopy_Item.findMany({
       where: { orderId: order.id },
     })
     await Promise.allSettled(

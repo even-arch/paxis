@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   if (!ids?.length) return NextResponse.json({ error: '請選擇至少一筆' }, { status: 400 })
 
   const prisma = await getRequestPrisma()
-  const result = await prisma.sLS_Shipment.updateMany({
+  const result = await prisma.sLS.updateMany({
     where: { id: { in: ids } },
     data: { archivedAt: action === 'archive' ? new Date() : null },
   })

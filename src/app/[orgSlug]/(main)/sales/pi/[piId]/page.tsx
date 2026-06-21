@@ -12,7 +12,7 @@ export default async function PIDetailPage({ params }: Props) {
   const piId = Number(params.piId)
   if (isNaN(piId)) notFound()
 
-  const pi = await prisma.sLS_PI.findUnique({
+  const pi = await prisma.pI.findUnique({
     where: { id: piId },
     include: {
       customer: true,
@@ -37,7 +37,7 @@ export default async function PIDetailPage({ params }: Props) {
   // 若 slsPiId FK 找不到，fallback 用 poNo=piNo 字串比對
   const linkedPOs = pi.poOrders.length > 0
     ? pi.poOrders
-    : await prisma.pO_Order.findMany({
+    : await prisma.pO.findMany({
         where: { poNo: pi.piNo },
         select: {
           id: true, poNo: true, status: true, totalAmount: true, currencyCode: true,

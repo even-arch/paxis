@@ -75,16 +75,16 @@ export async function GET(req: NextRequest) {
       return (sql as unknown as (t: TemplateStringsArray) => Promise<unknown[]>)(t)
     }
     const stmts = [
-      `ALTER TABLE "PO_SupplierPI" ADD COLUMN IF NOT EXISTS "patiscoCreatedAt" TIMESTAMP WITH TIME ZONE`,
-      `ALTER TABLE "PO_Order" ADD COLUMN IF NOT EXISTS "salesOrderId" INTEGER REFERENCES "SLS_Order"("id") ON DELETE SET NULL`,
-      `CREATE INDEX IF NOT EXISTS "PO_Order_salesOrderId_idx" ON "PO_Order"("salesOrderId")`,
+      `ALTER TABLE "PI_SupplierCopy" ADD COLUMN IF NOT EXISTS "patiscoCreatedAt" TIMESTAMP WITH TIME ZONE`,
+      `ALTER TABLE "PO" ADD COLUMN IF NOT EXISTS "salesOrderId" INTEGER REFERENCES "PO_CustomerCopy"("id") ON DELETE SET NULL`,
+      `CREATE INDEX IF NOT EXISTS "PO_Order_salesOrderId_idx" ON "PO"("salesOrderId")`,
       `ALTER TABLE "SYS_PatiscoConfig" ADD COLUMN IF NOT EXISTS "syncEnabled" BOOLEAN NOT NULL DEFAULT true`,
-      `ALTER TABLE "SLS_ShipmentItem" ADD COLUMN IF NOT EXISTS "cartons" INTEGER`,
-      `ALTER TABLE "SLS_ShipmentItem" ADD COLUMN IF NOT EXISTS "grossWeightKg" NUMERIC`,
-      `ALTER TABLE "SLS_ShipmentItem" ADD COLUMN IF NOT EXISTS "netWeightKg" NUMERIC`,
-      `ALTER TABLE "SLS_ShipmentItem" ADD COLUMN IF NOT EXISTS "cbm" NUMERIC`,
-      `ALTER TABLE "SLS_Shipment" ADD COLUMN IF NOT EXISTS "packingListNo" TEXT`,
-      `ALTER TABLE "SLS_Shipment" ADD COLUMN IF NOT EXISTS "commercialInvNo" TEXT`,
+      `ALTER TABLE "SLS_Item" ADD COLUMN IF NOT EXISTS "cartons" INTEGER`,
+      `ALTER TABLE "SLS_Item" ADD COLUMN IF NOT EXISTS "grossWeightKg" NUMERIC`,
+      `ALTER TABLE "SLS_Item" ADD COLUMN IF NOT EXISTS "netWeightKg" NUMERIC`,
+      `ALTER TABLE "SLS_Item" ADD COLUMN IF NOT EXISTS "cbm" NUMERIC`,
+      `ALTER TABLE "SLS" ADD COLUMN IF NOT EXISTS "packingListNo" TEXT`,
+      `ALTER TABLE "SLS" ADD COLUMN IF NOT EXISTS "commercialInvNo" TEXT`,
       `CREATE TABLE IF NOT EXISTS "CUS_CustomerProduct" (
         "id" SERIAL PRIMARY KEY,
         "customerId" INTEGER NOT NULL REFERENCES "CUS_Customer"("id") ON DELETE CASCADE,
@@ -299,10 +299,10 @@ export async function GET(req: NextRequest) {
       result = { ci: ci.ok ? { orders: (ci.data as Record<string,unknown>)?.orders, no: (ci.data as Record<string,unknown>)?.no } : { error: ci }, pl: pl.ok ? { orders: (pl.data as Record<string,unknown>)?.orders } : { error: pl }, ordersCount: (orders as unknown[]).length, packingsCount: (packings as unknown[]).length }
       break
     }
-    // ── 列出所有 DO 的 patiscoDocId（從 SLS_Shipment）────────────────────
+    // ── 列出所有 DO 的 patiscoDocId（從 SLS）────────────────────
     case 'shipmentDocIds': {
       const prisma2 = await import('@/lib/request-db').then(m => m.getRequestPrisma())
-      const rows = await prisma2.sLS_Shipment.findMany({
+      const rows = await prisma2.sLS.findMany({
         select: { id: true, shipmentNo: true, patiscoDocId: true, patiscoDocNo: true },
         where: { source: 'PATISCO' },
         orderBy: { id: 'desc' },

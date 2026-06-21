@@ -2,8 +2,8 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 async function main() {
-  // SLS_Order 的匯率和幣別
-  const orders = await prisma.sLS_Order.findMany({
+  // PO_CustomerCopy 的匯率和幣別
+  const orders = await prisma.pO_CustomerCopy.findMany({
     select: { orderNo: true, currencyCode: true, totalAmount: true, exchangeRate: true },
     take: 10,
     orderBy: { createdAt: 'desc' },
@@ -19,8 +19,8 @@ async function main() {
   console.log('\nFIN_Receivable:')
   recs.forEach(r => console.log(`  ${r.currencyCode}  foreign=${r.amountForeign}  rate=${r.rateAtInvoice}  twd=${r.amountTWD}`))
 
-  // SLS_Shipment ciExchangeRate
-  const ships = await prisma.sLS_Shipment.findMany({
+  // SLS ciExchangeRate
+  const ships = await prisma.sLS.findMany({
     select: { shipmentNo: true, ciExchangeRate: true, currencyCode: true },
     take: 5,
   })

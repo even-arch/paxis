@@ -32,7 +32,7 @@ type AnalysisResult = {
 }
 
 const DOC_LABEL: Record<string, string> = {
-  SLS_PI: 'Proforma Invoice (PI)',
+  PI: 'Proforma Invoice (PI)',
   PO_ORDER: '採購單 (PO)',
 }
 
@@ -99,7 +99,7 @@ export default function TemplatesClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: editName.trim(),
-          docType: 'SLS_PI',
+          docType: 'PI',
           htmlBody: analysisResult.htmlBody,
           freeFields: analysisResult.freeFields,
           setAsDefault,

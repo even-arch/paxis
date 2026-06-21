@@ -32,7 +32,7 @@ export async function POST(req: NextRequest, {
     return NextResponse.json({ error: '至少需要一項品項' }, { status: 400 })
   }
 
-  const order = await prisma.sLS_Order.findUnique({
+  const order = await prisma.pO_CustomerCopy.findUnique({
     where: { id: orderId },
     include: { items: { include: { product: true } } },
   })
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest, {
   let piNo = body.piNo?.trim() || null
   if (!piNo) {
     const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-    const count = await prisma.sLS_PI.count()
+    const count = await prisma.pI.count()
     piNo = `PI-${datePart}-${String(count + 1).padStart(4, '0')}`
   }
 
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest, {
   // 建立 PI
   const now = new Date()
 
-  const pi = await prisma.sLS_PI.create({
+  const pi = await prisma.pI.create({
     data: {
       orderId,
       piNo,
@@ -109,7 +109,7 @@ export async function POST(req: NextRequest, {
   }
 
   // 更新訂單狀態為「PI 已發出」
-  await prisma.sLS_Order.update({
+  await prisma.pO_CustomerCopy.update({
     where: { id: orderId },
     data: { status: 2 },
   })

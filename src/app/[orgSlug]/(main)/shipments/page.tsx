@@ -33,8 +33,8 @@ export default async function ShipmentsPage({ params, searchParams }: Props) {
   }
 
   const [total, shipments] = await Promise.all([
-    prisma.sLS_Shipment.count({ where }),
-    prisma.sLS_Shipment.findMany({
+    prisma.sLS.count({ where }),
+    prisma.sLS.findMany({
       where,
       orderBy: { [sort]: dir },
       skip: (page - 1) * limit,

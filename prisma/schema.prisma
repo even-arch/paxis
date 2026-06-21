@@ -111,17 +111,17 @@ model SYS_User {
 
   // Relations
   syncJobs         SYS_SyncJob[]
-  purchaseOrders   PO_Order[]
+  purchaseOrders   PO[]
   receipts         PO_Receipt[]
-  supplierPIs      PO_SupplierPI[]
+  supplierPIs      PI_SupplierCopy[]
   costSheets       COST_Sheet[]
   passwordResets   SYS_PasswordReset[]
   settingAuditLogs SYS_SettingAuditLog[]
   productHistories PRD_ProductHistory[]
-  salesOrders          SLS_Order[]  @relation("SLS_Order_creator")
-  salesOrdersPerformed SLS_Order[]  @relation("SLS_Order_performer")
-  salesPIs             SLS_PI[]
-  shipments        SLS_Shipment[]
+  salesOrders          PO_CustomerCopy[]  @relation("PO_CustomerCopy_creator")
+  salesOrdersPerformed PO_CustomerCopy[]  @relation("PO_CustomerCopy_performer")
+  salesPIs             PI[]
+  shipments        SLS[]
   stockMovements   INV_Movement[]
   invAdjustments   INV_Adjustment[]
   deliveryNotes    SLS_DeliveryNote[]
@@ -247,7 +247,7 @@ model SYS_PriceAdjustRule {
 model SYS_DataAlert {
   id          Int       @id @default(autoincrement())
   type        String    // PI_CONFLICT | MISSING_PI | UNLINKED_ITEM | WORKFLOW_GAP
-  refType     String    // SLS_Shipment | SLS_PI | SLS_Order
+  refType     String    // SLS | PI | PO_CustomerCopy
   refId       Int?
   refNo       String?
   message     String
@@ -305,8 +305,8 @@ model PRD_Product {
   customerProducts  CUS_CustomerProduct[]
   inventoryItems    INV_Stock[]
   purchaseItems     PO_Item[]
-  salesItems        SLS_Item[]
-  piItems           SLS_PIItem[]
+  salesItems        PO_CustomerCopy_Item[]
+  piItems           PI_Item[]
   costSheets        COST_Sheet[]
   categories        PRD_CategoryMapping[]
   history           PRD_ProductHistory[]
@@ -411,7 +411,7 @@ model SUP_Supplier {
   chargeTemplate    PRN_ChargeTemplate? @relation(fields: [chargeTemplateId], references: [id])
 
   products       SUP_SupplierProduct[]
-  purchaseOrders PO_Order[]
+  purchaseOrders PO[]
   contacts       SUP_Contact[]
   payables       FIN_Payable[]
   companyAliases SYS_CompanyAlias[]
@@ -481,7 +481,7 @@ model CUS_CustomerProduct {
 // =============================================================================
 // 客戶管理 (CUS_)
 // PAXIS 的客戶主檔，不直接對應 Patisco BU_Buyer。
-// Patisco webhook 帶來的 buyerCompanyId 存在 SLS_Order.patiscoBuyerId，
+// Patisco webhook 帶來的 buyerCompanyId 存在 PO_CustomerCopy.patiscoBuyerId，
 // 由人工或自動流程關聯到此主檔。
 // =============================================================================
 
@@ -520,9 +520,9 @@ model CUS_Customer {
   chargeTemplateId  Int?
   chargeTemplate    PRN_ChargeTemplate? @relation(fields: [chargeTemplateId], references: [id])
 
-  salesOrders       SLS_Order[]
-  salesPIs          SLS_PI[]
-  shipments         SLS_Shipment[]
+  salesOrders       PO_CustomerCopy[]
+  salesPIs          PI[]
+  shipments         SLS[]
   contacts          CUS_Contact[]
   receivables       FIN_Receivable[]
   deliveryNotes     SLS_DeliveryNote[]
@@ -553,8 +553,8 @@ model CUS_Contact {
 // 採購單 (PO_)
 //
 // 採購流程三節點：
-//   節點 1：PO_Order      — 我發出訂單正本給供應商（庫存不動）
-//   節點 2：PO_SupplierPI — 收到供應商 PI 副本，確認預計出貨（庫存不動）
+//   節點 1：PO      — 我發出訂單正本給供應商（庫存不動）
+//   節點 2：PI_SupplierCopy — 收到供應商 PI 副本，確認預計出貨（庫存不動）
 //   節點 3：PO_Receipt    — 收到裝箱單/實際到貨，按「入庫」→ quantity++
 //
 // 注意：quantity++ 發生在節點 3（裝箱單），不是節點 2（PI 副本）。
@@ -562,7 +562,7 @@ model CUS_Contact {
 
 // 採購單狀態
 // 0=草稿, 1=已送出, 2=部分到貨, 3=完成, 4=取消
-model PO_Order {
+model PO {
   id            Int    @id @default(autoincrement())
   poNo          String    @unique
   supplierId    Int
@@ -573,13 +573,13 @@ model PO_Order {
   // 貿易商模式：PI 是對客戶的承諾，採購單是對應的進貨動作，兩者直接掛鉤。
   // sourceType=1（接單後採購）時通常填寫；sourceType=0（主動補貨）時為 null。
   slsPiId       Int?
-  slsPi         SLS_PI? @relation("SLS_PI_PO_Link", fields: [slsPiId], references: [id])
+  slsPi         PI? @relation("PI_PO_Link", fields: [slsPiId], references: [id])
 
   // 【次要連結】客戶原始訂單（副本，僅供參考，不用於財務計算）
-  // 一張 SLS_Order 可以對應多張 PO_Order（拆單給不同供應商時，
+  // 一張 PO_CustomerCopy 可以對應多張 PO（拆單給不同供應商時，
   // poNo 會加上後綴：ABC-2025-001-1、ABC-2025-001-2…）
   salesOrderId  Int?
-  salesOrder    SLS_Order? @relation("SLS_PO_OrderLink", fields: [salesOrderId], references: [id])
+  salesOrder    PO_CustomerCopy? @relation("PO_CustomerCopy_PO_Link", fields: [salesOrderId], references: [id])
 
   status        Int       @default(0)
   currencyCode  String
@@ -618,22 +618,22 @@ model PO_Order {
   archivedAt    DateTime? // 封存時間，非 null = 已封存，正常查詢自動排除
 
   items         PO_Item[]
-  supplierPIs   PO_SupplierPI[]
+  supplierPIs   PI_SupplierCopy[]
   receipts      PO_Receipt[]
-  shipments     SLS_Shipment[]
+  shipments     SLS[]
 
   @@index([supplierId, status])
   @@index([poNo])
   @@index([slsPiId])
   @@index([salesOrderId])
   @@index([archivedAt])
-  @@map("PO_Order")
+  @@map("PO")
 }
 
 model PO_Item {
   id          Int    @id @default(autoincrement())
   orderId     Int
-  order       PO_Order  @relation(fields: [orderId], references: [id])
+  order       PO  @relation(fields: [orderId], references: [id])
   productId   Int
   product     PRD_Product @relation(fields: [productId], references: [id])
 
@@ -647,7 +647,7 @@ model PO_Item {
   productNameSnapshot String?
 
   receiptItems    PO_ReceiptItem[]
-  supplierPIItems PO_SupplierPIItem[]
+  supplierPIItems PI_SupplierCopy_Item[]
 
   @@index([orderId])
   @@index([productId])
@@ -656,10 +656,10 @@ model PO_Item {
 
 // 節點 2：收到供應商 PI 副本
 // 記錄供應商確認的數量與預計出貨日，庫存不動。
-model PO_SupplierPI {
+model PI_SupplierCopy {
   id          Int    @id @default(autoincrement())
   orderId     Int
-  order       PO_Order  @relation(fields: [orderId], references: [id])
+  order       PO  @relation(fields: [orderId], references: [id])
   piNo        String    // 供應商的 PI 單號
 
   // 文件日期（時間軸錨點）：供應商 PI 文件上印的日期
@@ -685,23 +685,23 @@ model PO_SupplierPI {
   patiscoStatus    String?   // Patisco 文件狀態：'0'=Editing, '1'=Confirmed
   syncJobId        Int?      // Patisco sync job ID，用於回滾
 
-  items       PO_SupplierPIItem[]
+  items       PI_SupplierCopy_Item[]
 
   @@index([orderId])
-  @@map("PO_SupplierPI")
+  @@map("PI_SupplierCopy")
 }
 
-model PO_SupplierPIItem {
+model PI_SupplierCopy_Item {
   id            Int    @id @default(autoincrement())
   supplierPIId  Int
-  supplierPI    PO_SupplierPI @relation(fields: [supplierPIId], references: [id])
+  supplierPI    PI_SupplierCopy @relation(fields: [supplierPIId], references: [id])
   poItemId      Int
   poItem        PO_Item       @relation(fields: [poItemId], references: [id])
 
   confirmedQty  Int  // 供應商確認的出貨數量
 
   @@index([supplierPIId])
-  @@map("PO_SupplierPIItem")
+  @@map("PI_SupplierCopy_Item")
 }
 
 // 節點 3：入庫確認（收到裝箱單 or 直接按入庫）
@@ -709,7 +709,7 @@ model PO_SupplierPIItem {
 model PO_Receipt {
   id          Int    @id @default(autoincrement())
   orderId     Int
-  order       PO_Order  @relation(fields: [orderId], references: [id])
+  order       PO  @relation(fields: [orderId], references: [id])
   receiptNo   String
 
   // 文件日期（時間軸錨點）：裝箱單 / 到貨文件上的日期
@@ -751,9 +751,9 @@ model PO_ReceiptItem {
 // 銷售單 (SLS_)
 //
 // 銷售流程三節點：
-//   節點 1：SLS_Order    — 收到客戶訂單（庫存不動）
-//   節點 2：SLS_PI       — 我發出 PI 正本給客戶 → reservedQty++
-//   節點 3：SLS_Shipment — 發出裝箱單/確認出貨 → quantity--, reservedQty--
+//   節點 1：PO_CustomerCopy    — 收到客戶訂單（庫存不動）
+//   節點 2：PI       — 我發出 PI 正本給客戶 → reservedQty++
+//   節點 3：SLS — 發出裝箱單/確認出貨 → quantity--, reservedQty--
 //
 // 三種來源：
 //   PATISCO   = Patisco webhook 自動建立
@@ -763,7 +763,7 @@ model PO_ReceiptItem {
 
 // 銷售訂單狀態
 // 0=草稿, 1=已確認, 2=PI已發出, 3=部分出貨, 4=完成, 5=取消
-model SLS_Order {
+model PO_CustomerCopy {
   id          Int    @id @default(autoincrement())
   orderNo     String    @unique
   customerId  Int?   // 可能尚未比對到客戶主檔
@@ -786,7 +786,7 @@ model SLS_Order {
   // 操作稽核
   source      String   @default("MANUAL")
   performedBy Int?
-  performer   SYS_User? @relation("SLS_Order_performer", fields: [performedBy], references: [id])
+  performer   SYS_User? @relation("PO_CustomerCopy_performer", fields: [performedBy], references: [id])
   performedAt DateTime @default(now())
 
   // Patisco 溯源
@@ -799,27 +799,27 @@ model SLS_Order {
   syncJobId        Int?      // Patisco sync job ID，用於回滾
 
   createdBy   Int
-  creator     SYS_User  @relation("SLS_Order_creator", fields: [createdBy], references: [id])
+  creator     SYS_User  @relation("PO_CustomerCopy_creator", fields: [createdBy], references: [id])
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   archivedAt  DateTime? // 封存時間，非 null = 已封存，正常查詢自動排除
 
-  items          SLS_Item[]
-  pis            SLS_PI[]
-  purchaseOrders PO_Order[]    @relation("SLS_PO_OrderLink")
+  items          PO_CustomerCopy_Item[]
+  pis            PI[]
+  purchaseOrders PO[]    @relation("PO_CustomerCopy_PO_Link")
   mktOrders      MKT_Order[]
   deliveryNotes  SLS_DeliveryNote[]
 
   @@index([customerId, status])
   @@index([orderNo])
   @@index([archivedAt])
-  @@map("SLS_Order")
+  @@map("PO_CustomerCopy")
 }
 
-model SLS_Item {
+model PO_CustomerCopy_Item {
   id          Int    @id @default(autoincrement())
   orderId     Int
-  order       SLS_Order   @relation(fields: [orderId], references: [id])
+  order       PO_CustomerCopy   @relation(fields: [orderId], references: [id])
   productId   Int
   product     PRD_Product @relation(fields: [productId], references: [id])
 
@@ -835,23 +835,23 @@ model SLS_Item {
   // Patisco webhook / AI 匯入時填入；手動建立時可留空（從 PRD_Product 取）
   productNameSnapshot String?
 
-  piItems       SLS_PIItem[]
-  shipmentItems SLS_ShipmentItem[]
+  piItems       PI_Item[]
+  shipmentItems SLS_Item[]
 
   @@index([orderId])
   @@index([productId])
-  @@map("SLS_Item")
+  @@map("PO_CustomerCopy_Item")
 }
 
 // 節點 2：我發出 PI 正本給客戶
 // 觸發 reservedQty++，寫 INV_Movement type=2
-model SLS_PI {
+model PI {
   id          Int    @id @default(autoincrement())
   orderId     Int?
-  order       SLS_Order? @relation(fields: [orderId], references: [id])
+  order       PO_CustomerCopy? @relation(fields: [orderId], references: [id])
   piNo        String    @unique
 
-  // 當無對應 SLS_Order 時，直接存 PI 本身的交易方資訊
+  // 當無對應 PO_CustomerCopy 時，直接存 PI 本身的交易方資訊
   customerId   Int?
   customer     CUS_Customer? @relation(fields: [customerId], references: [id])
   currencyCode String?
@@ -888,23 +888,23 @@ model SLS_PI {
 
   archivedAt DateTime? // 封存時間；非 null = 已封存
 
-  items          SLS_PIItem[]
-  shipmentPIs    SLS_ShipmentPI[]
-  shipmentItems  SLS_ShipmentItem[]
+  items          PI_Item[]
+  shipmentPIs    SLS_PI_Link[]
+  shipmentItems  SLS_Item[]
   stockMovements INV_Movement[]
   deliveryNotes  SLS_DeliveryNote[]
-  poOrders       PO_Order[] @relation("SLS_PI_PO_Link")
+  poOrders       PO[] @relation("PI_PO_Link")
 
   @@index([orderId])
-  @@map("SLS_PI")
+  @@map("PI")
 }
 
-model SLS_PIItem {
+model PI_Item {
   id          Int    @id @default(autoincrement())
   piId        Int
-  pi          SLS_PI    @relation(fields: [piId], references: [id])
+  pi          PI    @relation(fields: [piId], references: [id])
   slsItemId   Int?
-  slsItem     SLS_Item?  @relation(fields: [slsItemId], references: [id])
+  slsItem     PO_CustomerCopy_Item?  @relation(fields: [slsItemId], references: [id])
   productId   Int?
   product     PRD_Product? @relation(fields: [productId], references: [id])
 
@@ -919,12 +919,12 @@ model SLS_PIItem {
   netWeight     Decimal?
 
   @@index([piId])
-  @@map("SLS_PIItem")
+  @@map("PI_Item")
 }
 
 // 節點 3：出貨確認（發出裝箱單 or 直接按出貨）
 // 觸發 quantity--, reservedQty--，寫 INV_Movement type=4
-model SLS_Shipment {
+model SLS {
   id          Int    @id @default(autoincrement())
 
   // 客戶（直接存，不再靠 orderId 間接推導；一張出貨永遠只有一個客戶）
@@ -957,7 +957,7 @@ model SLS_Shipment {
 
   // 採購側連結（回查 DO 對應的 PO，供成本勾稽）
   poOrderId    Int?
-  poOrder      PO_Order? @relation(fields: [poOrderId], references: [id])
+  poOrder      PO? @relation(fields: [poOrderId], references: [id])
 
   // Patisco DO 原始日期（來自 listDeliveryOrders + getDeliveryOrderDetail）
   doCreatedDate   DateTime?  // DO 建立日（Patisco createdDate）
@@ -975,38 +975,38 @@ model SLS_Shipment {
   note        String?
 
   // 關聯的 PI 清單（多對多；同一張出貨可包含同一客戶的多張 PI）
-  pis            SLS_ShipmentPI[]
-  items          SLS_ShipmentItem[]
+  pis            SLS_PI_Link[]
+  items          SLS_Item[]
   stockMovements INV_Movement[]
   receivable     FIN_Receivable?
   fobCostItems   SLS_FobCostItem[]
 
   @@index([customerId])
-  @@map("SLS_Shipment")
+  @@map("SLS")
 }
 
-// SLS_Shipment ↔ SLS_PI 多對多關聯表
+// SLS ↔ PI 多對多關聯表
 // 一張出貨可包含同一客戶的多張 PI，每張 PI 也可能被多次局部出貨
-model SLS_ShipmentPI {
+model SLS_PI_Link {
   shipmentId  Int
-  shipment    SLS_Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  shipment    SLS @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
   piId        Int
-  pi          SLS_PI       @relation(fields: [piId], references: [id])
+  pi          PI       @relation(fields: [piId], references: [id])
 
   @@id([shipmentId, piId])
   @@index([piId])
-  @@map("SLS_ShipmentPI")
+  @@map("SLS_PI_Link")
 }
 
-model SLS_ShipmentItem {
+model SLS_Item {
   id            Int    @id @default(autoincrement())
   shipmentId    Int
-  shipment      SLS_Shipment @relation(fields: [shipmentId], references: [id])
+  shipment      SLS @relation(fields: [shipmentId], references: [id])
   slsItemId     Int?
-  slsItem       SLS_Item?    @relation(fields: [slsItemId], references: [id])
+  slsItem       PO_CustomerCopy_Item?    @relation(fields: [slsItemId], references: [id])
   // 直接記錄來源 PI，方便按 PI 分組顯示（同一 DO 可含多張 PI）
   piId          Int?
-  pi            SLS_PI?      @relation(fields: [piId], references: [id])
+  pi            PI?      @relation(fields: [piId], references: [id])
 
   // Patisco 原始欄位：product 找不到時也不丟資料
   rawSku        String?        // Patisco packing 的 SKU（product 不存在時仍保留）
@@ -1028,13 +1028,13 @@ model SLS_ShipmentItem {
   cubicFt       Decimal?       // 材積 ft³（Patisco 原始值）
   cbm           Decimal?       // 材積 m³（= cubicFt × 0.028317）
 
-  // 計價資訊（來自 SLS_PIItem，sync 時帶入）
+  // 計價資訊（來自 PI_Item，sync 時帶入）
   unit          String?        // 單位（PCS / PAIRS / SETS 等）
   unitPrice     Decimal?       // 單價（幣別同所屬 PI）
 
   @@index([shipmentId])
   @@index([piId])
-  @@map("SLS_ShipmentItem")
+  @@map("SLS_Item")
 }
 
 // =============================================================================
@@ -1047,9 +1047,9 @@ model SLS_ShipmentItem {
 //
 // 五個觸發點（對應文件節點）：
 //   入庫：收到裝箱單/按入庫（PO_Receipt）           → quantity++
-//   預留：發出 PI 正本給客戶（SLS_PI）              → reservedQty++
-//   取消預留：PI 正本取消（SLS_PI.status=1）        → reservedQty--
-//   出倉：發出裝箱單/按出貨（SLS_Shipment）         → quantity--, reservedQty--
+//   預留：發出 PI 正本給客戶（PI）              → reservedQty++
+//   取消預留：PI 正本取消（PI.status=1）        → reservedQty--
+//   出倉：發出裝箱單/按出貨（SLS）         → quantity--, reservedQty--
 //   手動調整/盤點/POS                              → 依情況
 // =============================================================================
 
@@ -1095,9 +1095,9 @@ model INV_Adjustment {
 
 // 異動類型：
 //   1 = 採購入庫     PO_Receipt 確認（qtyDelta > 0）
-//   2 = 預留         SLS_PI 發出（reservedDelta > 0）
-//   3 = 取消預留     SLS_PI 取消（reservedDelta < 0）
-//   4 = 出倉         SLS_Shipment 確認（qtyDelta < 0, reservedDelta < 0）
+//   2 = 預留         PI 發出（reservedDelta > 0）
+//   3 = 取消預留     PI 取消（reservedDelta < 0）
+//   4 = 出倉         SLS 確認（qtyDelta < 0, reservedDelta < 0）
 //   5 = 庫存調整     INV_Adjustment 單據（qtyDelta 可正可負）
 //   6 = 系統反轉     刪除出貨/入庫單時自動產生，不需 INV_Adjustment（qtyDelta > 0 = 反轉出貨入庫）
 //   8 = POS 銷售出庫 （預留給 POS 對接，qtyDelta < 0）
@@ -1133,9 +1133,9 @@ model INV_Movement {
 
   // 銷售側溯源（type=2,3,4）
   slsPiId       Int?
-  slsPi         SLS_PI?       @relation(fields: [slsPiId], references: [id])
+  slsPi         PI?       @relation(fields: [slsPiId], references: [id])
   slsShipmentId Int?
-  slsShipment   SLS_Shipment? @relation(fields: [slsShipmentId], references: [id])
+  slsShipment   SLS? @relation(fields: [slsShipmentId], references: [id])
 
   // 庫存調整單溯源（type=5）
   adjustmentId  Int?          @unique
@@ -1207,7 +1207,7 @@ model COST_Sheet {
 // 財務對帳 (FIN_)
 //
 // FIN_Payable   — 應付帳款，由 PO_Receipt 入庫確認時自動產生
-// FIN_Receivable — 應收帳款，由 SLS_Shipment 出貨確認時自動產生
+// FIN_Receivable — 應收帳款，由 SLS 出貨確認時自動產生
 // =============================================================================
 
 // 付款狀態：0=未付, 1=部分付清, 2=已付清
@@ -1272,7 +1272,7 @@ model FIN_Receivable {
 
   // 來源單據
   shipmentId  Int    @unique
-  shipment    SLS_Shipment @relation(fields: [shipmentId], references: [id])
+  shipment    SLS @relation(fields: [shipmentId], references: [id])
 
   // 金額（原始幣別，通常是 EUR）
   currencyCode    String
@@ -1314,7 +1314,7 @@ model FIN_Receivable {
 model SLS_FobCostItem {
   id          Int      @id @default(autoincrement())
   shipmentId  Int
-  shipment    SLS_Shipment @relation(fields: [shipmentId], references: [id])
+  shipment    SLS @relation(fields: [shipmentId], references: [id])
 
   name        String   // 費用名目：拖車費、報關費、倉租費…
   amountTWD   Decimal  // 費用金額（TWD）
@@ -1338,7 +1338,7 @@ model SLS_FobCostAllocation {
   supplierId  Int
   supplier    SUP_Supplier @relation(fields: [supplierId], references: [id])
 
-  poId        Int?     // 對應的 PO_Order（用於追蹤；可 null）
+  poId        Int?     // 對應的 PO（用於追蹤；可 null）
 
   grossWeightKg Decimal  // 此供應商在本次出貨的毛重（kg）
   weightPct     Decimal  // 佔所有 FOB 供應商總重的百分比（0-100）
@@ -1486,8 +1486,8 @@ model MKT_Order {
   waybillPrinted      Boolean  @default(false)
   totalAmount         Decimal?
   rawPayload          Json?    // 露天 API 原始資料快照
-  slsOrderId          Int?     // 匯入 PAXIS 後關聯的 SLS_Order
-  slsOrder            SLS_Order? @relation(fields: [slsOrderId], references: [id])
+  slsOrderId          Int?     // 匯入 PAXIS 後關聯的 PO_CustomerCopy
+  slsOrder            PO_CustomerCopy? @relation(fields: [slsOrderId], references: [id])
   paidAt              DateTime?
   shippedAt           DateTime?
   createdAt           DateTime @default(now())
@@ -1517,7 +1517,7 @@ model MKT_OrderItem {
 // =============================================================================
 // 簡易出貨單 (SLS_DeliveryNote)
 // 我方出貨給客戶的國內銷貨單，一式三聯（存根/客戶/司機）
-// 資料從 SLS_PI 或 SLS_Order 帶入品項
+// 資料從 PI 或 PO_CustomerCopy 帶入品項
 // status: DRAFT → DISPATCHED → RECEIVED
 // =============================================================================
 
@@ -1527,9 +1527,9 @@ model SLS_DeliveryNote {
   customerId    Int?
   customer      CUS_Customer?  @relation(fields: [customerId], references: [id])
   slsPiId       Int?
-  slsPi         SLS_PI?        @relation(fields: [slsPiId], references: [id])
+  slsPi         PI?        @relation(fields: [slsPiId], references: [id])
   slsOrderId    Int?
-  slsOrder      SLS_Order?     @relation(fields: [slsOrderId], references: [id])
+  slsOrder      PO_CustomerCopy?     @relation(fields: [slsOrderId], references: [id])
 
   issueDate     DateTime
   deliveryDate  DateTime?
@@ -1644,11 +1644,11 @@ model FIN_PaymentVoucherAdjustment {
 // =============================================================================
 // 列印模板 (PRN_)
 // 儲存各種單據的 HTML/CSS 列印模板
-// docType: "SLS_PI" | "PO_ORDER"
+// docType: "PI" | "PO_ORDER"
 // =============================================================================
 
 // 每個客戶每種單據的自由欄位預設值
-// docType: "SLS_PI" | "PO_ORDER"
+// docType: "PI" | "PO_ORDER"
 model PRN_CustomerDefault {
   id         Int          @id @default(autoincrement())
   customerId Int
@@ -1665,9 +1665,9 @@ model PRN_CustomerDefault {
 model PRN_Template {
   id          Int      @id @default(autoincrement())
   name        String
-  docType     String              // SLS_PI | PO_ORDER
+  docType     String              // PI | PO_ORDER
   htmlBody    String   @db.Text  // HTML 模板本體，含 {{variable}} 佔位符
-  fieldMap    Json                // { "{{pi_no}}": "SLS_PI.piNo", ... }
+  fieldMap    Json                // { "{{pi_no}}": "PI.piNo", ... }
   freeFields  Json                // [{ key, label, defaultValue }]
   isDefault      Boolean  @default(false)
   isSystem       Boolean  @default(false)

@@ -141,7 +141,7 @@ export default function DuplicatePIModal({ conflicts, onResolved, onClose }: Pro
 
         {/* Footer */}
         <div className="px-6 py-3 border-t border-gray-100 flex justify-between items-center">
-          <p className="text-xs text-gray-400">選擇後系統會依照你選的版本建立 SLS_PI 記錄</p>
+          <p className="text-xs text-gray-400">選擇後系統會依照你選的版本建立 PI 記錄</p>
           <button onClick={handleSkip} disabled={loading} className="text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50">
             {isLast ? '關閉' : '略過，看下一筆 →'}
           </button>

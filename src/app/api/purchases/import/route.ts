@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
     // 原始單號優先（供應商給的號碼不可修改）；無號碼時才由系統生成內部流水號供識別
     const poNo = po.docRefNo?.trim() || generatePoNo()
 
-    const order = await prisma.pO_Order.create({
+    const order = await prisma.pO.create({
       data: {
         poNo,
         supplierId,

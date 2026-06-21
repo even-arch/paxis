@@ -14,7 +14,7 @@ type Props = { params: { orgSlug: string; id: string } }
 export default async function PurchaseDetailPage({
   params }: Props) {
   const prisma = await getPagePrisma(params.orgSlug)
-  const order = await prisma.pO_Order.findUnique({
+  const order = await prisma.pO.findUnique({
     where: { id: Number(params.id) },
     include: {
       supplier: true,
@@ -49,16 +49,16 @@ export default async function PurchaseDetailPage({
   // 關聯我方 PI：優先用 slsPiId FK，fallback 用 poNo=piNo 比對
   const [linkedSlsPI, openSlsPIs] = await Promise.all([
     order.slsPiId
-      ? prisma.sLS_PI.findUnique({
+      ? prisma.pI.findUnique({
           where: { id: order.slsPiId },
           select: { id: true, piNo: true, status: true, totalAmount: true, currencyCode: true, customer: { select: { id: true, name: true } } },
         })
-      : prisma.sLS_PI.findFirst({
+      : prisma.pI.findFirst({
           where: { piNo: order.poNo },
           select: { id: true, piNo: true, status: true, totalAmount: true, currencyCode: true, customer: { select: { id: true, name: true } } },
         }),
     // 供「連結我方 PI」選單用
-    prisma.sLS_PI.findMany({
+    prisma.pI.findMany({
       where: { status: { in: [0, 2] } },
       select: { id: true, piNo: true, totalAmount: true, currencyCode: true, customer: { select: { name: true } } },
       orderBy: { performedAt: 'desc' },

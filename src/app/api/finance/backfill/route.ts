@@ -13,8 +13,8 @@ export async function POST() {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // ── AR：從 SLS_Shipment 補建 FIN_Receivable ────────────────────────────
-  const shipmentsWithoutReceivable = await prisma.sLS_Shipment.findMany({
+  // ── AR：從 SLS 補建 FIN_Receivable ────────────────────────────
+  const shipmentsWithoutReceivable = await prisma.sLS.findMany({
     where: {},
     include: {
       pis: {
@@ -44,7 +44,7 @@ export async function POST() {
 
   for (const shipment of shipmentsWithoutReceivable) {
     // 嘗試從 PI.order 或 PI 本身取得金額
-    // SLS_PI 是主，SLS_Order 只做 fallback
+    // PI 是主，PO_CustomerCopy 只做 fallback
     const piAmounts = shipment.pis.map(sp => ({
       totalAmount: sp.pi.totalAmount ?? sp.pi.order?.totalAmount,
       currencyCode: sp.pi.currencyCode ?? sp.pi.order?.currencyCode ?? 'TWD',
@@ -65,7 +65,7 @@ export async function POST() {
       if (o.currencyCode === 'TWD') return s + amt
       // ciRate = TWD→EUR（e.g. 0.02717），所以 EUR→TWD = amt / ciRate
       if (ciRate > 0) return s + amt / ciRate
-      // fallback：SLS_Order.exchangeRate（EUR→TWD 方向）
+      // fallback：PO_CustomerCopy.exchangeRate（EUR→TWD 方向）
       return s + amt * Number(o.orderExchangeRate ?? 1)
     }, 0)
 

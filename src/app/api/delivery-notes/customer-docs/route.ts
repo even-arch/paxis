@@ -7,8 +7,8 @@ export async function GET(req: NextRequest) {
   if (isNaN(customerId)) return NextResponse.json({ pis: [], orders: [] })
 
   const [pis, orders] = await Promise.all([
-    // 未出貨的 PI（沒有對應 SLS_Shipment 的）
-    prisma.sLS_PI.findMany({
+    // 未出貨的 PI（沒有對應 SLS 的）
+    prisma.pI.findMany({
       where: {
         order: { customerId },
         shipmentPIs: { none: {} },
@@ -23,8 +23,8 @@ export async function GET(req: NextRequest) {
       orderBy: { performedAt: 'desc' },
       take: 50,
     }),
-    // 未出貨的 SLS_Order
-    prisma.sLS_Order.findMany({
+    // 未出貨的 PO_CustomerCopy
+    prisma.pO_CustomerCopy.findMany({
       where: {
         customerId,
         deliveryNotes: { none: {} },

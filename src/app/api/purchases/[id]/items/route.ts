@@ -11,7 +11,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const orderId = Number(params.id)
-  const order = await prisma.pO_Order.findUnique({ where: { id: orderId } })
+  const order = await prisma.pO.findUnique({ where: { id: orderId } })
   if (!order) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const body = await req.json()

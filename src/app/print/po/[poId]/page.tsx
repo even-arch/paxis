@@ -160,7 +160,7 @@ export default function PrintPOPage() {
       .then(r => r.json())
       .then((d: POData) => { setData(d); if (d.po?.poNo) document.title = d.po.poNo; setLoading(false) })
 
-    fetch('/api/print/templates?docType=PO_Order')
+    fetch('/api/print/templates?docType=PO')
       .then(r => r.json())
       .then((list: TemplateOption[]) => {
         setTemplates(list)

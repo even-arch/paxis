@@ -8,7 +8,7 @@ export default async function EditPurchasePage({
   params }: Props) {
   const prisma = await getPagePrisma(params.orgSlug)
   const [order, suppliers, slsPIs] = await Promise.all([
-    prisma.pO_Order.findUnique({
+    prisma.pO.findUnique({
       where: { id: Number(params.id) },
       include: { items: { include: { product: true } } },
     }),
@@ -17,7 +17,7 @@ export default async function EditPurchasePage({
       select: { id: true, name: true, shortName: true, currencyCode: true },
       orderBy: { name: 'asc' },
     }),
-    prisma.sLS_PI.findMany({
+    prisma.pI.findMany({
       where: { status: { in: [0, 2] } },
       select: {
         id: true, piNo: true, totalAmount: true, currencyCode: true,

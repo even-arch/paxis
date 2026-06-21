@@ -14,7 +14,7 @@ export async function GET(
   const shipmentId = Number(params.shipmentId)
   if (isNaN(shipmentId)) return NextResponse.json({ error: 'Invalid shipmentId' }, { status: 400 })
 
-  const shipment = await prisma.sLS_Shipment.findUnique({
+  const shipment = await prisma.sLS.findUnique({
     where: { id: shipmentId },
     include: {
       customer: true,
@@ -52,7 +52,7 @@ export async function GET(
 
   const company = await prisma.sYS_Company.findFirst()
 
-  // 取得品項金額：從關聯的 SLS_Item 取單價
+  // 取得品項金額：從關聯的 PO_CustomerCopy_Item 取單價
   const items = shipment.items.map(item => {
     const product = item.slsItem?.product
     const unitPrice = Number(item.slsItem?.unitPrice ?? 0)

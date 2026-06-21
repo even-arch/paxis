@@ -25,7 +25,7 @@ type SLSItem = {
   productName: string
   productSku: string | null
   sellQty: number
-  sellPrice: number    // 賣價（SLS_Item.unitPrice）
+  sellPrice: number    // 賣價（PO_CustomerCopy_Item.unitPrice）
   sellCurrency: string
 }
 

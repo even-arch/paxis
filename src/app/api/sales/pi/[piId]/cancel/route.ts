@@ -17,7 +17,7 @@ export async function POST(req: NextRequest, {
   const piId = Number(params.piId)
   const body = await req.json() as { reason?: string }
 
-  const pi = await prisma.sLS_PI.findUnique({
+  const pi = await prisma.pI.findUnique({
     where: { id: piId },
     include: {
       items: { include: { slsItem: { include: { product: true } } } },
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest, {
   const now = new Date()
 
   // 取消 PI
-  await prisma.sLS_PI.update({
+  await prisma.pI.update({
     where: { id: piId },
     data: {
       status: 1,
@@ -67,11 +67,11 @@ export async function POST(req: NextRequest, {
     })
   }
 
-  // 若此訂單已無有效 PI，訂單狀態退回「已確認」（只對有 SLS_Order 的 PI 做）
+  // 若此訂單已無有效 PI，訂單狀態退回「已確認」（只對有 PO_CustomerCopy 的 PI 做）
   if (pi.order && pi.orderId) {
     const activePiCount = pi.order.pis.length - 1 // 扣掉剛取消這筆
     if (activePiCount <= 0) {
-      await prisma.sLS_Order.update({
+      await prisma.pO_CustomerCopy.update({
         where: { id: pi.orderId },
         data: { status: 1 },
       })

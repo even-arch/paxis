@@ -34,8 +34,8 @@ export default async function PIListPage({ params, searchParams }: Props) {
   }
 
   const [total, pis] = await Promise.all([
-    prisma.sLS_PI.count({ where }),
-    prisma.sLS_PI.findMany({
+    prisma.pI.count({ where }),
+    prisma.pI.findMany({
       where,
       orderBy: { [sort]: dir },
       skip: (page - 1) * limit,

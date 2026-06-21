@@ -11,7 +11,7 @@ export async function GET(_req: NextRequest, {
     const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const order = await prisma.pO_Order.findUnique({
+  const order = await prisma.pO.findUnique({
     where: { id: Number(params.id) },
     include: {
       supplier: true,
@@ -37,7 +37,7 @@ export async function DELETE(_req: NextRequest, {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const id = Number(params.id)
-  const order = await prisma.pO_Order.findUnique({
+  const order = await prisma.pO.findUnique({
     where: { id },
     include: { receipts: { select: { id: true } } },
   })
@@ -50,7 +50,7 @@ export async function DELETE(_req: NextRequest, {
 
   // 草稿直接刪，已送出視同「取消」
   await prisma.pO_Item.deleteMany({ where: { orderId: id } })
-  await prisma.pO_Order.delete({ where: { id } })
+  await prisma.pO.delete({ where: { id } })
 
   return NextResponse.json({ ok: true })
 }
@@ -64,7 +64,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const body = await req.json()
   const id = Number(params.id)
 
-  const existing = await prisma.pO_Order.findUnique({ where: { id } })
+  const existing = await prisma.pO.findUnique({ where: { id } })
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const data: Record<string, unknown> = {}
@@ -79,7 +79,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: '沒有可更新的欄位' }, { status: 400 })
   }
 
-  const order = await prisma.pO_Order.update({ where: { id }, data })
+  const order = await prisma.pO.update({ where: { id }, data })
   return NextResponse.json(order)
 }
 
@@ -92,10 +92,10 @@ export async function PUT(req: NextRequest, {
   const body = await req.json()
   const id = Number(params.id)
 
-  const existing = await prisma.pO_Order.findUnique({ where: { id } })
+  const existing = await prisma.pO.findUnique({ where: { id } })
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const order = await prisma.pO_Order.update({
+  const order = await prisma.pO.update({
     where: { id },
     data: {
       supplierId: Number(body.supplierId),
