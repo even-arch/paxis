@@ -5,7 +5,7 @@ import { orgPath } from '@/lib/org-path'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { statusBadge } from '@/modules/purchase/poUtils'
 import PurchaseActions from './PurchaseActions'
-import LinkSalesOrderButton from './LinkSalesOrderButton'
+import LinkSlsPIButton from './LinkSalesOrderButton'
 import DeletePoItemButton from './DeletePoItemButton'
 import { EditItemButton, AddItemPanel } from '@/components/ItemTableActions'
 
@@ -46,27 +46,22 @@ export default async function PurchaseDetailPage({
 
   if (!order) notFound()
 
-  // 關聯客戶訂單：優先用 salesOrderId FK，fallback 用單號比對
-  const [linkedSalesOrder, openSalesOrders] = await Promise.all([
-    order.salesOrderId
-      ? prisma.sLS_Order.findUnique({
-          where: { id: order.salesOrderId },
-          select: { id: true, orderNo: true, status: true, customer: { select: { name: true } }, patiscoBuyerName: true },
+  // 關聯我方 PI：優先用 slsPiId FK，fallback 用 poNo=piNo 比對
+  const [linkedSlsPI, openSlsPIs] = await Promise.all([
+    order.slsPiId
+      ? prisma.sLS_PI.findUnique({
+          where: { id: order.slsPiId },
+          select: { id: true, piNo: true, status: true, totalAmount: true, currencyCode: true, customer: { select: { id: true, name: true } } },
         })
-      : prisma.sLS_Order.findFirst({
-          where: {
-            OR: [
-              { orderNo: order.poNo },
-              { orderNo: order.poNo.replace(/-\d+$/, '') }, // 去掉後綴（ABC-001-1 → ABC-001）
-            ],
-          },
-          select: { id: true, orderNo: true, status: true, customer: { select: { name: true } }, patiscoBuyerName: true },
+      : prisma.sLS_PI.findFirst({
+          where: { piNo: order.poNo },
+          select: { id: true, piNo: true, status: true, totalAmount: true, currencyCode: true, customer: { select: { id: true, name: true } } },
         }),
-    // 供「連結客戶訂單」選單用
-    prisma.sLS_Order.findMany({
-      where: { status: { in: [0, 1, 2, 3] } },
-      select: { id: true, orderNo: true, customer: { select: { name: true } }, patiscoBuyerName: true },
-      orderBy: { createdAt: 'desc' },
+    // 供「連結我方 PI」選單用
+    prisma.sLS_PI.findMany({
+      where: { status: { in: [0, 2] } },
+      select: { id: true, piNo: true, totalAmount: true, currencyCode: true, customer: { select: { name: true } } },
+      orderBy: { performedAt: 'desc' },
       take: 200,
     }),
   ])
@@ -159,33 +154,36 @@ export default async function PurchaseDetailPage({
           {order.note && <div className="col-span-3"><Row label="備註" value={order.note} /></div>}
         </div>
 
-        {/* 來源客戶訂單 */}
+        {/* 關聯我方 PI */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg px-5 py-4">
           <div className="flex items-center justify-between mb-1">
-            <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">來源客戶訂單</p>
-            <LinkSalesOrderButton
+            <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">關聯我方 PI（形式發票）</p>
+            <LinkSlsPIButton
               poId={order.id}
-              currentSalesOrderId={linkedSalesOrder?.id ?? null}
-              salesOrders={openSalesOrders.map(s => ({
-                id: s.id,
-                orderNo: s.orderNo,
-                customerName: s.customer?.name ?? s.patiscoBuyerName ?? null,
+              currentSlsPiId={linkedSlsPI?.id ?? null}
+              slsPIs={openSlsPIs.map(p => ({
+                id: p.id,
+                piNo: p.piNo,
+                customerName: p.customer?.name ?? null,
+                totalAmount: p.totalAmount?.toString() ?? null,
+                currencyCode: p.currencyCode,
               }))}
             />
           </div>
-          {linkedSalesOrder ? (
-            <Link href={orgPath(params.orgSlug, `/sales/${linkedSalesOrder.id}`)}
+          {linkedSlsPI ? (
+            <Link href={orgPath(params.orgSlug, `/sales/pi/${linkedSlsPI.id}`)}
               className="inline-flex items-center gap-3 bg-white border border-blue-200 rounded-lg px-4 py-2.5 mt-2 hover:border-blue-400 transition-colors">
-              <span className="font-mono font-medium text-blue-700 text-sm">{linkedSalesOrder.orderNo}</span>
-              {(linkedSalesOrder.customer?.name || linkedSalesOrder.patiscoBuyerName) && (
-                <span className="text-gray-500 text-sm">
-                  {linkedSalesOrder.customer?.name ?? linkedSalesOrder.patiscoBuyerName}
-                </span>
+              <span className="font-mono font-medium text-blue-700 text-sm">{linkedSlsPI.piNo}</span>
+              {linkedSlsPI.customer?.name && (
+                <span className="text-gray-500 text-sm">{linkedSlsPI.customer.name}</span>
               )}
-              <span className="text-xs text-gray-400">→ 查看交易鏈</span>
+              {linkedSlsPI.totalAmount && (
+                <span className="text-xs text-gray-400">{linkedSlsPI.currencyCode} {Number(linkedSlsPI.totalAmount).toLocaleString()}</span>
+              )}
+              <span className="text-xs text-gray-400">→ 查看 PI</span>
             </Link>
           ) : (
-            <p className="text-sm text-gray-400 mt-1">尚未連結客戶訂單。點右上角「+ 連結客戶訂單」補上連結。</p>
+            <p className="text-sm text-gray-400 mt-1">尚未連結我方 PI。點右上角「+ 連結我方 PI」補上連結，AP 付款才能正確對帳。</p>
           )}
         </div>
 

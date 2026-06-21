@@ -64,6 +64,11 @@ export default function NotificationBell() {
       .catch(() => {})
   }
 
+  async function rescanAndRefresh() {
+    await fetch('/api/data-alerts/rescan', { method: 'POST' }).catch(() => {})
+    fetchAlerts()
+  }
+
   // 頁面載入時拉一次
   useEffect(() => { fetchAlerts() }, [])
 
@@ -183,7 +188,7 @@ export default function NotificationBell() {
               ) : (
                 <>
                 <div className="px-4 py-2 border-b border-gray-50 flex justify-between items-center">
-                  <button onClick={fetchAlerts} className="text-xs text-gray-400 hover:text-gray-600">↻ 重新偵測</button>
+                  <button onClick={rescanAndRefresh} className="text-xs text-gray-400 hover:text-gray-600">↻ 重新偵測</button>
                   <button onClick={resolveAllDataAlerts} disabled={resolving === -1} className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-50">全部標記已知</button>
                 </div>
                 <ul className="max-h-80 overflow-y-auto divide-y divide-gray-50">

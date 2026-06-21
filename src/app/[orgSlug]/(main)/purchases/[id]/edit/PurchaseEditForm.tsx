@@ -6,24 +6,27 @@ import { useOrgPath } from '@/lib/use-org-path'
 import { SHIP_VIA, CURRENCIES } from '@/modules/purchase/poUtils'
 
 type Supplier = { id: number; name: string; shortName: string | null; currencyCode: string | null }
+type SlsPI    = { id: number; piNo: string; totalAmount: { toString(): string } | null; currencyCode: string | null; customer: { name: string; shortName: string | null } | null }
 type Order = {
   id: number; supplierId: number; currencyCode: string; exchangeRate: { toString(): string };
+  slsPiId: number | null;
   expectedDate: Date | null; port: string | null; shipVia: string | null;
   patiscoOrderNo: string | null; note: string | null;
 }
 
-export default function PurchaseEditForm({ order, suppliers }: { order: Order; suppliers: Supplier[] }) {
+export default function PurchaseEditForm({ order, suppliers, slsPIs }: { order: Order; suppliers: Supplier[]; slsPIs: SlsPI[] }) {
   const router = useRouter()
   const toOrgPath = useOrgPath()
   const [form, setForm] = useState({
-    supplierId: String(order.supplierId),
+    supplierId:   String(order.supplierId),
+    slsPiId:      order.slsPiId ? String(order.slsPiId) : '',
     currencyCode: order.currencyCode,
     exchangeRate: order.exchangeRate.toString(),
     expectedDate: order.expectedDate ? order.expectedDate.toISOString().split('T')[0] : '',
-    port: order.port ?? '',
-    shipVia: order.shipVia ?? '',
+    port:         order.port ?? '',
+    shipVia:      order.shipVia ?? '',
     patiscoOrderNo: order.patiscoOrderNo ?? '',
-    note: order.note ?? '',
+    note:         order.note ?? '',
   })
   const [saving, setSaving] = useState(false)
 
@@ -37,7 +40,7 @@ export default function PurchaseEditForm({ order, suppliers }: { order: Order; s
     const res = await fetch(`/api/purchases/${order.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, slsPiId: form.slsPiId ? Number(form.slsPiId) : null }),
     })
     setSaving(false)
     if (res.ok) {
@@ -50,6 +53,21 @@ export default function PurchaseEditForm({ order, suppliers }: { order: Order; s
     <form onSubmit={handleSubmit} className="space-y-6 max-w-3xl">
       <section className="bg-white rounded-lg shadow p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="md:col-span-2">
+            <Field label="關聯我方 PI（形式發票）">
+              <select value={form.slsPiId} onChange={e => set('slsPiId', e.target.value)} className={inp}>
+                <option value="">— 不指定 —</option>
+                {slsPIs.map(pi => (
+                  <option key={pi.id} value={pi.id}>
+                    {pi.piNo}
+                    {pi.customer ? ` — ${pi.customer.shortName ?? pi.customer.name}` : ''}
+                    {pi.totalAmount ? ` (${pi.currencyCode} ${Number(pi.totalAmount).toLocaleString()})` : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">選擇後，應付帳款會自動與此 PI 的出貨連結</p>
+            </Field>
+          </div>
           <div className="md:col-span-2">
             <Field label="Patisco 訂單號">
               <input type="text" value={form.patiscoOrderNo} onChange={e => set('patiscoOrderNo', e.target.value)} className={inp} />

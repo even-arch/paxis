@@ -71,6 +71,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if ('salesOrderId' in body) {
     data.salesOrderId = body.salesOrderId ? Number(body.salesOrderId) : null
   }
+  if ('slsPiId' in body) {
+    data.slsPiId = body.slsPiId ? Number(body.slsPiId) : null
+  }
 
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: '沒有可更新的欄位' }, { status: 400 })
@@ -91,13 +94,12 @@ export async function PUT(req: NextRequest, {
 
   const existing = await prisma.pO_Order.findUnique({ where: { id } })
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  // 只有草稿可以編輯
-  if (existing.status !== 0) return NextResponse.json({ error: '只有草稿狀態可以編輯' }, { status: 400 })
 
   const order = await prisma.pO_Order.update({
     where: { id },
     data: {
       supplierId: Number(body.supplierId),
+      slsPiId: body.slsPiId !== undefined ? (body.slsPiId ? Number(body.slsPiId) : null) : undefined,
       currencyCode: body.currencyCode,
       exchangeRate: String(body.exchangeRate || '1'),
       expectedDate: body.expectedDate ? new Date(body.expectedDate) : null,

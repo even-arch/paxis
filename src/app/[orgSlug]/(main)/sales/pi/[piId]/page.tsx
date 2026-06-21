@@ -23,9 +23,27 @@ export default async function PIDetailPage({ params }: Props) {
           slsItem: { include: { product: { select: { sku: true, name: true, modelNo: true, specification: true } } } },
         },
       },
+      // 反向：哪些 PO 直接連結了這張 PI（slsPiId FK）
+      poOrders: {
+        select: {
+          id: true, poNo: true, status: true, totalAmount: true, currencyCode: true,
+          supplier: { select: { id: true, name: true, shortName: true } },
+        },
+      },
     },
   })
   if (!pi) notFound()
+
+  // 若 slsPiId FK 找不到，fallback 用 poNo=piNo 字串比對
+  const linkedPOs = pi.poOrders.length > 0
+    ? pi.poOrders
+    : await prisma.pO_Order.findMany({
+        where: { poNo: pi.piNo },
+        select: {
+          id: true, poNo: true, status: true, totalAmount: true, currencyCode: true,
+          supplier: { select: { id: true, name: true, shortName: true } },
+        },
+      })
 
   const cust = pi.order?.customer ?? pi.customer
   const currencyCode = pi.order?.currencyCode ?? pi.currencyCode ?? ''
@@ -100,6 +118,28 @@ export default async function PIDetailPage({ params }: Props) {
             </div>
           )}
         </div>
+      </div>
+
+      {/* 對應供應商採購單 */}
+      <div className="bg-orange-50 border border-orange-200 rounded-lg px-5 py-4 mb-6">
+        <p className="text-xs font-semibold text-orange-600 uppercase tracking-wide mb-2">對應供應商採購單（PO）</p>
+        {linkedPOs.length === 0 ? (
+          <p className="text-sm text-gray-400">尚未連結供應商採購單。請在採購訂單頁面點「+ 連結我方 PI」補上連結，AP 付款才能正確對帳。</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {linkedPOs.map(po => (
+              <Link key={po.id} href={orgPath(params.orgSlug, `/purchases/${po.id}`)}
+                className="inline-flex items-center gap-2 bg-white border border-orange-200 rounded-lg px-3 py-2 hover:border-orange-400 transition-colors text-sm">
+                <span className="font-mono font-medium text-orange-700">{po.poNo}</span>
+                <span className="text-gray-500">{po.supplier.shortName ?? po.supplier.name}</span>
+                {po.totalAmount && (
+                  <span className="text-xs text-gray-400">{po.currencyCode} {Number(po.totalAmount).toLocaleString()}</span>
+                )}
+                <span className="text-xs text-gray-400">→ 查看 PO</span>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 品項清單 */}
