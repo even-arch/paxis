@@ -5,6 +5,7 @@ import { getPagePrisma } from '@/lib/page-db'
 import { orgPath } from '@/lib/org-path'
 import { formatDate } from '@/lib/utils'
 import ShipmentItemTable, { type ShipmentGroupData } from './ShipmentItemTable'
+import ConfirmShipmentButton from './ConfirmShipmentButton'
 
 type Props = { params: { orgSlug: string; id: string } }
 
@@ -26,6 +27,7 @@ export default async function ShipmentDetailPage({ params }: Props) {
     where: { id },
     include: {
       customer: { select: { id: true, name: true, shortName: true } },
+      stockMovements: { where: { type: 4 }, select: { id: true } },
       pis: {
         include: {
           pi: {
@@ -63,6 +65,12 @@ export default async function ShipmentDetailPage({ params }: Props) {
         <Link href={orgPath(params.orgSlug, '/shipments')} className="text-gray-400 hover:text-gray-600 text-sm">← 出貨單列表</Link>
         <span className="text-gray-300">/</span>
         <h1 className="text-xl font-bold text-gray-800 font-mono">{shipment.shipmentNo}</h1>
+        <div className="ml-auto">
+          <ConfirmShipmentButton
+            shipmentId={shipment.id}
+            alreadyConfirmed={shipment.stockMovements.length > 0}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-6 mb-6">
@@ -175,6 +183,7 @@ export default async function ShipmentDetailPage({ params }: Props) {
             cartonNoTo: item.cartonNoTo ?? null,
             hasSlsItem: !!item.slsItem,
             hasRawSku: !!item.rawSku,
+            hasLinkedOrder: !!(item.slsItem || item.piId),
           })
         }
         const groups = Array.from(groupMap.values())
