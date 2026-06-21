@@ -6,6 +6,7 @@ import { orgPath } from '@/lib/org-path'
 import { formatDate } from '@/lib/utils'
 import ShipmentItemTable, { type ShipmentGroupData } from './ShipmentItemTable'
 import ConfirmShipmentButton from './ConfirmShipmentButton'
+import LinkPOButton from '@/app/[orgSlug]/(main)/sales/pi/[piId]/LinkPOButton'
 
 type Props = { params: { orgSlug: string; id: string } }
 
@@ -188,8 +189,9 @@ export default async function ShipmentDetailPage({ params }: Props) {
                           ))}
                         </div>
                       ) : (
-                        <div className="mt-1 text-xs text-orange-700">
-                          尚未連結採購單 — 請在採購頁面點「+ 連結我方 PI」補上連結，確認出貨前請先完成。
+                        <div className="mt-1 flex items-center gap-3">
+                          <span className="text-xs text-orange-700">尚未連結採購單</span>
+                          <LinkPOButton piId={pi.piId} linkedPOIds={[]} initialQuery={pi.piNo} />
                         </div>
                       )}
                     </div>

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 
 type POResult = { id: number; poNo: string; supplierId: number; supplier: { name: string; shortName: string | null }; totalAmount: string | null; currencyCode: string }
 
-export default function LinkPOButton({ piId, linkedPOIds }: { piId: number; linkedPOIds: number[] }) {
+export default function LinkPOButton({ piId, linkedPOIds, initialQuery = '' }: { piId: number; linkedPOIds: number[]; initialQuery?: string }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -16,7 +16,10 @@ export default function LinkPOButton({ piId, linkedPOIds }: { piId: number; link
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 50)
+    if (open) {
+      if (initialQuery) setQuery(initialQuery)
+      setTimeout(() => inputRef.current?.focus(), 50)
+    }
   }, [open])
 
   useEffect(() => {
