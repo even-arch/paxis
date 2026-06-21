@@ -146,15 +146,17 @@ export default function FinancePage() {
   // 同批匯款
   const [batchIds, setBatchIds] = useState<number[]>([])  // 其他一起收款的 receivable id
 
-  async function loadEstimates() {
-    if (estimatesLoaded) return
+  async function loadEstimates(force = false) {
+    if (!force && estimatesLoaded) return
+    setEstimatesLoaded(false)
     const data = await fetch('/api/finance/estimates').then(r => r.json())
     setEstimates(data)
     setEstimatesLoaded(true)
   }
 
-  async function loadRecon() {
-    if (reconLoaded) return
+  async function loadRecon(force = false) {
+    if (!force && reconLoaded) return
+    setReconLoaded(false)
     const data = await fetch('/api/finance/reconciliation').then(r => r.json())
     setRecon(data)
     setReconLoaded(true)
@@ -374,9 +376,9 @@ export default function FinancePage() {
       </div>
 
       {tab === 'recon' ? (
-        <ReconTab rows={recon} onRefresh={() => { setReconLoaded(false); loadRecon() }} />
+        <ReconTab rows={recon} onRefresh={() => loadRecon(true)} />
       ) : tab === 'est' ? (
-        <EstimatesTab estimates={estimates} loaded={estimatesLoaded} onRefresh={() => { setEstimatesLoaded(false); loadEstimates() }} />
+        <EstimatesTab estimates={estimates} loaded={estimatesLoaded} onRefresh={() => loadEstimates(true)} />
       ) : loading ? <div className="text-sm text-gray-400">載入中…</div> : tab === 'pay' ? (
         <>
           <div className="flex gap-2 mb-3">
