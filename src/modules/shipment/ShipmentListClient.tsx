@@ -22,6 +22,7 @@ type Shipment = {
   customer: { name: string; shortName: string | null } | null
   _count: { items: number; pis: number }
   pis: Array<{ pi: { piNo: string } }>
+  stockMovements: Array<{ id: number }>
 }
 
 type Props = { shipments: Shipment[]; isArchived: boolean; sort: string; dir: 'asc' | 'desc' }
@@ -104,9 +105,15 @@ export default function ShipmentListClient({ shipments, isArchived, sort, dir }:
                     <input type="checkbox" checked={isSelected} onChange={() => toggle(s.id)} className="rounded" />
                   </td>
                   <td className="px-4 py-3">
-                    <Link href={toOrgPath(`/shipments/${s.id}`)} className="font-mono font-medium text-teal-600 hover:underline">
-                      {s.shipmentNo}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link href={toOrgPath(`/shipments/${s.id}`)} className="font-mono font-medium text-teal-600 hover:underline">
+                        {s.shipmentNo}
+                      </Link>
+                      {s.stockMovements.length > 0
+                        ? <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">已出貨</span>
+                        : <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-400">待確認</span>
+                      }
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-gray-700">{customerName}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs font-mono">
