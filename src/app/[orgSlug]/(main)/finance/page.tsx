@@ -257,6 +257,21 @@ export default function FinancePage() {
     load()
   }
 
+  async function resetRec() {
+    if (!recDialog) return
+    if (!confirm(`確定要將 ${recDialog.shipment.shipmentNo} 退回「未收」狀態？收款紀錄將全部清除。`)) return
+    setSaving(true)
+    await fetch(`/api/finance/receivables/${recDialog.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ collectedForeign: null, rateAtCollection: null, collectedTWD: null, fxGainLoss: null, collectedAt: null, status: 0, note: null }),
+    })
+    setSaving(false)
+    setRecDialog(null)
+    setBatchIds([])
+    load()
+  }
+
   async function submitRec() {
     if (!recDialog) return
     setSaving(true)
@@ -861,13 +876,21 @@ export default function FinancePage() {
                   </div>
                 )}
               </div>
-              <div className="flex justify-end gap-2 mt-5">
-                <button onClick={() => { setRecDialog(null); setBatchIds([]) }}
-                  className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50">取消</button>
-                <button onClick={submitRec} disabled={saving}
-                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">
-                  {saving ? '儲存中…' : batchIds.length > 0 ? `確認收款（共 ${allIds.length} 張）` : '確認收款'}
-                </button>
+              <div className="flex justify-between items-center mt-5">
+                {isEditMode ? (
+                  <button onClick={resetRec} disabled={saving}
+                    className="px-3 py-2 text-sm text-red-600 border border-red-200 rounded-md hover:bg-red-50 disabled:opacity-50">
+                    退回未收
+                  </button>
+                ) : <span />}
+                <div className="flex gap-2">
+                  <button onClick={() => { setRecDialog(null); setBatchIds([]) }}
+                    className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50">取消</button>
+                  <button onClick={submitRec} disabled={saving}
+                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">
+                    {saving ? '儲存中…' : batchIds.length > 0 ? `確認收款（共 ${allIds.length} 張）` : '確認收款'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
