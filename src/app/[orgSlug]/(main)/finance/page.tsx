@@ -508,22 +508,38 @@ export default function FinancePage() {
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_REC_COLOR[r.status]}`}>{STATUS_REC[r.status]}</span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {r.status < 2 && (
+                        {(() => {
+                          const hasCollected = r.status === 2 && r.collectedForeign != null
+                          return (
                           <div className="flex flex-col items-end gap-1">
-                            <button onClick={() => { setRecDialog(r); setRecForeign((Number(r.amountForeign) * Number(r.rateAtInvoice)).toFixed(2)); setRecRate(''); setRecDateInput(''); setRecNote(r.note ?? '') }}
-                              className="text-xs text-blue-600 hover:underline">記錄收款</button>
+                            <button onClick={() => {
+                              setRecDialog(r)
+                              // 預填：已收清時帶入現有收款資料，否則帶入應收估算
+                              setRecForeign(hasCollected
+                                ? String(Number(r.collectedForeign))
+                                : (Number(r.amountForeign) * Number(r.rateAtInvoice)).toFixed(2))
+                              setRecRate(hasCollected && r.rateAtCollection ? String(Number(r.rateAtCollection)) : '')
+                              setRecDateInput(hasCollected && r.collectedAt
+                                ? new Date(r.collectedAt).toISOString().slice(0, 10)
+                                : '')
+                              setRecNote(r.note ?? '')
+                            }}
+                              className={`text-xs hover:underline ${r.status === 2 ? 'text-gray-400 hover:text-blue-600' : 'text-blue-600'}`}>
+                              {r.status === 2 ? '修改收款' : '記錄收款'}
+                            </button>
                             {r.status === 0 && !r.rateAtCollection && (
                               <span className="text-xs text-amber-500" title="收款後請填入銀行押匯匯率以計算匯差">
                                 待填押匯匯率
                               </span>
                             )}
+                            {r.status === 2 && !r.rateAtCollection && (
+                              <span className="text-xs text-gray-400" title="已收款但未記錄押匯匯率，無法計算匯差">
+                                未記錄匯率
+                              </span>
+                            )}
                           </div>
-                        )}
-                        {r.status === 2 && !r.rateAtCollection && (
-                          <span className="text-xs text-gray-400" title="已收款但未記錄押匯匯率，無法計算匯差">
-                            未記錄匯率
-                          </span>
-                        )}
+                          )
+                        })()}
                       </td>
                     </tr>
                   )
