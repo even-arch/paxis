@@ -36,8 +36,8 @@ export default async function PIDetailPage({ params }: Props) {
   })
   if (!pi) notFound()
 
-  // 若 slsPiId FK 找不到，fallback 用 poNo=piNo 字串比對
-  const linkedPOs = pi.poOrders.length > 0
+  // 若 slsPiId FK 找不到，fallback 用 poNo=piNo 字串比對，並自動補上 slsPiId
+  let linkedPOs = pi.poOrders.length > 0
     ? pi.poOrders
     : await prisma.pO.findMany({
         where: { poNo: pi.piNo },
@@ -46,6 +46,32 @@ export default async function PIDetailPage({ params }: Props) {
           supplier: { select: { id: true, name: true, shortName: true } },
         },
       })
+
+  // fallback 命中時自動補 slsPiId，確保後續成本計算能用 FK 查到
+  if (pi.poOrders.length === 0 && linkedPOs.length > 0) {
+    await prisma.pO.updateMany({
+      where: { id: { in: linkedPOs.map(p => p.id) }, slsPiId: null },
+      data: { slsPiId: pi.id },
+    })
+  }
+
+  // 取 PO 品項 SKU，用於覆蓋率檢查
+  const linkedPOsWithItems = await prisma.pO.findMany({
+    where: { slsPiId: pi.id },
+    select: {
+      id: true, poNo: true, status: true, totalAmount: true, currencyCode: true,
+      supplier: { select: { id: true, name: true, shortName: true } },
+      items: { select: { product: { select: { sku: true } } } },
+    },
+  })
+  if (linkedPOsWithItems.length > 0) linkedPOs = linkedPOsWithItems
+
+  // PI 品項 SKU 集合
+  const piSkus = new Set(pi.items.map(i => i.slsItem?.product?.sku ?? i.product?.sku).filter(Boolean))
+  const poSkus = new Set(linkedPOs.flatMap(po =>
+    ('items' in po ? (po as typeof linkedPOsWithItems[0]).items.map(i => i.product?.sku) : [])
+  ).filter(Boolean))
+  const missingSkus = Array.from(piSkus).filter((sku): sku is string => sku != null && !poSkus.has(sku))
 
   const cust = pi.order?.customer ?? pi.customer
   const currencyCode = pi.order?.currencyCode ?? pi.currencyCode ?? ''
@@ -128,6 +154,12 @@ export default async function PIDetailPage({ params }: Props) {
           <p className="text-xs font-semibold text-orange-600 uppercase tracking-wide">對應供應商採購單（PO）</p>
           <LinkPOButton piId={pi.id} linkedPOIds={linkedPOs.map(p => p.id)} />
         </div>
+        {missingSkus.length > 0 && (
+          <div className="mb-3 p-2.5 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-xs font-semibold text-red-600 mb-1">⚠ 以下 SKU 在已連結 PO 中找不到進價，毛利估算將不完整：</p>
+            <p className="text-xs font-mono text-red-500">{missingSkus.join('、')}</p>
+          </div>
+        )}
         {linkedPOs.length === 0 ? (
           <p className="text-sm text-gray-400">尚未連結採購單，請點右側按鈕搜尋並連結。</p>
         ) : (
