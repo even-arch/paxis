@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { getPagePrisma } from '@/lib/page-db'
 import { orgPath } from '@/lib/org-path'
 import { formatDate } from '@/lib/utils'
+import LinkPOButton from './LinkPOButton'
 
 type Props = { params: { orgSlug: string; piId: string } }
 
@@ -122,9 +123,12 @@ export default async function PIDetailPage({ params }: Props) {
 
       {/* 對應供應商採購單 */}
       <div className="bg-orange-50 border border-orange-200 rounded-lg px-5 py-4 mb-6">
-        <p className="text-xs font-semibold text-orange-600 uppercase tracking-wide mb-2">對應供應商採購單（PO）</p>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-semibold text-orange-600 uppercase tracking-wide">對應供應商採購單（PO）</p>
+          <LinkPOButton piId={pi.id} linkedPOIds={linkedPOs.map(p => p.id)} />
+        </div>
         {linkedPOs.length === 0 ? (
-          <p className="text-sm text-gray-400">尚未連結供應商採購單。請在採購訂單頁面點「+ 連結我方 PI」補上連結，AP 付款才能正確對帳。</p>
+          <p className="text-sm text-gray-400">尚未連結採購單，請點右側按鈕搜尋並連結。</p>
         ) : (
           <div className="flex flex-wrap gap-2">
             {linkedPOs.map(po => (

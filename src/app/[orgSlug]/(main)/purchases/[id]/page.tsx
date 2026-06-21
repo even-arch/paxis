@@ -161,13 +161,6 @@ export default async function PurchaseDetailPage({
             <LinkSlsPIButton
               poId={order.id}
               currentSlsPiId={linkedSlsPI?.id ?? null}
-              slsPIs={openSlsPIs.map(p => ({
-                id: p.id,
-                piNo: p.piNo,
-                customerName: p.customer?.name ?? null,
-                totalAmount: p.totalAmount?.toString() ?? null,
-                currencyCode: p.currencyCode,
-              }))}
             />
           </div>
           {linkedSlsPI ? (

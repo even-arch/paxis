@@ -3,13 +3,13 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
-type PIResult = { id: number; piNo: string; totalAmount: string | null; currencyCode: string | null; customer: { name: string; shortName: string | null } | null }
+type POResult = { id: number; poNo: string; supplierId: number; supplier: { name: string; shortName: string | null }; totalAmount: string | null; currencyCode: string }
 
-export default function LinkSlsPIButton({ poId, currentSlsPiId }: { poId: number; currentSlsPiId: number | null }) {
+export default function LinkPOButton({ piId, linkedPOIds }: { piId: number; linkedPOIds: number[] }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<PIResult[]>([])
+  const [results, setResults] = useState<POResult[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -26,16 +26,16 @@ export default function LinkSlsPIButton({ poId, currentSlsPiId }: { poId: number
     timerRef.current = setTimeout(async () => {
       setLoading(true)
       try {
-        const res = await fetch(`/api/sales/pi/search?q=${encodeURIComponent(query)}`)
+        const res = await fetch(`/api/purchases?search=${encodeURIComponent(query)}&limit=20`)
         const data = await res.json()
-        setResults(data ?? [])
+        setResults((data.orders ?? data ?? []).filter((po: POResult) => !linkedPOIds.includes(po.id)))
       } finally {
         setLoading(false)
       }
     }, 300)
   }, [query, open])
 
-  async function linkPI(piId: number | null) {
+  async function linkPO(poId: number) {
     setSaving(true)
     await fetch(`/api/purchases/${poId}`, {
       method: 'PATCH',
@@ -52,8 +52,9 @@ export default function LinkSlsPIButton({ poId, currentSlsPiId }: { poId: number
   return (
     <div className="relative inline-block">
       {!open ? (
-        <button onClick={() => setOpen(true)} className="text-xs text-blue-600 hover:text-blue-800 hover:underline">
-          {currentSlsPiId ? '變更連結' : '+ 連結我方 PI'}
+        <button onClick={() => setOpen(true)}
+          className="text-xs px-2 py-1 rounded border border-orange-300 text-orange-700 hover:bg-orange-50">
+          ＋ 連結採購單（PO）
         </button>
       ) : (
         <div className="absolute z-20 top-0 left-0 bg-white border border-gray-300 rounded-lg shadow-lg w-80">
@@ -62,7 +63,7 @@ export default function LinkSlsPIButton({ poId, currentSlsPiId }: { poId: number
               ref={inputRef}
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="輸入 PI 號或客戶名稱..."
+              placeholder="輸入 PO 號或供應商名稱..."
               className="flex-1 text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
             <button onClick={() => { setOpen(false); setQuery(''); setResults([]) }}
@@ -71,27 +72,21 @@ export default function LinkSlsPIButton({ poId, currentSlsPiId }: { poId: number
           <div className="max-h-64 overflow-y-auto">
             {loading && <div className="text-xs text-gray-400 px-3 py-2">搜尋中...</div>}
             {!loading && query && results.length === 0 && (
-              <div className="text-xs text-gray-400 px-3 py-3">找不到符合的 PI</div>
+              <div className="text-xs text-gray-400 px-3 py-3">找不到符合的採購單</div>
             )}
             {!loading && !query && (
-              <div className="text-xs text-gray-400 px-3 py-3">輸入 PI 號或客戶名稱搜尋</div>
+              <div className="text-xs text-gray-400 px-3 py-3">輸入 PO 號或供應商名稱搜尋</div>
             )}
-            {results.map(pi => (
-              <button key={pi.id} onClick={() => !saving && linkPI(pi.id)} disabled={saving}
+            {results.map(po => (
+              <button key={po.id} onClick={() => !saving && linkPO(po.id)} disabled={saving}
                 className="w-full text-left px-3 py-2.5 hover:bg-blue-50 border-b border-gray-50 last:border-0 disabled:opacity-50">
-                <div className="font-mono text-sm font-medium text-gray-800">{pi.piNo}</div>
+                <div className="font-mono text-sm font-medium text-gray-800">{po.poNo}</div>
                 <div className="text-xs text-gray-500 mt-0.5">
-                  {pi.customer?.shortName ?? pi.customer?.name ?? '未對應客戶'}
-                  {pi.totalAmount && <span className="ml-2 text-gray-400">{pi.currencyCode} {Number(pi.totalAmount).toLocaleString()}</span>}
+                  {po.supplier.shortName ?? po.supplier.name}
+                  {po.totalAmount && <span className="ml-2 text-gray-400">{po.currencyCode} {Number(po.totalAmount).toLocaleString()}</span>}
                 </div>
               </button>
             ))}
-            {currentSlsPiId && (
-              <button onClick={() => !saving && linkPI(null)} disabled={saving}
-                className="w-full text-left px-3 py-2.5 text-xs text-red-500 hover:bg-red-50 border-t border-gray-100 disabled:opacity-50">
-                移除連結
-              </button>
-            )}
           </div>
         </div>
       )}
