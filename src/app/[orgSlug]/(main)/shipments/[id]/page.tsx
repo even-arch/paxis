@@ -34,6 +34,7 @@ export default async function ShipmentDetailPage({ params }: Props) {
             select: {
               id: true, piNo: true, etd: true,
               order: { select: { id: true, orderNo: true } },
+              poOrders: { select: { id: true, poNo: true, supplier: { select: { shortName: true, name: true } } } },
             },
           },
         },
@@ -111,41 +112,71 @@ export default async function ShipmentDetailPage({ params }: Props) {
       {(() => {
         // 優先用 SLS_PI_Link junction table；若空（舊資料或 UPS 流程漏建），
         // 從 items.pi 推導唯一 PI 清單作為 fallback
-        type PiEntry = { piId: number; piNo: string; orderId?: number | null; orderNo?: string | null; etd?: Date | null }
+        type PiEntry = { piId: number; piNo: string; orderId?: number | null; orderNo?: string | null; etd?: Date | null; poOrders: { id: number; poNo: string; supplier: { shortName: string | null; name: string } }[] }
         let piList: PiEntry[] = shipment.pis.map(sp => ({
           piId: sp.piId,
           piNo: sp.pi.piNo,
           orderId: sp.pi.order?.id,
           orderNo: sp.pi.order?.orderNo,
           etd: sp.pi.etd,
+          poOrders: sp.pi.poOrders,
         }))
         if (piList.length === 0) {
           const seen = new Set<number>()
           for (const item of shipment.items) {
             if (item.pi && !seen.has(item.pi.id)) {
               seen.add(item.pi.id)
-              piList.push({ piId: item.pi.id, piNo: item.pi.piNo, orderId: item.pi.orderId })
+              piList.push({ piId: item.pi.id, piNo: item.pi.piNo, orderId: item.pi.orderId, poOrders: [] })
             }
           }
         }
         if (piList.length === 0) return null
+        const missingPO = piList.filter(p => p.poOrders.length === 0)
         return (
           <div className="bg-white rounded-lg shadow p-5 mb-6">
-            <h2 className="text-sm font-semibold text-gray-600 mb-3 uppercase tracking-wide">關聯 PI</h2>
-            <div className="flex flex-wrap gap-2">
-              {piList.map(pi => (
-                <div key={pi.piId} className="border border-gray-200 rounded px-3 py-2 text-sm">
-                  <Link href={orgPath(params.orgSlug, `/sales/${pi.orderId ?? ''}`)} className="font-mono text-teal-600 hover:underline">
-                    {pi.piNo}
-                  </Link>
-                  {pi.orderNo && (
-                    <span className="text-gray-400 text-xs ml-2">(訂單 {pi.orderNo})</span>
-                  )}
-                  {pi.etd && (
-                    <span className="text-gray-400 text-xs ml-2">ETD: {formatDate(pi.etd)}</span>
-                  )}
-                </div>
-              ))}
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">關聯 PI</h2>
+              {missingPO.length > 0 ? (
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded px-2 py-1">
+                  ⚠ {missingPO.length} 張 PI 尚未連結採購單（PO）
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded px-2 py-1">
+                  ✓ 全部 PI 均已連結 PO
+                </span>
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              {piList.map(pi => {
+                const hasPO = pi.poOrders.length > 0
+                return (
+                  <div key={pi.piId} className={`flex items-start gap-3 border rounded px-3 py-2 text-sm ${hasPO ? 'border-gray-200' : 'border-orange-300 bg-orange-50'}`}>
+                    <span className={`mt-0.5 text-base ${hasPO ? 'text-green-500' : 'text-orange-500'}`}>{hasPO ? '✓' : '⚠'}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Link href={orgPath(params.orgSlug, `/sales/pi/${pi.piId}`)} className="font-mono text-teal-600 hover:underline font-medium">
+                          {pi.piNo}
+                        </Link>
+                        {pi.etd && <span className="text-gray-400 text-xs">ETD: {formatDate(pi.etd)}</span>}
+                      </div>
+                      {hasPO ? (
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {pi.poOrders.map(po => (
+                            <Link key={po.id} href={orgPath(params.orgSlug, `/purchases/${po.id}`)}
+                              className="text-xs text-blue-600 hover:underline font-mono">
+                              PO: {po.poNo} <span className="text-gray-400 font-sans">({po.supplier.shortName ?? po.supplier.name})</span>
+                            </Link>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="mt-1 text-xs text-orange-700">
+                          尚未連結採購單 — 請在採購頁面點「+ 連結我方 PI」補上連結，確認出貨前請先完成。
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )
