@@ -90,7 +90,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
           reservedAfter: updatedStock?.reservedQty ?? currentReserved - reservedDecrement,
           slsShipmentId: shipmentId,
           source: 'MANUAL',
-          performedBy: ((session.user as unknown) as { id?: number }).id ?? null,
+          performedBy: (() => { const uid = ((session.user as unknown) as { id?: unknown }).id; return uid != null ? parseInt(String(uid), 10) : null })(),
           patiscoDocId: shipment.patiscoDocId ?? undefined,
           patiscoDocNo: shipment.patiscoDocNo ?? undefined,
         },
