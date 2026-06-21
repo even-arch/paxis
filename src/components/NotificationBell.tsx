@@ -67,8 +67,14 @@ export default function NotificationBell() {
   // 頁面載入時拉一次
   useEffect(() => { fetchAlerts() }, [])
 
-  // 開啟面板時也重新拉（資料可能在背景 sync 後已更新）
+  // 開啟面板時重新拉
   useEffect(() => { if (open) fetchAlerts() }, [open])
+
+  // 每 5 分鐘自動重新偵測（sync 後告警可能已消失）
+  useEffect(() => {
+    const timer = setInterval(fetchAlerts, 5 * 60 * 1000)
+    return () => clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -83,6 +89,16 @@ export default function NotificationBell() {
     try {
       await fetch(`/api/data-alerts/${id}`, { method: 'PATCH' })
       setDataAlerts(prev => prev.filter(a => a.id !== id))
+    } finally {
+      setResolving(null)
+    }
+  }
+
+  async function resolveAllDataAlerts() {
+    setResolving(-1)
+    try {
+      await Promise.all(dataAlerts.map(a => fetch(`/api/data-alerts/${a.id}`, { method: 'PATCH' })))
+      setDataAlerts([])
     } finally {
       setResolving(null)
     }
@@ -165,6 +181,11 @@ export default function NotificationBell() {
               {dataAlerts.length === 0 ? (
                 <p className="px-4 py-5 text-center text-gray-400 text-xs">沒有資料品質問題 ✓</p>
               ) : (
+                <>
+                <div className="px-4 py-2 border-b border-gray-50 flex justify-between items-center">
+                  <button onClick={fetchAlerts} className="text-xs text-gray-400 hover:text-gray-600">↻ 重新偵測</button>
+                  <button onClick={resolveAllDataAlerts} disabled={resolving === -1} className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-50">全部標記已知</button>
+                </div>
                 <ul className="max-h-80 overflow-y-auto divide-y divide-gray-50">
                   {dataAlerts.map(alert => {
                     const typeInfo = ALERT_TYPE_LABEL[alert.type] ?? { label: alert.type, color: 'text-gray-600' }
@@ -204,6 +225,7 @@ export default function NotificationBell() {
                     )
                   })}
                 </ul>
+                </>
               )}
             </>
           )}

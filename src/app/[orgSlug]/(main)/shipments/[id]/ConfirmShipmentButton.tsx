@@ -12,12 +12,11 @@ export default function ConfirmShipmentButton({ shipmentId, alreadyConfirmed }: 
   const [done, setDone] = useState(alreadyConfirmed)
   const [error, setError] = useState('')
 
-  if (done) {
-    return <span className="text-xs text-green-600 font-medium">✓ 庫存已扣減</span>
-  }
-
   async function handleConfirm() {
-    if (!confirm('確認驅動出貨？系統將寫入庫存扣減（quantity--），此動作不可逆。')) return
+    const msg = done
+      ? '庫存已扣減。是否補建財務記錄（應收/應付帳款）？'
+      : '確認驅動出貨？系統將寫入庫存扣減（quantity--）並建立財務記錄，此動作不可逆。'
+    if (!confirm(msg)) return
     setLoading(true); setError('')
     try {
       const res = await fetch(`/api/shipments/${shipmentId}/confirm`, { method: 'POST' })
@@ -34,12 +33,13 @@ export default function ConfirmShipmentButton({ shipmentId, alreadyConfirmed }: 
 
   return (
     <div className="flex items-center gap-3">
+      {done && <span className="text-xs text-green-600 font-medium">✓ 庫存已扣減</span>}
       <button
         onClick={handleConfirm}
         disabled={loading}
-        className="px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+        className={`px-4 py-2 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors ${done ? 'bg-gray-400 hover:bg-gray-500' : 'bg-teal-600 hover:bg-teal-700'}`}
       >
-        {loading ? '處理中…' : '✈ 確認出貨（驅動庫存）'}
+        {loading ? '處理中…' : done ? '補建財務記錄' : '✈ 確認出貨（驅動庫存）'}
       </button>
       {error && <span className="text-xs text-red-500">{error}</span>}
     </div>

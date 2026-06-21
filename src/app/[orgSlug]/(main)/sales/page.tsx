@@ -170,8 +170,8 @@ export default async function SalesPage({ params, searchParams }: Props) {
         </select>
         <button type="submit" className="bg-gray-100 border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-200">搜尋</button>
         {hasFilter && (
-          <Link href={showArchived ? orgPath(params.orgSlug, '/sales?archived=true') : orgPath(params.orgSlug, '/sales')}
-            className="border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-50 text-gray-500">清除</Link>
+          <a href={showArchived ? orgPath(params.orgSlug, '/sales?archived=true') : orgPath(params.orgSlug, '/sales')}
+            className="border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-50 text-gray-500">清除</a>
         )}
       </form>
 

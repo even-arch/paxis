@@ -139,7 +139,7 @@ export default async function InventoryPage({
           className="border border-gray-300 rounded-md px-3 py-2 text-sm w-72 focus:outline-none focus:ring-2 focus:ring-blue-500" />
         <button type="submit" className="bg-gray-100 border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-200">搜尋</button>
         {(search || filter) && (
-          <Link href={orgPath(params.orgSlug, '/inventory')} className="border border-gray-300 px-4 py-2 rounded-md text-sm text-gray-500 hover:bg-gray-50">清除</Link>
+          <a href={orgPath(params.orgSlug, '/inventory')} className="border border-gray-300 px-4 py-2 rounded-md text-sm text-gray-500 hover:bg-gray-50">清除</a>
         )}
         {filter !== 'low' && lowRows.length > 0 && (
           <Link href="?filter=low" className="border border-red-300 text-red-600 px-4 py-2 rounded-md text-sm hover:bg-red-50">

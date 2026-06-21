@@ -86,8 +86,8 @@ export default async function ShipmentsPage({ params, searchParams }: Props) {
           className="border border-gray-300 rounded-md px-3 py-2 text-sm w-80 focus:outline-none focus:ring-2 focus:ring-teal-500" />
         <button type="submit" className="bg-gray-100 border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-200">搜尋</button>
         {search && (
-          <Link href={orgPath(params.orgSlug, showArchived ? '/shipments?archived=true' : '/shipments')}
-            className="border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-50 text-gray-500">清除</Link>
+          <a href={orgPath(params.orgSlug, showArchived ? '/shipments?archived=true' : '/shipments')}
+            className="border border-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-50 text-gray-500">清除</a>
         )}
       </form>
 

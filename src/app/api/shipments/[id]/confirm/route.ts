@@ -59,8 +59,9 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   })
 
   if (!shipment) return NextResponse.json({ error: '找不到出貨單' }, { status: 404 })
-  if (shipment.stockMovements.length > 0)
-    return NextResponse.json({ error: '此出貨單已完成庫存扣減，請勿重複執行' }, { status: 409 })
+
+  // 若 INV 已扣過，跳過 INV 步驟但仍繼續建 AR/AP（補建財務記錄）
+  const invAlreadyDone = shipment.stockMovements.length > 0
 
   // ── 補查 rawSku → productId ──────────────────────────────────────────
   const rawSkuItems = shipment.items.filter(i => !i.slsItem && i.rawSku && i.piId)
@@ -86,7 +87,10 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
   try {
     // ── 1. INV_Movement type=4 + SLS_Item.shippedQty ─────────────────────
-    for (const item of shipment.items) {
+    if (invAlreadyDone) {
+      result.invSkipped = shipment.items.length
+    }
+    for (const item of invAlreadyDone ? [] : shipment.items) {
       const productId = item.slsItem?.product?.id
         ?? (item.piId && item.rawSku ? piItemLookup.get(`${item.piId}:${item.rawSku}`) : undefined)
 
@@ -157,14 +161,16 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
         amountTWD += base * calcExtraCharges(sp.pi.extraCharges)
       }
 
-      if (amountTWD > 0 && ciRate > 0) {
-        const amountForeign = amountTWD * ciRate
-        const rateAtInvoice = 1 / ciRate
+      if (amountTWD > 0) {
+        // ciRate=0 時（尚未同步 CI 文件），先用外幣金額原值存入，等待後續更新
+        const amountForeign = ciRate > 0 ? amountTWD * ciRate : amountTWD
+        const rateAtInvoice = ciRate > 0 ? 1 / ciRate : 1
+        const currencyCode = ciRate > 0 ? 'EUR' : (shipment.pis[0]?.pi.currencyCode ?? 'TWD')
         await prisma.fIN_Receivable.create({
           data: {
             shipmentId,
             customerId: shipment.customerId ?? undefined,
-            currencyCode: 'EUR',
+            currencyCode,
             amountForeign: new Prisma.Decimal(amountForeign),
             rateAtInvoice: new Prisma.Decimal(rateAtInvoice),
             amountTWD: new Prisma.Decimal(amountTWD),
@@ -176,15 +182,24 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     }
 
     // ── 3. FIN_Payable（AP）：找出此出貨關聯的 PO_Receipt ────────────────
-    // 路徑：SLS_PI → SLS_Order → PO_Order（salesOrderId）→ PO_Receipt
-    // 貿易商模式：若 PO_Order 沒有 PO_Receipt，自動建立一筆虛擬入庫記錄
+    // 路徑A：SLS_PI → SLS_Order → PO_Order（salesOrderId）
+    // 路徑B（貿易商/Patisco standalone PI）：SLS_PI.piNo → PO_Order.poNo 模糊比對
     const slsOrderIds = shipment.pis
       .map(sp => sp.pi.order?.id)
       .filter((id): id is number => id != null)
 
-    if (slsOrderIds.length > 0) {
+    // 路徑B：standalone PI 用 piNo 比對 PO_Order.poNo
+    const standalonePiNos = shipment.pis
+      .filter(sp => !sp.pi.order)
+      .map(sp => sp.pi.piNo)
+
+    const poOrderConditions: Record<string, unknown>[] = []
+    if (slsOrderIds.length > 0) poOrderConditions.push({ salesOrderId: { in: slsOrderIds } })
+    if (standalonePiNos.length > 0) poOrderConditions.push({ poNo: { in: standalonePiNos } })
+
+    if (poOrderConditions.length > 0) {
       const poOrders = await prisma.pO_Order.findMany({
-        where: { salesOrderId: { in: slsOrderIds } },
+        where: { OR: poOrderConditions },
         include: {
           receipts: { take: 1 },
           supplier: { select: { id: true } },
