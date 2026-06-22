@@ -829,12 +829,16 @@ export default function FinancePage() {
                       </div>
                       {payBatchIds.length > 0 && (
                         <div className="bg-amber-50 px-3 py-2 text-xs text-amber-700 border-t border-amber-200 flex justify-between">
-                          <span>同批合計（含主單）</span>
+                          <span>同批合計（含主單，未含稅前費用調整）</span>
                           <span className="font-mono font-medium">
-                            {(Number(payDialog.amountTWD) + payBatchIds.reduce((s, id) => {
-                              const p = payables.find(p => p.id === id)
-                              return s + (p ? Number(p.amountTWD) : 0)
-                            }, 0)).toLocaleString('zh-TW', { maximumFractionDigits: 0 })}
+                            {(() => {
+                              const vatRate = 1 + (parseFloat(feeVatPct) || 0) / 100
+                              const batchSum = payBatchIds.reduce((s, id) => {
+                                const p = payables.find(p => p.id === id)
+                                return s + (p ? Number(p.amountTWD) * vatRate : 0)
+                              }, 0)
+                              return (fees.finalWire + batchSum).toLocaleString('zh-TW', { maximumFractionDigits: 0 })
+                            })()}
                           </span>
                         </div>
                       )}
