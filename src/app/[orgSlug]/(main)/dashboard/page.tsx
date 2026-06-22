@@ -7,7 +7,8 @@ import { formatDate } from '@/lib/utils'
 export default async function DashboardPage({ params }: { params: { orgSlug: string } }) {
   const prisma = await getPagePrisma(params.orgSlug)
   const today = new Date()
-  const in14Days = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000)
+  const in7Days  = new Date(today.getTime() + 7  * 86400000)
+  const in14Days = new Date(today.getTime() + 14 * 86400000)
   const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1)
 
   const [
@@ -18,12 +19,14 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
     pendingPOs,
     ordersNeedingPI,
     upcomingShipments,
-    recentReceipts,
+    recentShipments,
     // 財務
     pendingPayables,
+    overduePayables,
+    dueSoonPayables,
     pendingReceivables,
     thisMonthReceivables,
-    // Patisco 同步
+    // Patisco
     lastSync,
     syncErrorCount,
   ] = await Promise.all([
@@ -52,7 +55,7 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
         customer: { select: { name: true } },
         _count: { select: { items: true } },
       },
-      orderBy: { customerRequestedShipDate: 'asc' },
+      orderBy: { createdAt: 'desc' },   // 最新訂單優先
       take: 5,
     }),
 
@@ -66,31 +69,42 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
       take: 5,
     }),
 
-    prisma.pO_Receipt.findMany({
-      where: { performedAt: { gte: new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000) } },
+    // 最近出貨（最新 5 筆）
+    prisma.sLS.findMany({
       include: {
-        order: { include: { supplier: { select: { name: true } } } },
-        items: { include: { poItem: { include: { product: { select: { name: true } } } } } },
+        customer: { select: { name: true } },
+        pis: { include: { pi: { select: { piNo: true } } }, take: 1 },
       },
-      orderBy: { performedAt: 'desc' },
+      orderBy: [{ actualShipDate: 'desc' }, { performedAt: 'desc' }],
       take: 5,
     }),
 
-    // 待付帳款（status=0 or 1）
+    // 待付帳款
     prisma.fIN_Payable.aggregate({
       where: { status: { in: [0, 1] } },
       _sum: { amountTWD: true },
       _count: true,
     }),
 
-    // 待收帳款（status=0 or 1）
+    // 逾期應付（dueDate < 今天）
+    prisma.fIN_Payable.count({
+      where: { status: { in: [0, 1] }, dueDate: { lt: today } },
+    }),
+
+    // 7天內到期應付
+    prisma.fIN_Payable.findMany({
+      where: { status: { in: [0, 1] }, dueDate: { gte: today, lte: in7Days } },
+      include: { supplier: { select: { shortName: true, name: true } } },
+      orderBy: { dueDate: 'asc' },
+      take: 5,
+    }),
+
     prisma.fIN_Receivable.aggregate({
       where: { status: { in: [0, 1] } },
       _sum: { amountForeign: true },
       _count: true,
     }),
 
-    // 本月已收款的匯差
     prisma.fIN_Receivable.aggregate({
       where: {
         status: 2,
@@ -100,21 +114,15 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
       _sum: { fxGainLoss: true },
     }),
 
-    // 最近一筆同步
-    prisma.sYS_PatiscoSync.findFirst({
-      orderBy: { syncedAt: 'desc' },
-    }),
+    prisma.sYS_PatiscoSync.findFirst({ orderBy: { syncedAt: 'desc' } }),
 
-    // 同步錯誤數（過去 7 天）
     prisma.sYS_PatiscoSync.count({
       where: {
         status: 'error',
-        syncedAt: { gte: new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000) },
+        syncedAt: { gte: new Date(today.getTime() - 7 * 86400000) },
       },
     }),
   ])
-
-  const poStatusLabel = (s: number) => s === 1 ? '已送出' : '部分到貨'
 
   const pendingPayTWD = Number(pendingPayables._sum.amountTWD ?? 0)
   const pendingRecTWD = Number(pendingReceivables._sum.amountForeign ?? 0)
@@ -123,6 +131,8 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
   const syncMinutesAgo = lastSync
     ? Math.floor((today.getTime() - new Date(lastSync.syncedAt).getTime()) / 60000)
     : null
+
+  const poStatusLabel = (s: number) => s === 1 ? '已送出' : '部分到貨'
 
   return (
     <div>
@@ -175,11 +185,15 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
 
       {/* 財務快覽 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Link href={orgPath(params.orgSlug, '/finance?tab=payable')} className="bg-white rounded-lg shadow p-5 hover:shadow-md">
+        <Link href={orgPath(params.orgSlug, '/finance?tab=payable')}
+          className={`bg-white rounded-lg shadow p-5 hover:shadow-md ${overduePayables > 0 ? 'border-l-4 border-red-400' : ''}`}>
           <p className="text-xs text-gray-500">待付帳款（{pendingPayables._count} 筆）</p>
           <p className="text-xl font-semibold text-gray-800 mt-1">
             {pendingPayTWD.toLocaleString('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 })}
           </p>
+          {overduePayables > 0 && (
+            <p className="text-xs text-red-500 mt-1 font-medium">⚠ {overduePayables} 筆已逾期</p>
+          )}
         </Link>
         <Link href={orgPath(params.orgSlug, '/finance?tab=receivable')} className="bg-white rounded-lg shadow p-5 hover:shadow-md">
           <p className="text-xs text-gray-500">待收帳款（{pendingReceivables._count} 筆）</p>
@@ -194,6 +208,34 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
           </p>
         </Link>
       </div>
+
+      {/* 7天內到期應付 */}
+      {dueSoonPayables.length > 0 && (
+        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg overflow-hidden">
+          <div className="px-5 py-3 border-b border-amber-200 flex items-center justify-between">
+            <span className="text-sm font-semibold text-amber-800">7 天內到期應付</span>
+            <Link href={orgPath(params.orgSlug, '/finance?tab=payable')} className="text-xs text-amber-700 hover:underline">查看全部</Link>
+          </div>
+          <div className="divide-y divide-amber-100">
+            {dueSoonPayables.map(p => {
+              const daysLeft = p.dueDate ? Math.ceil((new Date(p.dueDate).getTime() - today.getTime()) / 86400000) : null
+              return (
+                <div key={p.id} className="px-5 py-2.5 flex items-center justify-between">
+                  <span className="text-sm text-gray-700">{p.supplier.shortName ?? p.supplier.name}</span>
+                  <div className="flex items-center gap-4">
+                    <span className="font-mono text-sm text-gray-700">
+                      {Number(p.amountTWD).toLocaleString('zh-TW', { maximumFractionDigits: 0 })}
+                    </span>
+                    <span className={`text-xs font-medium ${daysLeft === 0 ? 'text-red-600' : 'text-amber-700'}`}>
+                      {daysLeft === 0 ? '今天到期' : `${daysLeft} 天後`}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 三條輸入管道 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -234,7 +276,30 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        {/* 待處理：客戶訂單待發 PI */}
+        {/* 最近出貨（最新優先） */}
+        <Section
+          title="最近出貨"
+          count={recentShipments.length}
+          href={orgPath(params.orgSlug, '/shipments')}
+          accentColor="text-green-600"
+          emptyText="尚無出貨記錄"
+        >
+          {recentShipments.map(s => {
+            const piNo = s.pis[0]?.pi?.piNo ?? null
+            return (
+              <ActionRow
+                key={s.id}
+                href={orgPath(params.orgSlug, `/shipments/${s.id}`)}
+                primary={s.shipmentNo}
+                secondary={s.customer?.name ?? piNo ?? '—'}
+                tag={s.actualShipDate ? formatDate(s.actualShipDate) : '出貨日未填'}
+                tagColor={s.actualShipDate ? 'text-gray-400' : 'text-amber-500'}
+              />
+            )
+          })}
+        </Section>
+
+        {/* 客戶訂單待發 PI（最新訂單優先） */}
         <Section
           title="客戶訂單待發 PI"
           count={ordersNeedingPI.length}
@@ -260,7 +325,7 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
           ))}
         </Section>
 
-        {/* 即將出貨的 PI（14天內） */}
+        {/* PI 即將出貨（14天內，最緊迫優先） */}
         <Section
           title="PI 預計出貨（14天內）"
           count={upcomingShipments.length}
@@ -287,7 +352,7 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
           })}
         </Section>
 
-        {/* 採購在途 */}
+        {/* 採購在途（最緊迫優先） */}
         <Section
           title="採購在途"
           count={pendingPOs.length}
@@ -308,30 +373,6 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
               }
             />
           ))}
-        </Section>
-
-        {/* 近期入庫 */}
-        <Section
-          title="近 7 天入庫"
-          count={recentReceipts.length}
-          href={orgPath(params.orgSlug, '/purchases')}
-          accentColor="text-green-600"
-          emptyText="近 7 天無入庫紀錄"
-        >
-          {recentReceipts.map(r => {
-            const productNames = r.items.map(i => i.poItem.product.name).slice(0, 2).join('、')
-            const more = r.items.length > 2 ? ` 等 ${r.items.length} 項` : ''
-            return (
-              <ActionRow
-                key={r.id}
-                href={orgPath(params.orgSlug, `/purchases/${r.orderId}`)}
-                primary={r.receiptNo}
-                secondary={r.order.supplier.name}
-                tag={productNames + more}
-                tagColor="text-gray-400"
-              />
-            )
-          })}
         </Section>
 
       </div>
