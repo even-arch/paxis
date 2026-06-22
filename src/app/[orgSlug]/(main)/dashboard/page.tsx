@@ -61,7 +61,7 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
     }),
 
     prisma.pI.findMany({
-      where: { status: 0, estimatedShipDate: { lte: in14Days }, createdAt: { gte: oneYearAgo } },
+      where: { status: 0, estimatedShipDate: { lte: in14Days } },
       include: {
         order: { include: { customer: { select: { name: true } } } },
         customer: { select: { name: true } },
@@ -345,7 +345,7 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
                 key={pi.id}
                 href={orgPath(params.orgSlug, pi.orderId ? `/sales/${pi.orderId}` : `/sales/pi`)}
                 primary={pi.piNo}
-                secondary={pi.order?.customer?.name ?? pi.order?.patiscoBuyerName ?? pi.customer?.name ?? '未知客戶'}
+                secondary={pi.order?.customer?.name ?? pi.customer?.name ?? '未知客戶'}
                 tag={daysLeft === null ? '' : isOverdue ? `逾期 ${-daysLeft} 天` : daysLeft === 0 ? '今天出貨' : `${daysLeft} 天後`}
                 tagColor={isOverdue ? 'text-red-600 font-medium' : isUrgent ? 'text-amber-600 font-medium' : 'text-gray-400'}
               />
