@@ -10,6 +10,7 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
   const in7Days  = new Date(today.getTime() + 7  * 86400000)
   const in14Days = new Date(today.getTime() + 14 * 86400000)
   const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+  const oneYearAgo = new Date(today.getTime() - 365 * 86400000)
 
   const [
     productCount,
@@ -43,24 +44,24 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
     ),
 
     prisma.pO.findMany({
-      where: { status: { in: [1, 2] } },
+      where: { status: { in: [1, 2] }, createdAt: { gte: oneYearAgo } },
       include: { supplier: { select: { name: true } } },
-      orderBy: { expectedDate: 'asc' },
+      orderBy: { createdAt: 'desc' },
       take: 5,
     }),
 
     prisma.pO_CustomerCopy.findMany({
-      where: { status: 1 },
+      where: { status: 1, createdAt: { gte: oneYearAgo } },
       include: {
         customer: { select: { name: true } },
         _count: { select: { items: true } },
       },
-      orderBy: { createdAt: 'desc' },   // 最新訂單優先
+      orderBy: { createdAt: 'desc' },
       take: 5,
     }),
 
     prisma.pI.findMany({
-      where: { status: 0, estimatedShipDate: { lte: in14Days } },
+      where: { status: 0, estimatedShipDate: { lte: in14Days }, createdAt: { gte: oneYearAgo } },
       include: {
         order: { include: { customer: { select: { name: true } } } },
         customer: { select: { name: true } },
