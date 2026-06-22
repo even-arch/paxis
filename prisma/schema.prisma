@@ -973,6 +973,10 @@ model SLS {
   // 與訂單建立時的匯率不同，出貨日期可能晚數月，匯率已變
   ciExchangeRate    Decimal?
 
+  // CI 附加費（Handling Charge、空運墊款等）
+  ciAdditionalChargesForeign  Decimal?  // 附加費總計（外幣，通常 EUR）
+  ciExtraCharges              Json?     // [{name, type, amount, charge}] Patisco extraCharges 原始陣列
+
   note        String?
 
   // 關聯的 PI 清單（多對多；同一張出貨可包含同一客戶的多張 PI）

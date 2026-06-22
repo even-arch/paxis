@@ -44,14 +44,14 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
     ),
 
     prisma.pO.findMany({
-      where: { status: { in: [1, 2] }, createdAt: { gte: oneYearAgo } },
+      where: { status: { in: [1, 2] }, archivedAt: null },
       include: { supplier: { select: { name: true } } },
       orderBy: { createdAt: 'desc' },
       take: 5,
     }),
 
     prisma.pO_CustomerCopy.findMany({
-      where: { status: 1, createdAt: { gte: oneYearAgo } },
+      where: { status: 1, archivedAt: null },
       include: {
         customer: { select: { name: true } },
         _count: { select: { items: true } },
@@ -61,7 +61,7 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
     }),
 
     prisma.pI.findMany({
-      where: { status: 0, estimatedShipDate: { lte: in14Days } },
+      where: { status: 0, estimatedShipDate: { lte: in14Days }, archivedAt: null },
       include: {
         order: { include: { customer: { select: { name: true } } } },
         customer: { select: { name: true } },

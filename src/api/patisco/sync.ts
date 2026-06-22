@@ -18,6 +18,7 @@
 import type { PrismaClient } from '@prisma/client'
 import { callLLM } from '@/lib/ai-llm'
 import { decrypt } from '@/lib/crypto'
+import { calcAndUpsertPayables } from '@/lib/ap-payable'
 import {
   patiscoLogin,
   listPurchaseOrderCopies,
@@ -1214,6 +1215,12 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
         : doExRate?.value
       const ciExchangeRate = ciExchangeRateValue ? parseFloat(ciExchangeRateValue) : undefined
 
+      // CI 附加費（Handling Charge、空運墊款等）
+      const ciExtraChargesRaw = ci?.extraCharges ?? []
+      const ciAdditionalChargesStr = (ci?.total as { additionalCharges?: string | null } | undefined)?.additionalCharges
+      const ciAdditionalChargesForeign = ciAdditionalChargesStr ? parseFloat(ciAdditionalChargesStr) : undefined
+      const ciExtraCharges = ciExtraChargesRaw.length > 0 ? ciExtraChargesRaw : undefined
+
       const shipmentCurrency: string | undefined =
         doExRate?.oriCurrency?.trim() ||
         (detail.currencyCode ? PATISCO_CURRENCY[parseInt(detail.currencyCode)] : undefined) ||
@@ -1372,6 +1379,8 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
               poOrderId: poOrderId ?? undefined,
               currencyCode: shipmentCurrency ?? undefined,
               ciExchangeRate: ciExchangeRate ?? undefined,
+              ciAdditionalChargesForeign: ciAdditionalChargesForeign ?? undefined,
+              ciExtraCharges: ciExtraCharges ?? undefined,
               archivedAt: null,
             },
           })
@@ -1383,6 +1392,7 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
           for (const row of toItemRows(existing.id)) {
             await prisma.sLS_Item.create({ data: row })
           }
+          await calcAndUpsertPayables(prisma, existing.id)
           r.updated++
         } else {
           r.skipped++
@@ -1408,6 +1418,8 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
           packingListNo: pl?.no ?? undefined,
           commercialInvNo: ci?.no ?? undefined,
           ciExchangeRate: ciExchangeRate ?? undefined,
+          ciAdditionalChargesForeign: ciAdditionalChargesForeign ?? undefined,
+          ciExtraCharges: ciExtraCharges ?? undefined,
           syncJobId: jobId,
           performedBy: null,
         },
@@ -1422,6 +1434,7 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
       for (const row of toItemRows(shipment.id)) {
         await prisma.sLS_Item.create({ data: row })
       }
+      await calcAndUpsertPayables(prisma, shipment.id)
       r.created++
     } catch (e) {
       r.errors.push(`DO ${rec.patiscoDocId}: ${e instanceof Error ? e.message : String(e)}`)
