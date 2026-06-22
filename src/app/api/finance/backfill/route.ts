@@ -15,13 +15,11 @@ export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // 支援指定單張出貨單：POST body { shipmentNo: "A251217" } 或不帶（全部）
-  let body: { shipmentNo?: string } = {}
-  try { body = await req.json() } catch { /* empty body is fine */ }
+  // 支援指定單張出貨單：?shipmentNo=A251217 或不帶（全部）
+  const url = new URL(req.url)
+  const shipmentNo = url.searchParams.get('shipmentNo')
 
-  const where = body.shipmentNo
-    ? { shipmentNo: body.shipmentNo }
-    : {}
+  const where = shipmentNo ? { shipmentNo } : {}
 
   const shipments = await prisma.sLS.findMany({ where, select: { id: true } })
   if (shipments.length === 0) return NextResponse.json({ error: 'No shipments found' }, { status: 404 })
