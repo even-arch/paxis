@@ -53,6 +53,7 @@ const b2bGroups: NavGroup[] = [
     section: '財務',
     items: [
       { label: '對帳 / 付款',   href: '/finance',          icon: '💳' },
+      { label: '損益報表',      href: '/finance/pl',       icon: '📊' },
       { label: '付款通知單',    href: '/finance/vouchers', icon: '📋' },
       { label: '到岸成本試算',  href: '/cost',             icon: '🧮' },
     ],
