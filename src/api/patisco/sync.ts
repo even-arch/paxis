@@ -1292,7 +1292,8 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
         const sku = packing.sku?.trim()
         const sourceOrderNo = packing.sourceOrderNo?.trim()
         const sourceDocNo = sourceOrderNo ? extractDocNo(sourceOrderNo) : undefined
-        const matchedPI = sourceOrderNo
+        // 1. 優先：sourceOrderNo 字串比對
+        let matchedPI = sourceOrderNo
           ? linkedPIs.find(p =>
               p.piNo === sourceOrderNo ||
               (sourceDocNo && p.piNo === sourceDocNo) ||
@@ -1300,8 +1301,15 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
               sourceOrderNo.startsWith(p.piNo.split(' ')[0]) ||
               (sourceDocNo && sourceDocNo === extractDocNo(p.piNo))
             )
-          : linkedPIs[0]
-        const piId = matchedPI?.id ?? linkedPIs[0]?.id ?? null
+          : undefined
+        // 2. 次要：多 PI 且 sourceOrderNo 沒有 match，用 SKU 反查 PI_Item 歸屬
+        if (!matchedPI && sku && linkedPIs.length > 1) {
+          matchedPI = linkedPIs.find(p =>
+            piSkuToPriceUnit.has(`${p.id}:${sku}`) || piSkuToSlsItemId.has(`${p.id}:${sku}`)
+          )
+        }
+        // 3. 最後 fallback：只有一個 PI 時才直接用；多 PI 且無法判斷則留 null
+        const piId = matchedPI?.id ?? (linkedPIs.length === 1 ? linkedPIs[0]?.id : null)
         const slsItemId = (piId && sku) ? (piSkuToSlsItemId.get(`${piId}:${sku}`) ?? null) : null
         const key = `${piId ?? 'null'}::${sku ?? ''}`
 
