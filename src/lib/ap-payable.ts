@@ -35,26 +35,29 @@ export async function calcAndUpsertPayables(
 
     const pi = await prisma.pI.findUnique({
       where: { id: piId },
-      include: {
-        poOrders: {
-          select: {
-            id: true,
-            supplierId: true,
-            exchangeRate: true,
-            totalAmount: true,
-            items: {
-              select: {
-                unitPrice: true,
-                product: { select: { sku: true } },
-              },
-            },
-          },
+      select: { id: true, piNo: true, poOrders: {
+        select: {
+          id: true, supplierId: true, exchangeRate: true, totalAmount: true,
+          items: { select: { unitPrice: true, product: { select: { sku: true } } } },
         },
-      },
+      }},
     })
     if (!pi) continue
 
-    for (const po of pi.poOrders) {
+    // 若 slsPiId FK 沒有設，改用 poNo = piNo 號碼比對找 PO
+    let poList = pi.poOrders
+    if (poList.length === 0) {
+      const poByNo = await prisma.pO.findMany({
+        where: { poNo: pi.piNo },
+        select: {
+          id: true, supplierId: true, exchangeRate: true, totalAmount: true,
+          items: { select: { unitPrice: true, product: { select: { sku: true } } } },
+        },
+      })
+      poList = poByNo
+    }
+
+    for (const po of poList) {
       const exRate = Number(po.exchangeRate ?? 1)
       const skuPrice = new Map<string, number>()
       for (const item of po.items) {
