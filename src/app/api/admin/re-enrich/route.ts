@@ -55,12 +55,22 @@ export async function GET(req: NextRequest) {
     take: 5,
   })
 
+  // 診斷 AI config 是否可用
+  const user = await prisma.sYS_User.findFirst({
+    orderBy: { id: 'asc' },
+    select: { aiProvider: true, encryptedAiKey: true, aiParseModel: true },
+  })
+  const aiConfigured = !!(user?.aiProvider && user?.encryptedAiKey)
+
   return NextResponse.json({
     total,
     needName,
     needHts,
     noSpec,
     actionNeeded: needName + needHts,
+    aiConfigured,
+    aiProvider: user?.aiProvider ?? null,
+    aiModel: user?.aiParseModel ?? null,
     samples: samples.map(p => ({
       id: p.id,
       sku: p.sku,
@@ -68,7 +78,7 @@ export async function GET(req: NextRequest) {
       htsCode: p.htsCode,
       specPreview: p.specification?.substring(0, 60),
     })),
-    howTo: 'POST /api/admin/re-enrich?batch=5 to start enriching',
+    howTo: 'POST /api/admin/re-enrich?batch=5&force=true to force re-enrich all',
   })
 }
 
