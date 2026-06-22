@@ -477,14 +477,13 @@ export default function FinancePage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right font-mono">{fmt(p.amountTWD)}</td>
-                      <td className="px-4 py-3 text-right font-mono text-green-700">{p.paidAmountTWD ? fmt(p.paidAmountTWD) : '—'}</td>
+                      <td className="px-4 py-3 text-right font-mono text-green-700">
+                        {p.batchPayable
+                          ? <span className="text-xs text-gray-400 font-sans">同批：{p.batchPayable.shipment?.shipmentNo ?? p.batchPayable.po?.poNo ?? `#${p.batchPayable.id}`}</span>
+                          : p.paidAmountTWD ? fmt(p.paidAmountTWD) : '—'}
+                      </td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_PAY_COLOR[p.status]}`}>{STATUS_PAY[p.status]}</span>
-                        {p.batchPayable && (
-                          <span className="ml-1 text-xs text-gray-400">
-                            同批：{p.batchPayable.shipment?.shipmentNo ?? p.batchPayable.po?.poNo ?? `#${p.batchPayable.id}`}
-                          </span>
-                        )}
                       </td>
                       <td className="px-4 py-3">
                         <button onClick={() => openPayDialog(p)}
