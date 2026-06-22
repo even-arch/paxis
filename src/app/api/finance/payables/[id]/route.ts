@@ -26,30 +26,37 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     vatPct?:             number | null  // 百分比，例如 5 表示 5%
     finalWireAmountTWD?: number | null  // 使用者確認後的最終匯款金額
     // 付款記錄
-    paidAmountTWD?:      number
-    paidAt?:             string
+    paidAmountTWD?:      number | null
+    paidAt?:             string | null
     note?:               string
+    // 批次付款時可直接傳入 status 覆寫（避免浮點精度問題）
+    status?:             number
+    // 批次付款：記錄主單 id
+    batchPayableId?:     number | null
   }
 
   const payable = await prisma.fIN_Payable.findUnique({ where: { id: Number(params.id) } })
   if (!payable) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  // 判斷付清依據：有 finalWireAmountTWD 時以它為準，否則用原始 amountTWD
-  const baseAmount = body.finalWireAmountTWD != null
-    ? new Decimal(body.finalWireAmountTWD)
-    : payable.finalWireAmountTWD ?? payable.amountTWD
-
-  const paidAmount = body.paidAmountTWD != null
+  const paidAmount = (body.paidAmountTWD != null && body.paidAmountTWD !== 0)
     ? new Decimal(body.paidAmountTWD)
+    : body.paidAmountTWD === 0 ? new Decimal(0)
     : payable.paidAmountTWD ?? new Decimal(0)
 
-  const isFullyPaid = paidAmount.gte(baseAmount)
-  const status = isFullyPaid ? 2 : paidAmount.gt(0) ? 1 : 0
+  let status: number
+  if (body.status != null) {
+    status = body.status
+  } else {
+    const baseAmount = body.finalWireAmountTWD != null
+      ? new Decimal(body.finalWireAmountTWD)
+      : payable.finalWireAmountTWD ?? payable.amountTWD
+    const isFullyPaid = paidAmount.gte(baseAmount)
+    status = isFullyPaid ? 2 : paidAmount.gt(0) ? 1 : 0
+  }
 
   const updated = await prisma.fIN_Payable.update({
     where: { id: Number(params.id) },
     data: {
-      // 費用明細
       ...(body.customsFeeTWD      !== undefined && { customsFeeTWD:      body.customsFeeTWD      != null ? new Decimal(body.customsFeeTWD)      : null }),
       ...(body.truckingFeeTWD     !== undefined && { truckingFeeTWD:     body.truckingFeeTWD     != null ? new Decimal(body.truckingFeeTWD)     : null }),
       ...(body.containerFeeTWD    !== undefined && { containerFeeTWD:    body.containerFeeTWD    != null ? new Decimal(body.containerFeeTWD)    : null }),
@@ -61,11 +68,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       ...(body.otherAdjustmentNote !== undefined && { otherAdjustmentNote: body.otherAdjustmentNote }),
       ...(body.vatPct              !== undefined && { vatPct:              body.vatPct              != null ? new Decimal(body.vatPct)              : null }),
       ...(body.finalWireAmountTWD  !== undefined && { finalWireAmountTWD:  body.finalWireAmountTWD  != null ? new Decimal(body.finalWireAmountTWD)  : null }),
-      // 付款記錄
       paidAmountTWD: paidAmount,
-      paidAt: body.paidAt ? new Date(body.paidAt) : (isFullyPaid ? new Date() : undefined),
+      paidAt: body.paidAt === null ? null : body.paidAt ? new Date(body.paidAt) : (status === 2 ? new Date() : undefined),
       status,
       ...(body.note !== undefined && { note: body.note }),
+      ...(body.batchPayableId !== undefined && { batchPayableId: body.batchPayableId }),
     },
   })
 

@@ -21,14 +21,19 @@ export async function GET(req: NextRequest) {
     orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
     include: {
       supplier: { select: { id: true, name: true, shortName: true } },
+      // 舊路徑（入庫觸發）
       receipt: {
         select: {
           receiptNo: true, performedAt: true,
           order: { select: { id: true, poNo: true } },
         },
       },
+      // 新路徑（出貨觸發）
+      shipment: { select: { id: true, shipmentNo: true, actualShipDate: true } },
+      po: { select: { id: true, poNo: true } },
+      // 批次付款連結
+      batchPayable: { select: { id: true, shipment: { select: { shipmentNo: true } }, po: { select: { poNo: true } } } },
     },
-    // 全欄位回傳（費用明細欄位皆在其中）
   })
 
   return NextResponse.json(payables)

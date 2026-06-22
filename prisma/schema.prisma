@@ -621,6 +621,7 @@ model PO {
   supplierPIs   PI_SupplierCopy[]
   receipts      PO_Receipt[]
   shipments     SLS[]
+  payables      FIN_Payable[]  @relation("PO_Payables")
 
   @@index([supplierId, status])
   @@index([poNo])
@@ -979,6 +980,7 @@ model SLS {
   items          SLS_Item[]
   stockMovements INV_Movement[]
   receivable     FIN_Receivable?
+  payables       FIN_Payable[]  @relation("SLS_Payables")
   fobCostItems   SLS_FobCostItem[]
 
   @@index([customerId])
@@ -1217,11 +1219,17 @@ model FIN_Payable {
   supplierId  Int
   supplier    SUP_Supplier @relation(fields: [supplierId], references: [id])
 
-  // 來源單據
-  receiptId   Int    @unique
-  receipt     PO_Receipt @relation(fields: [receiptId], references: [id])
+  // 來源單據（入庫觸發，舊路徑；貿易商模式不走此路徑）
+  receiptId   Int?   @unique
+  receipt     PO_Receipt? @relation(fields: [receiptId], references: [id])
 
-  // 基本金額（入庫時依採購單價計算，TWD）
+  // 出貨觸發（貿易商模式：出貨 → 付供應商）
+  shipmentId  Int?
+  shipment    SLS?   @relation("SLS_Payables", fields: [shipmentId], references: [id])
+  poId        Int?
+  po          PO?    @relation("PO_Payables", fields: [poId], references: [id])
+
+  // 基本金額（依採購單品項成本計算，TWD）
   amountTWD   Decimal
 
   // ── 費用明細（對應「台灣出貨明細表」各項扣除費用，事後填入）────────────────
@@ -1254,11 +1262,18 @@ model FIN_Payable {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // 批次付款：若本筆是跟著另一張一起付的，記錄主單 id
+  batchPayableId  Int?
+  batchPayable    FIN_Payable?  @relation("PayableBatch", fields: [batchPayableId], references: [id])
+  batchMembers    FIN_Payable[] @relation("PayableBatch")
+
   fobAllocations SLS_FobCostAllocation[]
   voucherItem    FIN_PaymentVoucherItem?
 
+  @@unique([shipmentId, poId])
   @@index([supplierId])
   @@index([dueDate])
+  @@index([shipmentId])
   @@map("FIN_Payable")
 }
 

@@ -12,7 +12,13 @@ type Payable = {
   paidAt: string | null
   note: string | null
   supplier: { id: number; name: string; shortName: string | null }
-  receipt: { receiptNo: string; performedAt: string; order: { id: number; poNo: string } }
+  // 舊路徑（入庫觸發）
+  receipt: { receiptNo: string; performedAt: string; order: { id: number; poNo: string } } | null
+  // 新路徑（出貨觸發）
+  shipment: { id: number; shipmentNo: string; actualShipDate: string | null } | null
+  po: { id: number; poNo: string } | null
+  // 批次付款：若本筆是跟著另一張一起付的
+  batchPayable: { id: number; shipment: { shipmentNo: string } | null; po: { poNo: string } | null } | null
   // 費用明細
   customsFeeTWD:      string | null
   truckingFeeTWD:     string | null
@@ -143,8 +149,10 @@ export default function FinancePage() {
   const [recRate, setRecRate] = useState('')
   const [recDateInput, setRecDateInput] = useState('')
   const [recNote, setRecNote] = useState('')
-  // 同批匯款
-  const [batchIds, setBatchIds] = useState<number[]>([])  // 其他一起收款的 receivable id
+  // 同批匯款（應收）
+  const [batchIds, setBatchIds] = useState<number[]>([])
+  // 同批付款（應付）
+  const [payBatchIds, setPayBatchIds] = useState<number[]>([])
 
   async function loadEstimates(force = false) {
     if (!force && estimatesLoaded) return
@@ -210,6 +218,7 @@ export default function FinancePage() {
 
   function openPayDialog(p: Payable) {
     setPayDialog(p)
+    setPayBatchIds([])
     setPayInput(p.finalWireAmountTWD ? p.finalWireAmountTWD : p.amountTWD)
     setPayDateInput('')
     setPayNote(p.note ?? '')
@@ -232,11 +241,14 @@ export default function FinancePage() {
     setSaving(true)
     const base = Number(payDialog.amountTWD)
     const fees = calcFees(base)
+    const paidAt = payDateInput || undefined
+    const note   = payNote || undefined
+
+    // 主單
     await fetch(`/api/finance/payables/${payDialog.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        // 費用明細
         customsFeeTWD:      feeCustoms      ? Number(feeCustoms)   : null,
         truckingFeeTWD:     feeTrucking     ? Number(feeTrucking)  : null,
         containerFeeTWD:    feeContainer    ? Number(feeContainer) : null,
@@ -248,14 +260,41 @@ export default function FinancePage() {
         otherAdjustmentNote: feeOtherNote  || null,
         vatPct:              feeVatPct      ? Number(feeVatPct)    : null,
         finalWireAmountTWD:  fees.finalWire > 0 ? fees.finalWire   : null,
-        // 付款記錄
         paidAmountTWD: Number(payInput),
-        paidAt:  payDateInput || undefined,
-        note:    payNote      || undefined,
+        paidAt, note,
       }),
+    })
+
+    // 同批：各自以自己的 amountTWD 為實付金額，明確設 status=2，並記錄主單 id
+    for (const id of payBatchIds) {
+      const p = payables.find(p => p.id === id)
+      if (!p) continue
+      await fetch(`/api/finance/payables/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paidAmountTWD: Number(p.amountTWD), paidAt, note, status: 2, batchPayableId: payDialog.id }),
+      })
+    }
+
+    setSaving(false)
+    setPayDialog(null)
+    setPayBatchIds([])
+    load()
+  }
+
+  async function resetPay() {
+    if (!payDialog) return
+    const label = payDialog.shipment?.shipmentNo ?? payDialog.po?.poNo ?? `#${payDialog.id}`
+    if (!confirm(`確定要將 ${label} 退回「未付」狀態？付款紀錄將全部清除。`)) return
+    setSaving(true)
+    await fetch(`/api/finance/payables/${payDialog.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paidAmountTWD: 0, paidAt: null, note: null, status: 0, batchPayableId: null }),
     })
     setSaving(false)
     setPayDialog(null)
+    setPayBatchIds([])
     load()
   }
 
@@ -394,8 +433,9 @@ export default function FinancePage() {
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">供應商</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">供應商訂單</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">入庫日</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">出貨單</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">採購單</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">出貨日</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">到期日</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-600">應付 (TWD)</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-600">已付 (TWD)</th>
@@ -407,6 +447,12 @@ export default function FinancePage() {
                 {payables.map(p => {
                   const overdue = isOverdue(p.dueDate, p.status)
                   const soon = isDueSoon(p.dueDate, p.status)
+                  // 出貨單 / 採購單 / 日期：優先用新路徑（shipment+po），fallback 舊路徑（receipt）
+                  const shipNo = p.shipment?.shipmentNo ?? null
+                  const shipId = p.shipment?.id ?? null
+                  const shipDate = p.shipment?.actualShipDate ?? p.receipt?.performedAt ?? null
+                  const poNo = p.po?.poNo ?? p.receipt?.order?.poNo ?? null
+                  const poHref = p.po?.id ? toOrgPath(`/purchases/${p.po.id}`) : p.receipt?.order?.id ? toOrgPath(`/purchases/${p.receipt.order.id}`) : null
                   return (
                     <tr key={p.id} className={overdue ? 'bg-red-50' : ''}>
                       <td className="px-4 py-3">
@@ -415,11 +461,16 @@ export default function FinancePage() {
                         </Link>
                       </td>
                       <td className="px-4 py-3">
-                        <Link href={toOrgPath(`/purchases/${p.receipt.order.id}`)} className="font-mono text-blue-600 hover:underline text-xs">
-                          {p.receipt.order.poNo}
-                        </Link>
+                        {shipNo && shipId
+                          ? <Link href={toOrgPath(`/shipments/${shipId}`)} className="font-mono text-blue-600 hover:underline text-xs">{shipNo}</Link>
+                          : <span className="text-gray-400 text-xs">—</span>}
                       </td>
-                      <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(p.receipt.performedAt)}</td>
+                      <td className="px-4 py-3">
+                        {poNo && poHref
+                          ? <Link href={poHref} className="font-mono text-blue-600 hover:underline text-xs">{poNo}</Link>
+                          : <span className="text-gray-400 text-xs">{poNo ?? '—'}</span>}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(shipDate)}</td>
                       <td className="px-4 py-3 text-xs">
                         <span className={overdue ? 'text-red-600 font-medium' : soon ? 'text-amber-600 font-medium' : 'text-gray-500'}>
                           {fmtDate(p.dueDate)}{overdue ? ' ⚠ 逾期' : soon ? ' ⚡ 即將到期' : ''}
@@ -429,12 +480,17 @@ export default function FinancePage() {
                       <td className="px-4 py-3 text-right font-mono text-green-700">{p.paidAmountTWD ? fmt(p.paidAmountTWD) : '—'}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_PAY_COLOR[p.status]}`}>{STATUS_PAY[p.status]}</span>
+                        {p.batchPayable && (
+                          <span className="ml-1 text-xs text-gray-400">
+                            同批：{p.batchPayable.shipment?.shipmentNo ?? p.batchPayable.po?.poNo ?? `#${p.batchPayable.id}`}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
-                        {p.status < 2 && (
-                          <button onClick={() => openPayDialog(p)}
-                            className="text-xs text-blue-600 hover:underline">記錄付款</button>
-                        )}
+                        <button onClick={() => openPayDialog(p)}
+                          className="text-xs text-blue-600 hover:underline">
+                          {p.status === 2 ? '修改付款' : '記錄付款'}
+                        </button>
                       </td>
                     </tr>
                   )
@@ -582,10 +638,18 @@ export default function FinancePage() {
                 <h2 className="text-base font-semibold">記錄付款 — 台灣出貨明細</h2>
                 <p className="text-sm text-gray-500 mt-0.5">
                   {payDialog.supplier.shortName ?? payDialog.supplier.name}
-                  <span className="mx-1 text-gray-300">·</span>
-                  <span className="font-mono text-xs text-gray-500">{payDialog.receipt.order.poNo}</span>
-                  <span className="mx-1 text-gray-300">·</span>
-                  入庫 {fmtDate(payDialog.receipt.performedAt)}
+                  {payDialog.shipment && <>
+                    <span className="mx-1 text-gray-300">·</span>
+                    <span className="font-mono text-xs text-gray-500">{payDialog.shipment.shipmentNo}</span>
+                  </>}
+                  {(payDialog.po?.poNo ?? payDialog.receipt?.order?.poNo) && <>
+                    <span className="mx-1 text-gray-300">·</span>
+                    <span className="font-mono text-xs text-gray-500">{payDialog.po?.poNo ?? payDialog.receipt?.order?.poNo}</span>
+                  </>}
+                  {(payDialog.shipment?.actualShipDate ?? payDialog.receipt?.performedAt) && <>
+                    <span className="mx-1 text-gray-300">·</span>
+                    出貨 {fmtDate(payDialog.shipment?.actualShipDate ?? payDialog.receipt?.performedAt)}
+                  </>}
                 </p>
               </div>
 
@@ -725,11 +789,63 @@ export default function FinancePage() {
                   </table>
                 </div>
 
+                {/* 同批付款 */}
+                {(() => {
+                  const isModifyMode = payDialog.status === 2
+                  const batchCandidates = payables.filter(p =>
+                    p.id !== payDialog.id &&
+                    p.supplier.id === payDialog.supplier.id &&
+                    (isModifyMode ? true : p.status < 2)
+                  )
+                  if (batchCandidates.length === 0) return null
+                  return (
+                    <div className="border border-amber-200 rounded-lg overflow-hidden">
+                      <div className="bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                        同批付款（{payDialog.supplier.shortName ?? payDialog.supplier.name} 其他未付帳款）
+                      </div>
+                      <div className="divide-y divide-gray-100 max-h-40 overflow-y-auto">
+                        {batchCandidates.map(p => (
+                          <label key={p.id} className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={payBatchIds.includes(p.id)}
+                              onChange={e => setPayBatchIds(prev =>
+                                e.target.checked ? [...prev, p.id] : prev.filter(x => x !== p.id)
+                              )}
+                              className="rounded"
+                            />
+                            <span className="font-mono text-xs text-blue-600 shrink-0">
+                              {p.shipment?.shipmentNo ?? p.receipt?.order?.poNo ?? `#${p.id}`}
+                            </span>
+                            <span className="text-xs text-gray-500 truncate flex-1">
+                              {p.po?.poNo ?? ''}
+                            </span>
+                            <span className="font-mono text-xs text-gray-700 shrink-0">
+                              {fmt(p.amountTWD)}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                      {payBatchIds.length > 0 && (
+                        <div className="bg-amber-50 px-3 py-2 text-xs text-amber-700 border-t border-amber-200 flex justify-between">
+                          <span>同批合計（含主單）</span>
+                          <span className="font-mono font-medium">
+                            {(Number(payDialog.amountTWD) + payBatchIds.reduce((s, id) => {
+                              const p = payables.find(p => p.id === id)
+                              return s + (p ? Number(p.amountTWD) : 0)
+                            }, 0)).toLocaleString('zh-TW', { maximumFractionDigits: 0 })}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
+
                 {/* 付款輸入 */}
                 <div className="border-t border-gray-100 pt-4 space-y-3">
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">
-                      實付金額（TWD）
+                      實付金額（TWD）— 主單
                       {fees.finalWire > 0 && (
                         <button type="button" onClick={() => setPayInput(String(Math.round(fees.finalWire)))}
                           className="ml-2 text-blue-600 underline">帶入計算值</button>
@@ -755,11 +871,21 @@ export default function FinancePage() {
                 </div>
               </div>
 
-              <div className="px-6 pb-5 flex justify-end gap-2">
-                <button onClick={() => setPayDialog(null)} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50">取消</button>
-                <button onClick={submitPay} disabled={saving} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">
-                  {saving ? '儲存中…' : '確認付款'}
-                </button>
+              <div className="px-6 pb-5 flex justify-between items-center">
+                <div>
+                  {payDialog.status === 2 && (
+                    <button onClick={resetPay} disabled={saving}
+                      className="px-3 py-2 text-sm text-red-600 border border-red-200 rounded-md hover:bg-red-50 disabled:opacity-50">
+                      取消付款
+                    </button>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setPayDialog(null)} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50">關閉</button>
+                  <button onClick={submitPay} disabled={saving} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">
+                    {saving ? '儲存中…' : '確認付款'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
