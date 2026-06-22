@@ -795,7 +795,9 @@ export default function FinancePage() {
                   const batchCandidates = payables.filter(p =>
                     p.id !== payDialog.id &&
                     p.supplier.id === payDialog.supplier.id &&
-                    (isModifyMode ? true : p.status < 2)
+                    (isModifyMode ? true : p.status < 2) &&
+                    // 過濾掉無出貨單也無入庫單的舊式殘留記錄
+                    (p.shipment != null || p.receipt != null || p.po != null)
                   )
                   if (batchCandidates.length === 0) return null
                   return (
@@ -803,7 +805,7 @@ export default function FinancePage() {
                       <div className="bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
                         同批付款（{payDialog.supplier.shortName ?? payDialog.supplier.name} 其他未付帳款）
                       </div>
-                      <div className="divide-y divide-gray-100 max-h-40 overflow-y-auto">
+                      <div className="divide-y divide-gray-100 max-h-60 overflow-y-auto">
                         {batchCandidates.map(p => (
                           <label key={p.id} className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer">
                             <input
