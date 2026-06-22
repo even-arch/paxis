@@ -290,7 +290,7 @@ export default function FinancePage() {
     await fetch(`/api/finance/payables/${payDialog.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paidAmountTWD: 0, paidAt: null, note: null, status: 0, batchPayableId: null }),
+      body: JSON.stringify({ paidAmountTWD: 0, paidAt: null, note: null, status: 0, batchPayableId: null, resetBatch: true }),
     })
     setSaving(false)
     setPayDialog(null)

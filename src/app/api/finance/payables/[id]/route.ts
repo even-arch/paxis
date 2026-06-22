@@ -33,6 +33,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     status?:             number
     // 批次付款：記錄主單 id
     batchPayableId?:     number | null
+    // 取消付款時，同時還原所有 batchMembers
+    resetBatch?:         boolean
   }
 
   const payable = await prisma.fIN_Payable.findUnique({ where: { id: Number(params.id) } })
@@ -75,6 +77,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       ...(body.batchPayableId !== undefined && { batchPayableId: body.batchPayableId }),
     },
   })
+
+  // 取消付款時，同時還原所有 batchMembers
+  if (body.resetBatch) {
+    await prisma.fIN_Payable.updateMany({
+      where: { batchPayableId: Number(params.id) },
+      data: { paidAmountTWD: new Decimal(0), paidAt: null, status: 0, batchPayableId: null },
+    })
+  }
 
   return NextResponse.json(updated)
 }
