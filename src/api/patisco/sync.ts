@@ -19,6 +19,7 @@ import type { PrismaClient } from '@prisma/client'
 import { callLLM } from '@/lib/ai-llm'
 import { decrypt } from '@/lib/crypto'
 import { calcAndUpsertPayables } from '@/lib/ap-payable'
+import { calcAndUpsertReceivable } from '@/lib/ar-receivable'
 import {
   patiscoLogin,
   listPurchaseOrderCopies,
@@ -1401,6 +1402,7 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
             await prisma.sLS_Item.create({ data: row })
           }
           await calcAndUpsertPayables(prisma, existing.id)
+          await calcAndUpsertReceivable(prisma, existing.id)
           r.updated++
         } else {
           r.skipped++
@@ -1443,6 +1445,7 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
         await prisma.sLS_Item.create({ data: row })
       }
       await calcAndUpsertPayables(prisma, shipment.id)
+      await calcAndUpsertReceivable(prisma, shipment.id)
       r.created++
     } catch (e) {
       r.errors.push(`DO ${rec.patiscoDocId}: ${e instanceof Error ? e.message : String(e)}`)
