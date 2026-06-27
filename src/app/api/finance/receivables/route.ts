@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
     orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
     include: {
       customer: { select: { id: true, name: true, shortName: true } },
+      batchReceivable: { select: { id: true, shipment: { select: { shipmentNo: true } } } },
       shipment: {
         select: {
           id: true, shipmentNo: true, actualShipDate: true,

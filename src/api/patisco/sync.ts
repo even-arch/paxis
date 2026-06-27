@@ -876,48 +876,12 @@ export async function step7_slsPIs(prisma: PrismaClient, jobId: number): Promise
     prisma.pRD_Product.findMany({ select: { id: true, sku: true } }),
     prisma.cUS_Customer.findMany({ select: { id: true, name: true } }),
     prisma.pO_CustomerCopy.findMany({ select: { id: true, orderNo: true } }),
-    prisma.pI.findMany({ select: { id: true, piNo: true, source: true, orderId: true } }),
+    prisma.pI.findMany({ select: { id: true, piNo: true, source: true, orderId: true, archivedAt: true } }),
   ])
   const productMap = new Map(allProducts.map(p => [p.sku, p.id]))
   const customerMap = new Map(allCustomers.map(c => [c.name, c.id]))
   const orderMap = new Map(allOrders.map(o => [o.orderNo, o.id]))
   const piMap = new Map(allPIs.map(p => [p.piNo, p]))
-
-  // 偵測重複：同一 piNo 出現在多筆 SYS_PatiscoSync → 收集衝突，跳過不自動建立
-  const byPiNo = new Map<string, typeof records>()
-  for (const rec of records) {
-    const piNo = rec.patiscoDocNo?.trim()
-    if (!piNo) continue  // 空號碼的草稿另行略過
-    if (!byPiNo.has(piNo)) byPiNo.set(piNo, [])
-    byPiNo.get(piNo)!.push(rec)
-  }
-  const conflictPiNos = new Set<string>()
-  for (const [piNo, recs] of Array.from(byPiNo.entries())) {
-    if (recs.length <= 1) continue
-    // 若 DB 裡已有這筆 PI（上次用戶已解決衝突），不再重複提示
-    if (piMap.has(piNo)) continue
-    conflictPiNos.add(piNo)
-    const conflictRecords: PIConflictRecord[] = recs.map(rec => {
-      const raw = rec.result as { header?: Record<string, unknown>; products?: PatiscoOrderDetailItem[]; price?: { amount?: string } | null }
-      const h = raw?.header as Record<string, unknown> | undefined
-      const buyer = h?.buyer as { name?: string } | undefined
-      return {
-        docId: rec.patiscoDocId,
-        buyerName: buyer?.name?.trim() ?? null,
-        date: h?.createdDate as string | null ?? null,
-        amount: (raw?.price as { amount?: string } | null)?.amount ?? null,
-        products: (raw?.products ?? []).map((p: PatiscoOrderDetailItem) => ({
-          sku: p.sku ?? '',
-          modelNo: p.modelNo ?? null,
-          specification: p.specification ?? null,
-          quantity: p.quantity ?? null,
-          price: p.price ?? null,
-          unit: p.unit ?? null,
-        })),
-      }
-    })
-    r.conflicts!.push({ piNo, records: conflictRecords })
-  }
 
   for (const rec of records) {
     try {
@@ -934,9 +898,6 @@ export async function step7_slsPIs(prisma: PrismaClient, jobId: number): Promise
       const piNo = rec.patiscoDocNo.trim()
       if (!piNo) { r.skipped++; continue }
 
-      // 有衝突的 piNo 等用戶手動解決，此次略過
-      if (conflictPiNos.has(piNo)) { r.skipped++; continue }
-
       // PI 的幣別（header.currencyCode 是 Patisco 內部編號，header.payment 是交易條件）
       const buyerName = header.buyer?.name?.trim()
       const rawHeader = header as unknown as { currencyCode?: string; expiredDate?: string | null }
@@ -944,14 +905,16 @@ export async function step7_slsPIs(prisma: PrismaClient, jobId: number): Promise
 
       const existing = piMap.get(piNo)
       if (existing) {
-        if (existing.source === 'PATISCO') {
+        if (existing.archivedAt) {
+          // 已封存的 PI 不受 sync 影響，保持封存狀態
+          r.skipped++
+        } else if (existing.source === 'PATISCO') {
           // 更新幣別 + Patisco 元資料（修正舊記錄的錯誤幣別）
           await prisma.pI.update({
             where: { piNo },
             data: {
               patiscoDocId: rec.patiscoDocId,
               patiscoStatus: header.status ?? undefined,
-              archivedAt: null,
               currencyCode: existing.orderId ? undefined : currencyCode,
             },
           })
@@ -1035,7 +998,7 @@ export async function step7_slsPIs(prisma: PrismaClient, jobId: number): Promise
           performedBy: null,
         },
       })
-      piMap.set(piNo, { id: pi.id, piNo, source: 'PATISCO', orderId: null })
+      piMap.set(piNo, { id: pi.id, piNo, source: 'PATISCO', orderId: null, archivedAt: null })
 
       // 建立 PI_Item
       for (const p of (raw.products ?? [])) {
@@ -1379,7 +1342,10 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
         })
 
       if (existing) {
-        if (existing.source === 'PATISCO') {
+        if (existing.archivedAt) {
+          // 已封存的出貨單不受 sync 影響，保持封存狀態
+          r.skipped++
+        } else if (existing.source === 'PATISCO') {
           // 既有記錄：更新幣別 + PI 連結 + 品項（全部重建，修正舊 sync 的錯誤）
           await prisma.sLS.update({
             where: { shipmentNo },
@@ -1390,7 +1356,6 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
               ciExchangeRate: ciExchangeRate ?? undefined,
               ciAdditionalChargesForeign: ciAdditionalChargesForeign ?? undefined,
               ciExtraCharges: ciExtraCharges ?? undefined,
-              archivedAt: null,
             },
           })
           await prisma.sLS_PI_Link.deleteMany({ where: { shipmentId: existing.id } })

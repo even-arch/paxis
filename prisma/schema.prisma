@@ -1314,6 +1314,11 @@ model FIN_Receivable {
 
   note            String?
 
+  // 批次收款：若本筆是跟著另一張一起收的，記錄主單 id
+  batchReceivableId  Int?
+  batchReceivable    FIN_Receivable?  @relation("ReceivableBatch", fields: [batchReceivableId], references: [id])
+  batchMembers       FIN_Receivable[] @relation("ReceivableBatch")
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

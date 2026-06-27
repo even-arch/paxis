@@ -123,7 +123,7 @@ export default function ProductsClient({
     }
   }
 
-  async function handleEnrich() {
+  async function runEnrich(force: boolean) {
     setEnriching(true); setEnrichMsg(null); setEnrichProgress(null)
     try {
       const preview = await fetch('/api/admin/re-enrich').then(r => r.json())
@@ -132,16 +132,17 @@ export default function ProductsClient({
         setEnriching(false)
         return
       }
-      const total = (preview.needName ?? 0) + (preview.needHts ?? 0)
+      const total = force ? (preview.total ?? 0) : ((preview.needName ?? 0) + (preview.needHts ?? 0))
       if (total === 0) {
-        setEnrichMsg(`不需要豐富化（共 ${preview.total ?? 0} 筆商品，${preview.noSpec ?? 0} 筆無規格）`)
+        setEnrichMsg(`不需要豐富化（共 ${preview.total ?? 0} 筆商品）`)
         setEnriching(false)
         return
       }
       let done = 0; let offset = 0
       const batchSize = 5
+      const forceParam = force ? '&force=true' : ''
       while (true) {
-        const res = await fetch(`/api/admin/re-enrich?batch=${batchSize}&offset=${offset}`, { method: 'POST' })
+        const res = await fetch(`/api/admin/re-enrich?batch=${batchSize}&offset=${offset}${forceParam}`, { method: 'POST' })
         const data = await res.json()
         if (!data.ok) { setEnrichMsg(`豐富化失敗：${data.error ?? '未知錯誤'}`); break }
         done += data.changed ?? 0
@@ -200,7 +201,7 @@ export default function ProductsClient({
               : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
             {archived ? '查看現有產品' : '查看封存產品'}
           </a>
-          <button onClick={handleEnrich} disabled={enriching || working}
+          <button onClick={() => runEnrich(false)} disabled={enriching || working}
             className="border border-purple-300 text-purple-700 bg-purple-50 px-3 py-2 rounded-md text-sm font-medium hover:bg-purple-100 disabled:opacity-50">
             {enriching
               ? (enrichProgress ? `✨ 豐富化 ${enrichProgress.done}/${enrichProgress.total}` : '✨ 查詢中...')

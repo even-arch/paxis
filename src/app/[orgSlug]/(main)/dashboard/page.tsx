@@ -13,9 +13,12 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
   const oneYearAgo = new Date(today.getTime() - 365 * 86400000)
 
   const [
-    productCount,
-    supplierCount,
-    customerCount,
+    productActiveCount,
+    productArchivedCount,
+    supplierActiveCount,
+    supplierArchivedCount,
+    customerActiveCount,
+    customerArchivedCount,
     lowStockItems,
     pendingPOs,
     ordersNeedingPI,
@@ -31,9 +34,12 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
     lastSync,
     syncErrorCount,
   ] = await Promise.all([
-    prisma.pRD_Product.count({ where: { isActive: true } }),
-    prisma.sUP_Supplier.count({ where: { isActive: true } }),
-    prisma.cUS_Customer.count({ where: { isActive: true } }),
+    prisma.pRD_Product.count({ where: { isActive: true, isArchived: false } }),
+    prisma.pRD_Product.count({ where: { isActive: true, isArchived: true } }),
+    prisma.sUP_Supplier.count({ where: { isActive: true, archivedAt: null } }),
+    prisma.sUP_Supplier.count({ where: { isActive: true, archivedAt: { not: null } } }),
+    prisma.cUS_Customer.count({ where: { isActive: true, archivedAt: null } }),
+    prisma.cUS_Customer.count({ where: { isActive: true, archivedAt: { not: null } } }),
 
     prisma.iNV_Stock.findMany({
       where: { quantity: { gt: 0 } },
@@ -165,15 +171,27 @@ export default async function DashboardPage({ params }: { params: { orgSlug: str
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Link href={orgPath(params.orgSlug, '/products')} className="bg-white rounded-lg shadow p-5 hover:shadow-md">
           <p className="text-xs text-gray-500">商品</p>
-          <p className="text-2xl font-semibold text-gray-800 mt-1">{productCount}</p>
+          <p className="text-2xl font-semibold text-gray-800 mt-1">{productActiveCount + productArchivedCount}</p>
+          <p className="text-xs text-gray-400 mt-1">
+            活躍 {productActiveCount}
+            {productArchivedCount > 0 && <span className="ml-1.5 text-gray-300">· 封存 {productArchivedCount}</span>}
+          </p>
         </Link>
         <Link href={orgPath(params.orgSlug, '/suppliers')} className="bg-white rounded-lg shadow p-5 hover:shadow-md">
           <p className="text-xs text-gray-500">供應商</p>
-          <p className="text-2xl font-semibold text-gray-800 mt-1">{supplierCount}</p>
+          <p className="text-2xl font-semibold text-gray-800 mt-1">{supplierActiveCount + supplierArchivedCount}</p>
+          <p className="text-xs text-gray-400 mt-1">
+            活躍 {supplierActiveCount}
+            {supplierArchivedCount > 0 && <span className="ml-1.5 text-gray-300">· 封存 {supplierArchivedCount}</span>}
+          </p>
         </Link>
         <Link href={orgPath(params.orgSlug, '/customers')} className="bg-white rounded-lg shadow p-5 hover:shadow-md">
           <p className="text-xs text-gray-500">客戶</p>
-          <p className="text-2xl font-semibold text-gray-800 mt-1">{customerCount}</p>
+          <p className="text-2xl font-semibold text-gray-800 mt-1">{customerActiveCount + customerArchivedCount}</p>
+          <p className="text-xs text-gray-400 mt-1">
+            活躍 {customerActiveCount}
+            {customerArchivedCount > 0 && <span className="ml-1.5 text-gray-300">· 封存 {customerArchivedCount}</span>}
+          </p>
         </Link>
         <Link href={orgPath(params.orgSlug, '/inventory?filter=low')}
           className={`bg-white rounded-lg shadow p-5 hover:shadow-md ${lowStockItems.length > 0 ? 'border-l-4 border-red-400' : ''}`}>

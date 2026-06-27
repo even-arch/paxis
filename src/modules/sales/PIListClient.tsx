@@ -17,6 +17,9 @@ type PI = {
   customer: { name: string; shortName: string | null } | null
   order: { id: number; orderNo: string; customer: { name: string; shortName: string | null } | null } | null
   _count: { items: number }
+  shipStatus?: 'none' | 'partial' | 'full'
+  piTotal?: number
+  shipped?: number
 }
 
 type Props = { pis: PI[]; isArchived: boolean; sort: string; dir: 'asc' | 'desc' }
@@ -98,10 +101,19 @@ export default function PIListClient({ pis, isArchived, sort, dir }: Props) {
                     <input type="checkbox" checked={isSelected} onChange={() => toggle(pi.id)} className="rounded" />
                   </td>
                   <td className="px-4 py-3">
-                    <Link href={pi.order ? toOrgPath(`/sales/${pi.order.id}`) : toOrgPath(`/sales/pi/${pi.id}`)}
-                      className="font-mono font-medium text-teal-600 hover:underline">
-                      {pi.piNo}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link href={pi.order ? toOrgPath(`/sales/${pi.order.id}`) : toOrgPath(`/sales/pi/${pi.id}`)}
+                        className="font-mono font-medium text-teal-600 hover:underline">
+                        {pi.piNo}
+                      </Link>
+                      {pi.shipStatus === 'none' && pi.piTotal && pi.piTotal > 0 && (
+                        <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-600" title="尚未出貨">未出貨</span>
+                      )}
+                      {pi.shipStatus === 'partial' && (
+                        <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700"
+                          title={`已出 ${pi.shipped} / ${pi.piTotal}`}>部分出貨</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-gray-700">{customerName}</td>
                   <td className="px-4 py-3 text-gray-500 font-mono text-xs">{pi.order?.orderNo ?? '-'}</td>

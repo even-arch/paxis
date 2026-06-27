@@ -44,9 +44,20 @@ export default async function PIListPage({ params, searchParams }: Props) {
         customer: { select: { name: true, shortName: true } },
         order: { select: { id: true, orderNo: true, customer: { select: { name: true, shortName: true } } } },
         _count: { select: { items: true } },
+        items: { select: { quantity: true } },
+        shipmentItems: { select: { quantity: true } },
       },
     }),
   ])
+
+  // 計算每張 PI 的出貨進度
+  const pisWithShipStatus = pis.map(pi => {
+    const piTotal = pi.items.reduce((s, i) => s + i.quantity, 0)
+    const shipped = pi.shipmentItems.reduce((s, i) => s + Number(i.quantity), 0)
+    const shipStatus: 'none' | 'partial' | 'full' =
+      piTotal === 0 ? 'none' : shipped >= piTotal ? 'full' : shipped > 0 ? 'partial' : 'none'
+    return { ...pi, shipStatus, piTotal, shipped }
+  })
 
   const totalPages = Math.ceil(total / limit)
 
@@ -75,7 +86,7 @@ export default async function PIListPage({ params, searchParams }: Props) {
         )}
       </form>
 
-      <PIListClient pis={pis} isArchived={showArchived} sort={sort} dir={dir} />
+      <PIListClient pis={pisWithShipStatus} isArchived={showArchived} sort={sort} dir={dir} />
 
       {totalPages > 1 && (
         <div className="flex items-center gap-2 mt-4 text-sm">

@@ -47,6 +47,7 @@ type Receivable = {
   status: number
   collectedAt: string | null
   note: string | null
+  batchReceivable: { id: number; shipment: { shipmentNo: string } } | null
   customer: { id: number; name: string; shortName: string | null } | null
   customerName: string | null
   shipment: {
@@ -305,7 +306,7 @@ export default function FinancePage() {
     await fetch(`/api/finance/receivables/${recDialog.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ collectedForeign: null, rateAtCollection: null, collectedTWD: null, fxGainLoss: null, collectedAt: null, status: 0, note: null }),
+      body: JSON.stringify({ collectedForeign: null, rateAtCollection: null, collectedTWD: null, fxGainLoss: null, collectedAt: null, status: 0, note: null, batchReceivableId: null }),
     })
     setSaving(false)
     setRecDialog(null)
@@ -327,14 +328,14 @@ export default function FinancePage() {
       body: JSON.stringify({ collectedForeign: Number(recForeign), rateAtCollection: rate, collectedAt: date, note }),
     })
 
-    // 同批：各自用自己的 amountForeign 作為實收金額，套同一匯率
+    // 同批：各自用自己的 amountForeign 作為實收金額，套同一匯率，並記錄主單 id
     for (const id of batchIds) {
       const r = receivables.find(r => r.id === id)
       if (!r) continue
       await fetch(`/api/finance/receivables/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ collectedForeign: Number(r.amountForeign), rateAtCollection: rate, collectedAt: date, note }),
+        body: JSON.stringify({ collectedForeign: Number(r.amountForeign), rateAtCollection: rate, collectedAt: date, note, batchReceivableId: recDialog.id }),
       })
     }
 
@@ -596,15 +597,18 @@ export default function FinancePage() {
                                 : '')
                               setRecNote(r.note ?? '')
                             }}
-                              className={`text-xs hover:underline ${r.status === 2 ? 'text-gray-400 hover:text-blue-600' : 'text-blue-600'}`}>
-                              {r.status === 2 ? '修改收款' : '記錄收款'}
+                              className={`text-xs hover:underline ${r.status >= 1 ? 'text-gray-400 hover:text-blue-600' : 'text-blue-600'}`}>
+                              {r.status >= 1 ? '修改收款' : '記錄收款'}
                             </button>
+                            {r.batchReceivable && (
+                              <span className="text-xs text-gray-400 font-sans">同批：{r.batchReceivable.shipment.shipmentNo}</span>
+                            )}
                             {r.status === 0 && !r.rateAtCollection && (
                               <span className="text-xs text-amber-500" title="收款後請填入銀行押匯匯率以計算匯差">
                                 待填押匯匯率
                               </span>
                             )}
-                            {r.status === 2 && !r.rateAtCollection && (
+                            {r.status >= 1 && !r.rateAtCollection && (
                               <span className="text-xs text-gray-400" title="已收款但未記錄押匯匯率，無法計算匯差">
                                 未記錄匯率
                               </span>
@@ -899,9 +903,9 @@ export default function FinancePage() {
 
       {/* 收款對話框 */}
       {recDialog && (() => {
-        // 修改模式（recDialog 本身已收清）：顯示所有其他單子（含已收清），讓用戶重新連結同批
+        // 修改模式（有任何收款紀錄）：顯示所有其他單子（含已收清），讓用戶重新連結同批
         // 新增模式：只顯示未收清的
-        const isEditMode = recDialog.status === 2
+        const isEditMode = recDialog.status >= 1
         const batchCandidates = receivables.filter(r =>
           r.id !== recDialog.id && (isEditMode ? true : r.status < 2)
         )

@@ -21,6 +21,7 @@ export async function PATCH(req: NextRequest, {
     collectedAt?: string | null
     status?: number
     note?: string | null
+    batchReceivableId?: number | null
   }
 
   const rec = await prisma.fIN_Receivable.findUnique({ where: { id: Number(params.id) } })
@@ -30,7 +31,7 @@ export async function PATCH(req: NextRequest, {
   if (body.status === 0 && body.collectedForeign === null) {
     const updated = await prisma.fIN_Receivable.update({
       where: { id: Number(params.id) },
-      data: { collectedForeign: null, rateAtCollection: null, collectedTWD: null, fxGainLoss: null, collectedAt: null, status: 0, note: null },
+      data: { collectedForeign: null, rateAtCollection: null, collectedTWD: null, fxGainLoss: null, collectedAt: null, status: 0, note: null, batchReceivableId: null },
     })
     return NextResponse.json(updated)
   }
@@ -59,6 +60,7 @@ export async function PATCH(req: NextRequest, {
       collectedAt: body.collectedAt ? new Date(body.collectedAt) : (isFullyCollected ? new Date() : undefined),
       status,
       note: body.note !== undefined ? (body.note ?? undefined) : undefined,
+      ...(body.batchReceivableId !== undefined ? { batchReceivableId: body.batchReceivableId } : {}),
     },
   })
 

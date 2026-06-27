@@ -24,8 +24,8 @@ export default async function InventoryPage({
 
   const products = await prisma.pRD_Product.findMany({
     where: search
-      ? { isActive: true, OR: [{ name: { contains: search } }, { sku: { contains: search } }] }
-      : { isActive: true },
+      ? { isActive: true, isArchived: false, OR: [{ name: { contains: search } }, { sku: { contains: search } }] }
+      : { isActive: true, isArchived: false },
     select: { id: true, name: true, sku: true, unit: true, safetyStock: true },
     orderBy: { name: 'asc' },
   })

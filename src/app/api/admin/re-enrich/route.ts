@@ -23,13 +23,13 @@ export async function GET(req: NextRequest) {
 
   const total = await prisma.pRD_Product.count({ where: { isActive: true } })
 
-  const needName = await prisma.pRD_Product.count({
-    where: {
-      isActive: true,
-      specification: { not: null },
-      name: '未命名商品',
-    },
-  })
+  // name = modelNo 表示首次 sync 時塞的 placeholder，尚未 AI 豐富化
+  const needNameResult = await prisma.$queryRaw<[{ count: bigint }]>`
+    SELECT COUNT(*)::bigint AS count FROM "PRD_Product"
+    WHERE "isActive" = true AND specification IS NOT NULL
+    AND "modelNo" IS NOT NULL AND name = "modelNo"
+  `
+  const needName = Number(needNameResult[0].count)
 
   const needHts = await prisma.pRD_Product.count({
     where: {
@@ -43,17 +43,13 @@ export async function GET(req: NextRequest) {
     where: { isActive: true, specification: null },
   })
 
-  // 取樣前 5 筆需要補的
-  const samples = await prisma.pRD_Product.findMany({
-    where: {
-      isActive: true,
-      specification: { not: null },
-      OR: [{ name: '未命名商品' }, { htsCode: null }],
-    },
-    select: { id: true, sku: true, name: true, htsCode: true, specification: true },
-    orderBy: { id: 'asc' },
-    take: 5,
-  })
+  // 取樣前 5 筆需要補的（name = modelNo 或缺 htsCode）
+  const samples = await prisma.$queryRaw<{ id: number; sku: string; name: string; htsCode: string | null; specification: string | null }[]>`
+    SELECT id, sku, name, "htsCode", specification FROM "PRD_Product"
+    WHERE "isActive" = true AND specification IS NOT NULL
+    AND ("modelNo" IS NOT NULL AND name = "modelNo" OR "htsCode" IS NULL)
+    ORDER BY id ASC LIMIT 5
+  `
 
   // 診斷 AI config 是否可用
   const user = await prisma.sYS_User.findFirst({
@@ -94,31 +90,30 @@ export async function POST(req: NextRequest) {
   const offset = Number(searchParams.get('offset') ?? '0')
   const force  = searchParams.get('force') === 'true'
 
-  // 只抓有 spec、且缺名稱或缺 HS Code 的（除非 force）
-  const where = force
-    ? { isActive: true }
-    : {
-        isActive: true,
-        AND: [
-          { specification: { not: null } },
-          {
-            OR: [
-              { name: '未命名商品' },
-              { htsCode: null },
-            ],
-          },
-        ],
-      }
+  type ProductRow = { id: number; name: string; sku: string; modelNo: string | null; specification: string | null; htsCode: string | null }
 
-  const products = await prisma.pRD_Product.findMany({
-    where,
-    select: { id: true, name: true, sku: true, modelNo: true, specification: true, htsCode: true },
-    orderBy: { id: 'asc' },
-    take: batch,
-    skip: offset,
-  })
+  // Prisma 不支援跨欄位比較（name = modelNo），故用 raw SQL
+  const products: ProductRow[] = force
+    ? await prisma.$queryRaw`
+        SELECT id, name, sku, "modelNo", specification, "htsCode" FROM "PRD_Product"
+        WHERE "isActive" = true
+        ORDER BY id ASC LIMIT ${batch} OFFSET ${offset}
+      `
+    : await prisma.$queryRaw`
+        SELECT id, name, sku, "modelNo", specification, "htsCode" FROM "PRD_Product"
+        WHERE "isActive" = true AND specification IS NOT NULL
+        AND ("modelNo" IS NOT NULL AND name = "modelNo" OR "htsCode" IS NULL)
+        ORDER BY id ASC LIMIT ${batch} OFFSET ${offset}
+      `
 
-  const totalNeed = await prisma.pRD_Product.count({ where })
+  const totalNeedRows = force
+    ? await prisma.$queryRaw<[{ count: bigint }]>`SELECT COUNT(*)::bigint AS count FROM "PRD_Product" WHERE "isActive" = true`
+    : await prisma.$queryRaw<[{ count: bigint }]>`
+        SELECT COUNT(*)::bigint AS count FROM "PRD_Product"
+        WHERE "isActive" = true AND specification IS NOT NULL
+        AND ("modelNo" IS NOT NULL AND name = "modelNo" OR "htsCode" IS NULL)
+      `
+  const totalNeed = Number(totalNeedRows[0].count)
   const systemUser = await prisma.sYS_User.findFirst({ orderBy: { id: 'asc' } })
   const systemUserId = systemUser?.id ?? 1
 
