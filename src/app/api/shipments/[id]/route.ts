@@ -131,7 +131,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
         cartonNoTo:    i.cartonNoTo,     // String | null
         grossWeightKg: i.grossWeightKg != null ? parseFloat(i.grossWeightKg.toString()) : null,
         netWeightKg:   i.netWeightKg   != null ? parseFloat(i.netWeightKg.toString())  : null,
-        cbm:           i.cbm != null ? parseFloat(i.cbm.toString()) : null,
+        cubicFt:       i.cubicFt != null ? parseFloat(i.cubicFt.toString()) : null,
+        cbm:           i.cbm     != null ? parseFloat(i.cbm.toString())     : null,
       })),
     },
   })

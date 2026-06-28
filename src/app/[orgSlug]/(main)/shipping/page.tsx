@@ -473,7 +473,7 @@ export default function ShippingPage() {
           sku: string; modelNo: string; name: string; specification: string; htsCode: string
           quantity: number; unitPrice: number | null; unit: string
           cartons: number | null; cartonNoFrom: string | null; cartonNoTo: string | null
-          cbm: number | null; grossWeightKg: number | null; netWeightKg: number | null }>
+          cubicFt: number | null; cbm: number | null; grossWeightKg: number | null; netWeightKg: number | null }>
       }; error?: string }) => {
         if (!json.ok || !json.data) return
         const d = json.data
@@ -501,7 +501,7 @@ export default function ShippingPage() {
           key: string
           piId: number | null; piNo: string | null
           fromStr: string; toStr: string; boxCount: number
-          totalGw: number; totalNw: number; totalCbm: number
+          totalGw: number; totalNw: number; totalCft: number; totalCbm: number
           items: typeof d.items
         }
         const groupMap = new Map<string, BoxGroup>()
@@ -518,15 +518,17 @@ export default function ShippingPage() {
               groupMap.set(key, {
                 key, piId: it.piId, piNo: it.piNo,
                 fromStr, toStr, boxCount: Math.max(1, to - from + 1),
-                totalGw: 0, totalNw: 0, totalCbm: 0, items: [],
+                totalGw: 0, totalNw: 0, totalCft: 0, totalCbm: 0, items: [],
               })
             }
             const g = groupMap.get(key)!
-            // GW/NW/CBM 是整組箱子的值，每個品項重複存相同數據
+            // GW/NW/CFT/CBM 是整組箱子的值，每個品項重複存相同數據
             // 只取第一個非零值，不能累加（否則多品項時會乘以品項數）
             if (g.totalGw  === 0 && (it.grossWeightKg ?? 0) > 0) g.totalGw  = it.grossWeightKg!
             if (g.totalNw  === 0 && (it.netWeightKg   ?? 0) > 0) g.totalNw  = it.netWeightKg!
-            if (g.totalCbm === 0 && (it.cbm           ?? 0) > 0) g.totalCbm = it.cbm!
+            // cubicFt 是 Patisco 原始值，優先使用；cbm 是換算值備用
+            if (g.totalCft === 0 && (it.cubicFt ?? 0) > 0) g.totalCft = it.cubicFt!
+            if (g.totalCbm === 0 && (it.cbm     ?? 0) > 0) g.totalCbm = it.cbm!
             g.items.push(it)
           }
         } else {
@@ -537,6 +539,7 @@ export default function ShippingPage() {
             fromStr: '1', toStr: String(fallbackBoxes), boxCount: fallbackBoxes,
             totalGw:  d.totalGrossWeightKg ?? 0,
             totalNw:  d.totalNetWeightKg   ?? 0,
+            totalCft: 0,
             totalCbm: d.totalCbm           ?? 0,
             items: d.items,
           })
@@ -549,11 +552,14 @@ export default function ShippingPage() {
             return (parseInt(a.fromStr) || 0) - (parseInt(b.fromStr) || 0)
           })
           .map(g => {
-            // grossWeightKg/netWeightKg/cbm 在 SLS_Item 裡是「每箱」值，不需除以 boxCount
-            const gwPerBox  = g.totalGw  > 0 ? g.totalGw.toFixed(2)  : ''
-            const nwPerBox  = g.totalNw  > 0 ? g.totalNw.toFixed(2)  : ''
-            const cbmPerBox = g.totalCbm > 0 ? g.totalCbm : 0
-            const cftPerBox = cbmPerBox * CBM_TO_CFT
+            // GW/NW/CFT/CBM 在 SLS_Item 裡是「每箱」值，不需除以 boxCount
+            const gwPerBox  = g.totalGw > 0 ? g.totalGw.toFixed(2) : ''
+            const nwPerBox  = g.totalNw > 0 ? g.totalNw.toFixed(2) : ''
+            // 優先用 cubicFt 原始值，避免 cbm 來回換算誤差
+            const cftPerBox = g.totalCft > 0 ? g.totalCft
+                            : g.totalCbm > 0 ? g.totalCbm * CBM_TO_CFT : 0
+            const cbmPerBox = g.totalCbm > 0 ? g.totalCbm
+                            : g.totalCft > 0 ? g.totalCft / CBM_TO_CFT : 0
             return {
               grossWeightKg: gwPerBox,
               netWeightKg: nwPerBox,
@@ -562,7 +568,7 @@ export default function ShippingPage() {
               heightCm: '',
               cbmStr: cbmPerBox > 0 ? cbmPerBox.toFixed(4) : '',
               cftStr: cftPerBox > 0 ? cftPerBox.toFixed(3) : '',
-              dimsFromCbm: cbmPerBox > 0,
+              dimsFromCbm: cbmPerBox > 0 || cftPerBox > 0,
               quantity: String(g.boxCount),
               packageType: 'package' as const,
               cartonNoFrom: g.fromStr,
