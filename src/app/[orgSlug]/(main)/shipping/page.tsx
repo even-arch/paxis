@@ -549,9 +549,10 @@ export default function ShippingPage() {
             return (parseInt(a.fromStr) || 0) - (parseInt(b.fromStr) || 0)
           })
           .map(g => {
-            const gwPerBox  = g.totalGw  > 0 ? (g.totalGw  / g.boxCount).toFixed(2) : ''
-            const nwPerBox  = g.totalNw  > 0 ? (g.totalNw  / g.boxCount).toFixed(2) : ''
-            const cbmPerBox = g.totalCbm > 0 ? g.totalCbm / g.boxCount : 0
+            // grossWeightKg/netWeightKg/cbm 在 SLS_Item 裡是「每箱」值，不需除以 boxCount
+            const gwPerBox  = g.totalGw  > 0 ? g.totalGw.toFixed(2)  : ''
+            const nwPerBox  = g.totalNw  > 0 ? g.totalNw.toFixed(2)  : ''
+            const cbmPerBox = g.totalCbm > 0 ? g.totalCbm : 0
             const cftPerBox = cbmPerBox * CBM_TO_CFT
             return {
               grossWeightKg: gwPerBox,
@@ -1302,6 +1303,7 @@ export default function ShippingPage() {
                       <span>GW <strong>{piGw.toFixed(2)}</strong> kg</span>
                       {piNw > 0 && <span>NW <strong>{piNw.toFixed(2)}</strong> kg</span>}
                       {piCbm > 0 && <span>CBM <strong>{piCbm.toFixed(4)}</strong></span>}
+                      {piCbm > 0 && <span>CFT <strong>{(piCbm * CBM_TO_CFT).toFixed(3)}</strong></span>}
                       {piAmt > 0 && <span><strong>{currency} {piAmt.toFixed(2)}</strong></span>}
                     </div>
                   </div>

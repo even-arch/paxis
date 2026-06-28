@@ -55,6 +55,7 @@ function cartonLabel(item: ShipmentItemData) {
 
 function groupSummary(items: ShipmentItemData[]) {
   const totalQty = items.reduce((s, i) => s + i.quantity, 0)
+  // 依 cartonNoFrom 去重，取同一箱號範圍的第一筆（GW/NW/CBM 是每箱值，重複品項都相同）
   const seenBoxes = new Map<string, ShipmentItemData>()
   for (const i of items) {
     const key = i.cartonNoFrom ?? `__item_${i.id}`
@@ -68,10 +69,16 @@ function groupSummary(items: ShipmentItemData[]) {
   const totalCartons = (minBox != null && maxBox != null)
     ? maxBox - minBox + 1
     : (items.reduce((s, i) => s + (i.cartons ?? 0), 0) || null)
-  const totalGW  = distinctBoxes.reduce((s, i) => s + parseFloat(i.grossWeightKg ?? '0'), 0)
-  const totalNW  = distinctBoxes.reduce((s, i) => s + parseFloat(i.netWeightKg ?? '0'), 0)
-  const totalFt3 = distinctBoxes.reduce((s, i) => s + parseFloat(i.cubicFt ?? '0'), 0)
-  const totalCbm = distinctBoxes.reduce((s, i) => s + parseFloat(i.cbm ?? '0'), 0)
+  // GW/NW/CBM/ft3 是「每箱」值，需乘以該範圍的箱數才是總重
+  const boxCount = (i: ShipmentItemData) => {
+    const from = parseInt(i.cartonNoFrom ?? '0') || 0
+    const to   = parseInt(i.cartonNoTo   ?? i.cartonNoFrom ?? '0') || from
+    return from > 0 ? Math.max(1, to - from + 1) : (i.cartons ?? 1)
+  }
+  const totalGW  = distinctBoxes.reduce((s, i) => s + parseFloat(i.grossWeightKg ?? '0') * boxCount(i), 0)
+  const totalNW  = distinctBoxes.reduce((s, i) => s + parseFloat(i.netWeightKg ?? '0') * boxCount(i), 0)
+  const totalFt3 = distinctBoxes.reduce((s, i) => s + parseFloat(i.cubicFt ?? '0') * boxCount(i), 0)
+  const totalCbm = distinctBoxes.reduce((s, i) => s + parseFloat(i.cbm ?? '0') * boxCount(i), 0)
   const rangeLabel = minBox != null && maxBox != null
     ? minBox === maxBox ? String(minBox) : `${minBox}–${maxBox}`
     : '-'
