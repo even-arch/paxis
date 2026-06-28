@@ -125,6 +125,7 @@ model SYS_User {
   stockMovements   INV_Movement[]
   invAdjustments   INV_Adjustment[]
   deliveryNotes    SLS_DeliveryNote[]
+  upsShipments     UPS_Shipment[]
 
   @@map("SYS_User")
 }
@@ -986,6 +987,7 @@ model SLS {
   receivable     FIN_Receivable?
   payables       FIN_Payable[]  @relation("SLS_Payables")
   fobCostItems   SLS_FobCostItem[]
+  upsShipments   UPS_Shipment[]
 
   @@index([customerId])
   @@map("SLS")
@@ -1747,4 +1749,36 @@ model PRN_ChargeTemplateItem {
 
   @@index([templateId])
   @@map("PRN_ChargeTemplateItem")
+}
+
+// =============================================================================
+// UPS 出貨記錄 (UPS_)
+// 每次透過系統發 UPS 提單都建一筆；一張 SLS 可有多次（分批出貨）
+// Label PDF 透過 Resend Email 直接發給客戶，不存檔；只記錄發送資訊
+// =============================================================================
+
+model UPS_Shipment {
+  id           Int       @id @default(autoincrement())
+
+  // 對應的出貨單
+  slsId        Int
+  sls          SLS       @relation(fields: [slsId], references: [id])
+
+  // UPS 回傳資訊
+  shipDate     DateTime?           // 出貨日（UPS pickup date）
+  status       String   @default("created")   // created | voided
+  packageCount Int?                // 本次出幾箱
+  trackingNos  Json?               // String[]，每箱一個 tracking number
+
+  // Label Email 發送記錄（透過 Resend，不存 PDF 檔）
+  labelEmailTo     String?         // 寄給誰（通常是 customer 聯絡人）
+  labelEmailSentAt DateTime?       // 發送時間；null = 尚未發送
+
+  // 稽核
+  createdAt    DateTime @default(now())
+  createdById  Int?
+  createdBy    SYS_User? @relation(fields: [createdById], references: [id])
+
+  @@index([slsId])
+  @@map("UPS_Shipment")
 }
