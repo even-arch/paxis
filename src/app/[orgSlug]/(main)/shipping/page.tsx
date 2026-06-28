@@ -38,8 +38,9 @@ interface Package {
   quantity: string        // 箱數
   dimsFromCbm?: boolean   // L/W/H 是否由 CBM 倒算
   packageType: 'package' | 'document'
-  cartonNoFrom?: number   // 箱號起（從 SLS 帶入時填入）
-  cartonNoTo?: number     // 箱號迄
+  cartonNoFrom?: string   // 箱號起（從 SLS 帶入時填入，字串格式）
+  cartonNoTo?: string     // 箱號迄
+  piNo?: string           // 所屬 PI 號碼（每個 PI 箱號各自從 1 起算）
   items: PackageItem[]    // 裝箱內容物（qty = 每箱數量）
 }
 
@@ -467,9 +468,12 @@ export default function ShippingPage() {
         currencyCode: string
         recipient: { name: string; address: string; city: string; countryCode: string; postalCode: string; taxId: string } | null
         totalCartons: number | null; totalGrossWeightKg: number | null; totalNetWeightKg: number | null; totalCbm: number | null
-        items: Array<{ sku: string; modelNo: string; name: string; specification: string; htsCode: string; quantity: number
-          unitPrice: number | null; unit: string; cbm: number | null; grossWeightKg: number | null; netWeightKg: number | null
-          cartons: number | null; cartonNoFrom: number | null; cartonNoTo: number | null }>
+        items: Array<{
+          piId: number | null; piNo: string | null
+          sku: string; modelNo: string; name: string; specification: string; htsCode: string
+          quantity: number; unitPrice: number | null; unit: string
+          cartons: number | null; cartonNoFrom: string | null; cartonNoTo: string | null
+          cbm: number | null; grossWeightKg: number | null; netWeightKg: number | null }>
       }; error?: string }) => {
         if (!json.ok || !json.data) return
         const d = json.data
@@ -489,12 +493,14 @@ export default function ShippingPage() {
           })
         }
 
-        // 按箱號範圍分組 → 每個唯一範圍 = 一個 Package
-        // 若沒有箱號資訊，fallback 到單一 Package（全部加總平均）
+        // 箱號說明：每個 PI 的箱號各自從 1 起算，因此分組 key 必須包含 piId
+        // 同一個 (piId, cartonNoFrom, cartonNoTo) 範圍內的品項 → 合併為一個 Package
         const hasCartonNos = d.items.some(it => it.cartonNoFrom != null && it.cartonNoTo != null)
 
         type BoxGroup = {
-          key: string; from: number; to: number; boxCount: number
+          key: string
+          piId: number | null; piNo: string | null
+          fromStr: string; toStr: string; boxCount: number
           totalGw: number; totalNw: number; totalCbm: number
           items: typeof d.items
         }
@@ -502,11 +508,18 @@ export default function ShippingPage() {
 
         if (hasCartonNos) {
           for (const it of d.items) {
-            const from = it.cartonNoFrom ?? 0
-            const to   = it.cartonNoTo   ?? (from + (it.cartons ?? 1) - 1)
-            const key  = `${from}-${to}`
+            const fromStr = it.cartonNoFrom ?? '1'
+            const toStr   = it.cartonNoTo   ?? fromStr
+            // 每個 PI 的箱號獨立，key 必須含 piId
+            const key = `${it.piId ?? 'null'}|${fromStr}-${toStr}`
             if (!groupMap.has(key)) {
-              groupMap.set(key, { key, from, to, boxCount: to - from + 1, totalGw: 0, totalNw: 0, totalCbm: 0, items: [] })
+              const from = parseInt(fromStr) || 1
+              const to   = parseInt(toStr)   || from
+              groupMap.set(key, {
+                key, piId: it.piId, piNo: it.piNo,
+                fromStr, toStr, boxCount: Math.max(1, to - from + 1),
+                totalGw: 0, totalNw: 0, totalCbm: 0, items: [],
+              })
             }
             const g = groupMap.get(key)!
             g.totalGw  += it.grossWeightKg ?? 0
@@ -518,7 +531,8 @@ export default function ShippingPage() {
           // fallback：所有品項放同一組，箱數用 totalCartons
           const fallbackBoxes = d.totalCartons || 1
           groupMap.set('all', {
-            key: 'all', from: 1, to: fallbackBoxes, boxCount: fallbackBoxes,
+            key: 'all', piId: null, piNo: null,
+            fromStr: '1', toStr: String(fallbackBoxes), boxCount: fallbackBoxes,
             totalGw:  d.totalGrossWeightKg ?? 0,
             totalNw:  d.totalNetWeightKg   ?? 0,
             totalCbm: d.totalCbm           ?? 0,
@@ -526,9 +540,12 @@ export default function ShippingPage() {
           })
         }
 
+        // 依 PI → 箱號起排序
         const newPackages = Array.from(groupMap.values())
-          // 依箱號順序排列
-          .sort((a, b) => a.from - b.from)
+          .sort((a, b) => {
+            if ((a.piId ?? 0) !== (b.piId ?? 0)) return (a.piId ?? 0) - (b.piId ?? 0)
+            return (parseInt(a.fromStr) || 0) - (parseInt(b.fromStr) || 0)
+          })
           .map(g => {
             const gwPerBox  = g.totalGw  > 0 ? (g.totalGw  / g.boxCount).toFixed(2) : ''
             const nwPerBox  = g.totalNw  > 0 ? (g.totalNw  / g.boxCount).toFixed(2) : ''
@@ -545,13 +562,14 @@ export default function ShippingPage() {
               dimsFromCbm: cbmPerBox > 0,
               quantity: String(g.boxCount),
               packageType: 'package' as const,
-              cartonNoFrom: g.from,
-              cartonNoTo: g.to,
-              // qty 存每箱數量，save 函數以 qty × 箱數 還原總量
+              cartonNoFrom: g.fromStr,
+              cartonNoTo: g.toStr,
+              piNo: g.piNo ?? undefined,
+              // qty = 每箱數量，save 時 qty × 箱數 = 總量
               items: g.items.map(it => ({
                 sku: it.sku || '',
                 modelNo: it.modelNo || '',
-                desc: it.name,
+                desc: it.name,                      // 若空白，AI 補齊後填入
                 specification: it.specification || '',
                 htsCode: it.htsCode || '',
                 qty: g.boxCount > 1
@@ -565,6 +583,45 @@ export default function ShippingPage() {
           })
 
         setPackages(newPackages)
+
+        // AI 補齊：對缺少品名或 HS Code 的品項呼叫 enrich API
+        const needsEnrich = newPackages.flatMap((pkg, pi) =>
+          pkg.items
+            .map((it, ii) => ({ pi, ii, it }))
+            .filter(({ it }) => !it.desc || !it.htsCode)
+        )
+        if (needsEnrich.length > 0) {
+          // 非同步補齊，不擋主流程
+          ;(async () => {
+            for (const { pi, ii, it } of needsEnrich) {
+              try {
+                const res = await fetch('/api/shipping/enrich-item', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    specification: it.specification || it.desc,
+                    name: it.desc || undefined,
+                    modelNo: it.modelNo || undefined,
+                  }),
+                })
+                const data = await res.json()
+                if (!data.ok) continue
+                setPackages(prev => prev.map((pkg2, pi2) =>
+                  pi2 !== pi ? pkg2 : {
+                    ...pkg2,
+                    items: pkg2.items.map((item, ii2) =>
+                      ii2 !== ii ? item : {
+                        ...item,
+                        desc: item.desc || data.name || item.desc,
+                        htsCode: item.htsCode || data.htsCode || '',
+                      }
+                    ),
+                  }
+                ))
+              } catch { /* ignore */ }
+            }
+          })()
+        }
 
         if (d.currencyCode) setDeclaredCurrency(d.currencyCode)
         // 申報總金額 = 品項 qty × unitPrice 加總
@@ -1196,10 +1253,13 @@ export default function ShippingPage() {
           {packages.map((pkg, i) => (
             <div key={i} className="border rounded-md p-3 space-y-3 relative">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500">
-                  第 {i + 1} 組
+                <span className="text-xs font-medium text-gray-500 flex items-center gap-2 flex-wrap">
+                  <span>第 {i + 1} 組</span>
+                  {pkg.piNo && (
+                    <span className="font-mono text-gray-600">PI: {pkg.piNo}</span>
+                  )}
                   {pkg.cartonNoFrom != null && pkg.cartonNoTo != null && (
-                    <span className="ml-2 font-mono text-blue-600 font-semibold">
+                    <span className="font-mono text-blue-600 font-semibold">
                       C/T No. {pkg.cartonNoFrom}–{pkg.cartonNoTo}
                     </span>
                   )}

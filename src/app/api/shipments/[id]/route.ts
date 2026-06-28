@@ -46,6 +46,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       },
       items: {
         include: {
+          pi: { select: { id: true, piNo: true } },
           slsItem: {
             select: {
               unitPrice: true,
@@ -54,6 +55,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
             },
           },
         },
+        orderBy: [{ piId: 'asc' }, { cartonNoFrom: 'asc' }, { id: 'asc' }],
       },
     },
   })
@@ -110,17 +112,23 @@ export async function GET(_req: NextRequest, { params }: Params) {
       // 品項清單（優先用連結的 slsItem，fallback 到 Patisco raw 欄位）
       items: shipment.items.map(i => ({
         id:            i.id,
+        piId:          i.piId,
+        piNo:          i.pi?.piNo ?? null,
         sku:           i.slsItem?.product.sku    ?? i.rawSku ?? '',
         modelNo:       i.slsItem?.product.modelNo ?? '',
-        name:          i.slsItem?.product.name   ?? i.rawProductName ?? '（未知商品）',
-        specification: i.slsItem?.product.specification ?? '',
+        // rawProductName 是 Patisco 帶入的規格字串，作為 specification fallback
+        name:          i.slsItem?.product.name   ?? '',
+        specification: i.slsItem?.product.specification ?? i.rawProductName ?? '',
         htsCode:       i.slsItem?.product.htsCode ?? '',
         quantity:      i.quantity,
-        unitPrice:     i.slsItem?.unitPrice != null ? parseFloat(i.slsItem.unitPrice.toString()) : null,
-        unit:          i.slsItem?.unit ?? 'PC',
+        // 優先用 SLS_Item 自身的 unitPrice（Patisco sync 時帶入），再試 slsItem
+        unitPrice:     i.unitPrice != null
+          ? parseFloat(i.unitPrice.toString())
+          : (i.slsItem?.unitPrice != null ? parseFloat(i.slsItem.unitPrice.toString()) : null),
+        unit:          i.unit ?? i.slsItem?.unit ?? 'PC',
         cartons:       i.cartons,
-        cartonNoFrom:  i.cartonNoFrom,
-        cartonNoTo:    i.cartonNoTo,
+        cartonNoFrom:  i.cartonNoFrom,   // String | null
+        cartonNoTo:    i.cartonNoTo,     // String | null
         grossWeightKg: i.grossWeightKg != null ? parseFloat(i.grossWeightKg.toString()) : null,
         netWeightKg:   i.netWeightKg   != null ? parseFloat(i.netWeightKg.toString())  : null,
         cbm:           i.cbm != null ? parseFloat(i.cbm.toString()) : null,
