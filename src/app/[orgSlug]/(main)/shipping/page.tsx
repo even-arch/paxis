@@ -28,17 +28,19 @@ interface PackageItem {
 }
 
 interface Package {
-  grossWeightKg: string   // 毛重（計費用）
-  netWeightKg: string     // 淨重（報關用）
+  grossWeightKg: string   // 毛重（計費用），每箱
+  netWeightKg: string     // 淨重（報關用），每箱
   lengthCm: string
   widthCm: string
   heightCm: string
-  cbmStr: string          // 材積（m³），自動算或手動填
+  cbmStr: string          // 材積（m³），每箱，自動算或手動填
   cftStr: string          // 材積（ft³），與 cbmStr 互算
-  quantity: string
+  quantity: string        // 箱數
   dimsFromCbm?: boolean   // L/W/H 是否由 CBM 倒算
   packageType: 'package' | 'document'
-  items: PackageItem[]    // 裝箱內容物
+  cartonNoFrom?: number   // 箱號起（從 SLS 帶入時填入）
+  cartonNoTo?: number     // 箱號迄
+  items: PackageItem[]    // 裝箱內容物（qty = 每箱數量）
 }
 
 interface ShippingOption {
@@ -543,13 +545,18 @@ export default function ShippingPage() {
               dimsFromCbm: cbmPerBox > 0,
               quantity: String(g.boxCount),
               packageType: 'package' as const,
+              cartonNoFrom: g.from,
+              cartonNoTo: g.to,
+              // qty 存每箱數量，save 函數以 qty × 箱數 還原總量
               items: g.items.map(it => ({
                 sku: it.sku || '',
                 modelNo: it.modelNo || '',
                 desc: it.name,
                 specification: it.specification || '',
                 htsCode: it.htsCode || '',
-                qty: String(it.quantity),
+                qty: g.boxCount > 1
+                  ? String(+(it.quantity / g.boxCount).toFixed(4))
+                  : String(it.quantity),
                 unitPrice: it.unitPrice != null ? String(it.unitPrice) : '',
                 unit: it.unit || 'PC',
                 currencyCode: d.currencyCode || 'USD',
@@ -1189,7 +1196,14 @@ export default function ShippingPage() {
           {packages.map((pkg, i) => (
             <div key={i} className="border rounded-md p-3 space-y-3 relative">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500">第 {i + 1} 組</span>
+                <span className="text-xs font-medium text-gray-500">
+                  第 {i + 1} 組
+                  {pkg.cartonNoFrom != null && pkg.cartonNoTo != null && (
+                    <span className="ml-2 font-mono text-blue-600 font-semibold">
+                      C/T No. {pkg.cartonNoFrom}–{pkg.cartonNoTo}
+                    </span>
+                  )}
+                </span>
                 <div className="flex items-center gap-2">
                   <button type="button"
                     onClick={() => updatePkg(i, 'packageType', pkg.packageType === 'document' ? 'package' : 'document')}
@@ -1323,13 +1337,23 @@ export default function ShippingPage() {
                         className="w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white font-mono" />
                       <div className="grid grid-cols-3 gap-1">
                         <div className="flex gap-1 items-center">
-                          <input type="number" min={1} value={it.qty}
-                            onChange={e => updateItem(i, j, 'qty', e.target.value)}
-                            placeholder="數量"
-                            className="w-full border rounded px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white" />
+                          <div className="flex-1">
+                            <div className="text-[10px] text-gray-400 mb-0.5">
+                              {parseInt(pkg.quantity) > 1 ? '每箱數量' : '數量'}
+                            </div>
+                            <input type="number" min={1} value={it.qty}
+                              onChange={e => updateItem(i, j, 'qty', e.target.value)}
+                              placeholder="數量"
+                              className="w-full border rounded px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white" />
+                            {parseInt(pkg.quantity) > 1 && parseFloat(it.qty) > 0 && (
+                              <div className="text-[10px] text-gray-400 mt-0.5 text-center">
+                                合計 {(parseFloat(it.qty) * parseInt(pkg.quantity)).toFixed(0)} {it.unit || 'PC'}
+                              </div>
+                            )}
+                          </div>
                           <input value={it.unit} onChange={e => updateItem(i, j, 'unit', e.target.value)}
                             placeholder="單位"
-                            className="w-14 border rounded px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white" />
+                            className="w-14 border rounded px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white mt-4" />
                         </div>
                         <div className="flex gap-1 items-center col-span-2">
                           <input type="number" min={0} step={0.01} value={it.unitPrice}
