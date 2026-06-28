@@ -1252,246 +1252,270 @@ export default function ShippingPage() {
         )}
       </div>
 
-      {/* ── Section B: 裝箱明細（Packing List 格式）── */}
-      <div className="bg-white rounded-lg border overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-50">
-          <h2 className="text-sm font-medium text-gray-700">裝箱明細</h2>
-          <button type="button" onClick={addPackage}
-            className="text-xs text-blue-600 hover:underline">+ 新增一組</button>
-        </div>
+      {/* ── Section B: 裝箱明細（三層結構：PI → 箱組 → 品項）── */}
+      {(() => {
+        // 依 piNo 分組（preserving insertion order）
+        const piGroupMap = new Map<string, { piNo: string | undefined; pkgIndices: number[] }>()
+        packages.forEach((pkg, i) => {
+          const key = pkg.piNo ?? '__none__'
+          if (!piGroupMap.has(key)) piGroupMap.set(key, { piNo: pkg.piNo, pkgIndices: [] })
+          piGroupMap.get(key)!.pkgIndices.push(i)
+        })
+        const piGroups = Array.from(piGroupMap.values())
+        const currency = packages[0]?.items[0]?.currencyCode || 'USD'
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs border-collapse">
-            {/* ── Package-level header ── */}
-            <thead>
-              <tr className="bg-gray-100 text-gray-500 text-[11px] uppercase tracking-wide">
-                <th className="px-3 py-2 text-left font-medium border-b w-8">#</th>
-                <th className="px-3 py-2 text-left font-medium border-b">PI 號碼</th>
-                <th className="px-3 py-2 text-left font-medium border-b">箱號 C/T No.</th>
-                <th className="px-3 py-2 text-center font-medium border-b w-16">箱數</th>
-                <th className="px-3 py-2 text-right font-medium border-b w-24">GW/箱 (kg)</th>
-                <th className="px-3 py-2 text-right font-medium border-b w-24">NW/箱 (kg)</th>
-                <th className="px-3 py-2 text-center font-medium border-b w-20">長 (cm)</th>
-                <th className="px-3 py-2 text-center font-medium border-b w-20">寬 (cm)</th>
-                <th className="px-3 py-2 text-center font-medium border-b w-20">高 (cm)</th>
-                <th className="px-3 py-2 text-right font-medium border-b w-24">CBM/箱</th>
-                <th className="px-3 py-2 text-right font-medium border-b w-24">CFT/箱</th>
-                <th className="px-3 py-2 text-center font-medium border-b w-16">類型</th>
-                <th className="px-2 py-2 border-b w-6"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {packages.map((pkg, i) => {
-                const boxes = parseInt(pkg.quantity) || 1
-                const hasDims = !!(pkg.lengthCm && pkg.widthCm && pkg.heightCm)
-                const cbmReadOnly = hasDims && !pkg.dimsFromCbm
-                const pkgGwTotal = (parseFloat(pkg.grossWeightKg) || 0) * boxes
-                const pkgNwTotal = (parseFloat(pkg.netWeightKg) || 0) * boxes
-                const pkgCbmTotal = (parseFloat(pkg.cbmStr) || 0) * boxes
-                const pkgAmount = pkg.items.reduce((s, it) =>
-                  s + (parseFloat(it.unitPrice) || 0) * (parseFloat(it.qty) || 0) * boxes, 0)
+        return (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-medium text-gray-700">裝箱明細</h2>
+              <button type="button" onClick={addPackage}
+                className="text-xs text-blue-600 hover:underline">+ 新增一組</button>
+            </div>
 
-                return (
-                  <React.Fragment key={i}>
-                    {/* ── Package row ── */}
-                    <tr className="bg-blue-50/40 border-t-2 border-blue-100">
-                      <td className="px-3 py-1.5 text-gray-400 font-medium">{i + 1}</td>
-                      <td className="px-3 py-1.5 font-mono text-gray-600 text-[11px]">
-                        {pkg.piNo || <span className="text-gray-300">—</span>}
-                      </td>
-                      <td className="px-3 py-1.5 font-mono text-blue-600 font-semibold text-[11px]">
-                        {pkg.cartonNoFrom && pkg.cartonNoTo
-                          ? `${pkg.cartonNoFrom} – ${pkg.cartonNoTo}`
-                          : <span className="text-gray-300">—</span>}
-                      </td>
-                      <td className="px-2 py-1 text-center">
-                        <input type="number" min={1} value={pkg.quantity}
-                          onChange={e => updatePkg(i, 'quantity', e.target.value)}
-                          className="w-14 border rounded px-1.5 py-1 text-center focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white" />
-                      </td>
-                      <td className="px-2 py-1 text-right">
-                        <input type="number" min={0} step={0.01} value={pkg.grossWeightKg}
-                          onChange={e => updatePkg(i, 'grossWeightKg', e.target.value)}
-                          placeholder="0.00"
-                          className="w-20 border rounded px-1.5 py-1 text-right focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white" />
-                      </td>
-                      <td className="px-2 py-1 text-right">
-                        <input type="number" min={0} step={0.01} value={pkg.netWeightKg}
-                          onChange={e => updatePkg(i, 'netWeightKg', e.target.value)}
-                          placeholder="0.00"
-                          className="w-20 border rounded px-1.5 py-1 text-right focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white" />
-                      </td>
-                      {(['lengthCm', 'widthCm', 'heightCm'] as const).map(dim => (
-                        <td key={dim} className="px-2 py-1 text-center">
-                          <input type="number" min={0} step={0.1} value={pkg[dim]}
-                            onChange={e => updatePkg(i, dim, e.target.value)}
-                            placeholder="—"
-                            className="w-16 border rounded px-1.5 py-1 text-center focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white" />
-                        </td>
-                      ))}
-                      <td className="px-2 py-1 text-right">
-                        <input type="number" min={0} step={0.0001} value={pkg.cbmStr}
-                          onChange={e => handleCbmInput(i, e.target.value)}
-                          placeholder="0.0000"
-                          readOnly={cbmReadOnly}
-                          className={`w-22 border rounded px-1.5 py-1 text-right font-mono focus:outline-none focus:ring-1 focus:ring-blue-400 ${cbmReadOnly ? 'bg-gray-50 text-gray-500' : 'bg-white'}`} />
-                      </td>
-                      <td className="px-2 py-1 text-right">
-                        <input type="number" min={0} step={0.001} value={pkg.cftStr}
-                          onChange={e => handleCftInput(i, e.target.value)}
-                          placeholder="0.000"
-                          readOnly={cbmReadOnly}
-                          className={`w-22 border rounded px-1.5 py-1 text-right font-mono focus:outline-none focus:ring-1 focus:ring-blue-400 ${cbmReadOnly ? 'bg-gray-50 text-gray-500' : 'bg-white'}`} />
-                      </td>
-                      <td className="px-2 py-1 text-center">
-                        <button type="button"
-                          onClick={() => updatePkg(i, 'packageType', pkg.packageType === 'document' ? 'package' : 'document')}
-                          className={`text-[10px] px-2 py-0.5 rounded-full border whitespace-nowrap ${
-                            pkg.packageType === 'document'
-                              ? 'bg-blue-100 text-blue-700 border-blue-200'
-                              : 'bg-gray-100 text-gray-600 border-gray-200'
-                          }`}>
-                          {pkg.packageType === 'document' ? '文件' : '貨物'}
-                        </button>
-                      </td>
-                      <td className="px-2 py-1 text-center">
-                        {packages.length > 1 && (
-                          <button onClick={() => removePackage(i)}
-                            className="text-gray-300 hover:text-red-500 text-base leading-none">×</button>
-                        )}
-                      </td>
-                    </tr>
+            {/* ── Level 1: PI groups ── */}
+            {piGroups.map((group, gi) => {
+              // PI 層合計
+              const groupPkgs = group.pkgIndices.map(i => packages[i])
+              const piBoxes  = groupPkgs.reduce((s, p) => s + (parseInt(p.quantity) || 1), 0)
+              const piGw     = groupPkgs.reduce((s, p) => s + (parseFloat(p.grossWeightKg) || 0) * (parseInt(p.quantity) || 1), 0)
+              const piNw     = groupPkgs.reduce((s, p) => s + (parseFloat(p.netWeightKg) || 0) * (parseInt(p.quantity) || 1), 0)
+              const piCbm    = groupPkgs.reduce((s, p) => s + (parseFloat(p.cbmStr) || 0) * (parseInt(p.quantity) || 1), 0)
+              const piAmt    = groupPkgs.reduce((s, p) => {
+                const b = parseInt(p.quantity) || 1
+                return s + p.items.reduce((ss, it) => ss + (parseFloat(it.unitPrice) || 0) * (parseFloat(it.qty) || 0) * b, 0)
+              }, 0)
 
-                    {/* ── Package sub-total bar ── */}
-                    <tr className="bg-blue-50/20 text-[10px] text-gray-400">
-                      <td colSpan={3} className="px-3 py-0.5 text-right pr-4">小計（{boxes} 箱）：</td>
-                      <td className="px-3 py-0.5 text-center text-blue-600 font-semibold">{boxes} 箱</td>
-                      <td className="px-3 py-0.5 text-right tabular-nums">{pkgGwTotal.toFixed(2)} kg</td>
-                      <td className="px-3 py-0.5 text-right tabular-nums">{pkgNwTotal > 0 ? pkgNwTotal.toFixed(2) + ' kg' : '—'}</td>
-                      <td colSpan={3}></td>
-                      <td className="px-3 py-0.5 text-right tabular-nums font-mono">{pkgCbmTotal > 0 ? pkgCbmTotal.toFixed(4) : '—'}</td>
-                      <td className="px-3 py-0.5 text-right tabular-nums font-mono">{pkgCbmTotal > 0 ? (pkgCbmTotal * CBM_TO_CFT).toFixed(3) : '—'}</td>
-                      <td colSpan={2} className="px-3 py-0.5 text-right tabular-nums">
-                        {pkgAmount > 0 ? `${pkg.items[0]?.currencyCode || 'USD'} ${pkgAmount.toFixed(2)}` : '—'}
-                      </td>
-                    </tr>
+              return (
+                <div key={gi} className="bg-white rounded-lg border overflow-hidden">
+                  {/* ── PI header ── */}
+                  <div className="flex items-center justify-between px-4 py-2.5 bg-indigo-50 border-b border-indigo-100">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">PI</span>
+                      <span className="font-mono font-bold text-indigo-800 text-sm">
+                        {group.piNo ?? <span className="text-gray-400 font-normal">（未關聯 PI）</span>}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 text-[11px] text-indigo-600 tabular-nums">
+                      <span><strong>{piBoxes}</strong> 箱</span>
+                      <span>GW <strong>{piGw.toFixed(2)}</strong> kg</span>
+                      {piNw > 0 && <span>NW <strong>{piNw.toFixed(2)}</strong> kg</span>}
+                      {piCbm > 0 && <span>CBM <strong>{piCbm.toFixed(4)}</strong></span>}
+                      {piAmt > 0 && <span><strong>{currency} {piAmt.toFixed(2)}</strong></span>}
+                    </div>
+                  </div>
 
-                    {/* ── Items sub-table ── */}
-                    <tr>
-                      <td colSpan={13} className="p-0">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="bg-gray-50 text-gray-400 text-[10px] border-y border-gray-100">
-                              <th className="w-4 pl-8"></th>
-                              <th className="px-2 py-1 text-left font-normal w-24">SKU</th>
-                              <th className="px-2 py-1 text-left font-normal w-28">型號</th>
-                              <th className="px-2 py-1 text-left font-normal">品名 Description *</th>
-                              <th className="px-2 py-1 text-left font-normal min-w-[180px]">規格 Specification</th>
-                              <th className="px-2 py-1 text-left font-normal w-28">HS Code</th>
-                              <th className="px-2 py-1 text-right font-normal w-20">每箱數量</th>
-                              <th className="px-2 py-1 text-center font-normal w-12">單位</th>
-                              <th className="px-2 py-1 text-right font-normal w-20">單價</th>
-                              <th className="px-2 py-1 text-center font-normal w-12">幣別</th>
-                              <th className="px-2 py-1 text-right font-normal w-20">合計數量</th>
-                              <th className="px-2 py-1 text-right font-normal w-24">金額</th>
-                              <th className="w-6"></th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {pkg.items.map((it, j) => {
-                              const totalQty = parseFloat(it.qty) > 0 ? parseFloat(it.qty) * boxes : null
-                              const lineAmt = parseFloat(it.unitPrice) > 0 && totalQty ? parseFloat(it.unitPrice) * totalQty : null
-                              return (
-                                <tr key={j} className="border-b border-gray-50 hover:bg-gray-50/60">
-                                  <td className="w-4 pl-8 text-gray-200">›</td>
-                                  <td className="px-2 py-1">
-                                    <input value={it.sku} onChange={e => updateItem(i, j, 'sku', e.target.value)}
-                                      placeholder="SKU"
-                                      className="w-full border-b border-transparent hover:border-gray-200 focus:border-blue-400 px-1 py-0.5 bg-transparent focus:outline-none" />
-                                  </td>
-                                  <td className="px-2 py-1">
-                                    <input value={it.modelNo} onChange={e => updateItem(i, j, 'modelNo', e.target.value)}
-                                      placeholder="型號"
-                                      className="w-full border-b border-transparent hover:border-gray-200 focus:border-blue-400 px-1 py-0.5 bg-transparent focus:outline-none" />
-                                  </td>
-                                  <td className="px-2 py-1">
-                                    <input value={it.desc} onChange={e => updateItem(i, j, 'desc', e.target.value)}
-                                      placeholder="品名 *"
-                                      className={`w-full border-b px-1 py-0.5 bg-transparent focus:outline-none focus:border-blue-400 ${!it.desc ? 'border-orange-300 placeholder-orange-300' : 'border-transparent hover:border-gray-200'}`} />
-                                  </td>
-                                  <td className="px-2 py-1">
-                                    <input value={it.specification} onChange={e => updateItem(i, j, 'specification', e.target.value)}
-                                      placeholder="規格"
-                                      className="w-full border-b border-transparent hover:border-gray-200 focus:border-blue-400 px-1 py-0.5 bg-transparent focus:outline-none text-gray-500" />
-                                  </td>
-                                  <td className="px-2 py-1">
-                                    <input value={it.htsCode} onChange={e => updateItem(i, j, 'htsCode', e.target.value)}
-                                      placeholder="XXXX.XX"
-                                      className={`w-full border-b px-1 py-0.5 font-mono bg-transparent focus:outline-none focus:border-blue-400 ${!it.htsCode ? 'border-orange-200 text-gray-400' : 'border-transparent hover:border-gray-200'}`} />
-                                  </td>
-                                  <td className="px-2 py-1 text-right">
-                                    <input type="number" min={0} value={it.qty}
-                                      onChange={e => updateItem(i, j, 'qty', e.target.value)}
-                                      className="w-full border-b border-transparent hover:border-gray-200 focus:border-blue-400 px-1 py-0.5 text-right bg-transparent focus:outline-none tabular-nums" />
-                                  </td>
-                                  <td className="px-2 py-1 text-center">
-                                    <input value={it.unit} onChange={e => updateItem(i, j, 'unit', e.target.value)}
-                                      className="w-full border-b border-transparent hover:border-gray-200 focus:border-blue-400 px-1 py-0.5 text-center bg-transparent focus:outline-none" />
-                                  </td>
-                                  <td className="px-2 py-1 text-right">
-                                    <input type="number" min={0} step={0.01} value={it.unitPrice}
-                                      onChange={e => updateItem(i, j, 'unitPrice', e.target.value)}
-                                      placeholder="0.00"
-                                      className="w-full border-b border-transparent hover:border-gray-200 focus:border-blue-400 px-1 py-0.5 text-right bg-transparent focus:outline-none tabular-nums" />
-                                  </td>
-                                  <td className="px-2 py-1 text-center">
-                                    <input value={it.currencyCode} onChange={e => updateItem(i, j, 'currencyCode', e.target.value)}
-                                      className="w-full border-b border-transparent hover:border-gray-200 focus:border-blue-400 px-1 py-0.5 text-center bg-transparent focus:outline-none" />
-                                  </td>
-                                  <td className="px-2 py-1 text-right text-gray-500 tabular-nums">
-                                    {totalQty != null ? totalQty.toFixed(0) : '—'}
-                                  </td>
-                                  <td className="px-2 py-1 text-right text-gray-500 tabular-nums">
-                                    {lineAmt != null ? lineAmt.toFixed(2) : '—'}
-                                  </td>
-                                  <td className="px-1 py-1 text-center">
-                                    <button type="button" onClick={() => removeItem(i, j)}
-                                      className="text-gray-200 hover:text-red-400">×</button>
-                                  </td>
-                                </tr>
-                              )
-                            })}
-                            <tr>
-                              <td colSpan={13} className="pl-8 py-1">
-                                <button type="button" onClick={() => addItem(i)}
-                                  className="text-[11px] text-blue-400 hover:text-blue-600 hover:underline">+ 新增品項</button>
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </td>
-                    </tr>
-                  </React.Fragment>
-                )
-              })}
+                  {/* ── Level 2 & 3: packages + items ── */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 text-gray-400 text-[10px] uppercase tracking-wide border-b">
+                          <th className="px-3 py-1.5 text-left font-medium w-28">C/T No.</th>
+                          <th className="px-3 py-1.5 text-center font-medium w-14">箱數</th>
+                          <th className="px-3 py-1.5 text-right font-medium w-24">GW/箱 (kg)</th>
+                          <th className="px-3 py-1.5 text-right font-medium w-24">NW/箱 (kg)</th>
+                          <th className="px-3 py-1.5 text-center font-medium w-16">長(cm)</th>
+                          <th className="px-3 py-1.5 text-center font-medium w-16">寬(cm)</th>
+                          <th className="px-3 py-1.5 text-center font-medium w-16">高(cm)</th>
+                          <th className="px-3 py-1.5 text-right font-medium w-22">CBM/箱</th>
+                          <th className="px-3 py-1.5 text-right font-medium w-22">CFT/箱</th>
+                          <th className="px-3 py-1.5 text-center font-medium w-14">類型</th>
+                          <th className="px-2 py-1.5 w-5"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.pkgIndices.map((pkgIdx, pi) => {
+                          const pkg = packages[pkgIdx]
+                          const boxes = parseInt(pkg.quantity) || 1
+                          const cbmReadOnly = !!(pkg.lengthCm && pkg.widthCm && pkg.heightCm && !pkg.dimsFromCbm)
+                          const pkgAmt = pkg.items.reduce((s, it) =>
+                            s + (parseFloat(it.unitPrice) || 0) * (parseFloat(it.qty) || 0) * boxes, 0)
 
-              {/* ── Grand Total row ── */}
-              <tr className="bg-gray-100 border-t-2 border-gray-300 font-semibold text-gray-700 text-xs">
-                <td colSpan={3} className="px-4 py-2 text-right text-gray-500">合計</td>
-                <td className="px-3 py-2 text-center text-blue-700">{totalBoxes} 箱</td>
-                <td className="px-3 py-2 text-right tabular-nums">{totalGw.toFixed(2)} kg</td>
-                <td className="px-3 py-2 text-right tabular-nums">{totalNw > 0 ? totalNw.toFixed(2) + ' kg' : '—'}</td>
-                <td colSpan={3}></td>
-                <td className="px-3 py-2 text-right tabular-nums font-mono">{totalCbm > 0 ? totalCbm.toFixed(4) : '—'}</td>
-                <td className="px-3 py-2 text-right tabular-nums font-mono">{totalCbm > 0 ? (totalCbm * CBM_TO_CFT).toFixed(3) : '—'}</td>
-                <td colSpan={2} className="px-3 py-2 text-right tabular-nums">
-                  {totalAmount > 0 ? `${packages[0]?.items[0]?.currencyCode || 'USD'} ${totalAmount.toFixed(2)}` : '—'}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+                          return (
+                            <React.Fragment key={pi}>
+                              {/* ── Package row ── */}
+                              <tr className="border-t border-gray-100 bg-slate-50/60">
+                                <td className="px-3 py-1 font-mono text-blue-600 font-semibold text-[11px]">
+                                  {pkg.cartonNoFrom && pkg.cartonNoTo
+                                    ? `${pkg.cartonNoFrom} – ${pkg.cartonNoTo}`
+                                    : <span className="text-gray-300">—</span>}
+                                </td>
+                                <td className="px-2 py-1 text-center">
+                                  <input type="number" min={1} value={pkg.quantity}
+                                    onChange={e => updatePkg(pkgIdx, 'quantity', e.target.value)}
+                                    className="w-12 border rounded px-1 py-0.5 text-center focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white" />
+                                </td>
+                                <td className="px-2 py-1">
+                                  <input type="number" min={0} step={0.01} value={pkg.grossWeightKg}
+                                    onChange={e => updatePkg(pkgIdx, 'grossWeightKg', e.target.value)}
+                                    placeholder="0.00"
+                                    className="w-full border rounded px-1.5 py-0.5 text-right focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white" />
+                                </td>
+                                <td className="px-2 py-1">
+                                  <input type="number" min={0} step={0.01} value={pkg.netWeightKg}
+                                    onChange={e => updatePkg(pkgIdx, 'netWeightKg', e.target.value)}
+                                    placeholder="0.00"
+                                    className="w-full border rounded px-1.5 py-0.5 text-right focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white" />
+                                </td>
+                                {(['lengthCm', 'widthCm', 'heightCm'] as const).map(dim => (
+                                  <td key={dim} className="px-2 py-1">
+                                    <input type="number" min={0} step={0.1} value={pkg[dim]}
+                                      onChange={e => updatePkg(pkgIdx, dim, e.target.value)}
+                                      placeholder="—"
+                                      className="w-full border rounded px-1 py-0.5 text-center focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white" />
+                                  </td>
+                                ))}
+                                <td className="px-2 py-1">
+                                  <input type="number" min={0} step={0.0001} value={pkg.cbmStr}
+                                    onChange={e => handleCbmInput(pkgIdx, e.target.value)}
+                                    placeholder="0.0000" readOnly={cbmReadOnly}
+                                    className={`w-full border rounded px-1.5 py-0.5 text-right font-mono focus:outline-none focus:ring-1 focus:ring-blue-400 ${cbmReadOnly ? 'bg-gray-50 text-gray-400' : 'bg-white'}`} />
+                                </td>
+                                <td className="px-2 py-1">
+                                  <input type="number" min={0} step={0.001} value={pkg.cftStr}
+                                    onChange={e => handleCftInput(pkgIdx, e.target.value)}
+                                    placeholder="0.000" readOnly={cbmReadOnly}
+                                    className={`w-full border rounded px-1.5 py-0.5 text-right font-mono focus:outline-none focus:ring-1 focus:ring-blue-400 ${cbmReadOnly ? 'bg-gray-50 text-gray-400' : 'bg-white'}`} />
+                                </td>
+                                <td className="px-2 py-1 text-center">
+                                  <button type="button"
+                                    onClick={() => updatePkg(pkgIdx, 'packageType', pkg.packageType === 'document' ? 'package' : 'document')}
+                                    className={`text-[10px] px-1.5 py-0.5 rounded border whitespace-nowrap ${pkg.packageType === 'document' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>
+                                    {pkg.packageType === 'document' ? '文件' : '貨物'}
+                                  </button>
+                                </td>
+                                <td className="px-1 py-1 text-center">
+                                  {packages.length > 1 && (
+                                    <button onClick={() => removePackage(pkgIdx)}
+                                      className="text-gray-300 hover:text-red-400 text-sm">×</button>
+                                  )}
+                                </td>
+                              </tr>
+
+                              {/* ── Level 3: Items ── */}
+                              <tr>
+                                <td colSpan={11} className="p-0 pb-1">
+                                  <table className="w-full text-xs">
+                                    <thead>
+                                      <tr className="text-gray-300 text-[10px] border-b border-gray-50">
+                                        <th className="pl-8 pr-2 py-0.5 text-left font-normal w-28">SKU</th>
+                                        <th className="px-2 py-0.5 text-left font-normal w-28">型號</th>
+                                        <th className="px-2 py-0.5 text-left font-normal">品名 *</th>
+                                        <th className="px-2 py-0.5 text-left font-normal min-w-[160px]">規格</th>
+                                        <th className="px-2 py-0.5 text-left font-normal w-24">HS Code</th>
+                                        <th className="px-2 py-0.5 text-right font-normal w-36">
+                                          {boxes > 1 ? `數量（每箱 × ${boxes}箱）` : '數量'}
+                                        </th>
+                                        <th className="px-2 py-0.5 text-center font-normal w-12">單位</th>
+                                        <th className="px-2 py-0.5 text-right font-normal w-32">單價 ({currency})</th>
+                                        <th className="px-2 py-0.5 text-right font-normal w-28">金額 ({currency})</th>
+                                        <th className="w-5"></th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {pkg.items.map((it, j) => {
+                                        const totalQty = parseFloat(it.qty) > 0 ? parseFloat(it.qty) * boxes : null
+                                        const lineAmt = parseFloat(it.unitPrice) > 0 && totalQty ? parseFloat(it.unitPrice) * totalQty : null
+                                        const inp = 'w-full border-b border-transparent hover:border-gray-200 focus:border-blue-400 px-1 py-0.5 bg-transparent focus:outline-none'
+                                        return (
+                                          <tr key={j} className="border-b border-gray-50 hover:bg-blue-50/20">
+                                            <td className="pl-8 pr-2 py-0.5">
+                                              <input value={it.sku} onChange={e => updateItem(pkgIdx, j, 'sku', e.target.value)}
+                                                placeholder="SKU" className={inp} />
+                                            </td>
+                                            <td className="px-2 py-0.5">
+                                              <input value={it.modelNo} onChange={e => updateItem(pkgIdx, j, 'modelNo', e.target.value)}
+                                                placeholder="型號" className={inp} />
+                                            </td>
+                                            <td className="px-2 py-0.5">
+                                              <input value={it.desc} onChange={e => updateItem(pkgIdx, j, 'desc', e.target.value)}
+                                                placeholder="品名 *"
+                                                className={`${inp} ${!it.desc ? 'border-orange-300 placeholder-orange-300' : ''}`} />
+                                            </td>
+                                            <td className="px-2 py-0.5">
+                                              <input value={it.specification} onChange={e => updateItem(pkgIdx, j, 'specification', e.target.value)}
+                                                placeholder="規格" className={`${inp} text-gray-500`} />
+                                            </td>
+                                            <td className="px-2 py-0.5">
+                                              <input value={it.htsCode} onChange={e => updateItem(pkgIdx, j, 'htsCode', e.target.value)}
+                                                placeholder="XXXX.XX"
+                                                className={`${inp} font-mono ${!it.htsCode ? 'text-gray-300' : ''}`} />
+                                            </td>
+                                            <td className="px-2 py-0.5 text-right">
+                                              {boxes > 1 ? (
+                                                <div className="flex items-center justify-end gap-1">
+                                                  <input type="number" min={0} value={it.qty}
+                                                    onChange={e => updateItem(pkgIdx, j, 'qty', e.target.value)}
+                                                    className="w-14 border-b border-transparent hover:border-gray-200 focus:border-blue-400 px-1 py-0.5 text-right bg-transparent focus:outline-none tabular-nums" />
+                                                  <span className="text-gray-300 text-[10px] whitespace-nowrap">
+                                                    ={totalQty != null ? totalQty.toFixed(0) : '?'}
+                                                  </span>
+                                                </div>
+                                              ) : (
+                                                <input type="number" min={0} value={it.qty}
+                                                  onChange={e => updateItem(pkgIdx, j, 'qty', e.target.value)}
+                                                  className="w-full border-b border-transparent hover:border-gray-200 focus:border-blue-400 px-1 py-0.5 text-right bg-transparent focus:outline-none tabular-nums" />
+                                              )}
+                                            </td>
+                                            <td className="px-2 py-0.5 text-center">
+                                              <input value={it.unit} onChange={e => updateItem(pkgIdx, j, 'unit', e.target.value)}
+                                                className={`${inp} text-center w-10`} />
+                                            </td>
+                                            <td className="px-2 py-0.5 text-right">
+                                              <input type="number" min={0} step={0.01} value={it.unitPrice}
+                                                onChange={e => updateItem(pkgIdx, j, 'unitPrice', e.target.value)}
+                                                placeholder="0.00" className={`${inp} text-right tabular-nums`} />
+                                            </td>
+                                            <td className="px-2 py-0.5 text-right text-gray-500 tabular-nums">
+                                              {lineAmt != null ? lineAmt.toFixed(2) : '—'}
+                                            </td>
+                                            <td className="px-1 py-0.5 text-center">
+                                              <button type="button" onClick={() => removeItem(pkgIdx, j)}
+                                                className="text-gray-200 hover:text-red-400">×</button>
+                                            </td>
+                                          </tr>
+                                        )
+                                      })}
+                                      {/* 品項小計 */}
+                                      {boxes > 1 && pkgAmt > 0 && (
+                                        <tr className="text-[10px] text-gray-400 bg-gray-50/50">
+                                          <td colSpan={8} className="pl-8 pr-2 py-0.5 text-right">本組小計（{boxes} 箱）：</td>
+                                          <td className="px-2 py-0.5 text-right tabular-nums font-medium text-gray-600">{pkgAmt.toFixed(2)}</td>
+                                          <td></td>
+                                        </tr>
+                                      )}
+                                      <tr>
+                                        <td colSpan={10} className="pl-8 py-0.5">
+                                          <button type="button" onClick={() => addItem(pkgIdx)}
+                                            className="text-[11px] text-blue-400 hover:text-blue-600 hover:underline">+ 新增品項</button>
+                                        </td>
+                                      </tr>
+                                    </tbody>
+                                  </table>
+                                </td>
+                              </tr>
+                            </React.Fragment>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )
+            })}
+
+            {/* ── Grand Total bar ── */}
+            <div className="bg-gray-800 text-white rounded-lg px-5 py-3 flex items-center gap-6 text-xs tabular-nums">
+              <span className="text-gray-400 font-medium uppercase tracking-wide text-[10px]">總計</span>
+              <span><strong className="text-white">{totalBoxes}</strong> <span className="text-gray-400">箱</span></span>
+              <span>GW <strong className="text-white">{totalGw.toFixed(2)}</strong> <span className="text-gray-400">kg</span></span>
+              {totalNw > 0 && <span>NW <strong className="text-white">{totalNw.toFixed(2)}</strong> <span className="text-gray-400">kg</span></span>}
+              {totalCbm > 0 && <span>CBM <strong className="text-white">{totalCbm.toFixed(4)}</strong></span>}
+              {totalCbm > 0 && <span>CFT <strong className="text-white">{(totalCbm * CBM_TO_CFT).toFixed(3)}</strong></span>}
+              {totalAmount > 0 && <span className="ml-auto"><strong className="text-white">{currency} {totalAmount.toFixed(2)}</strong></span>}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── Section C: 地址 ── */}
       <div className="bg-white rounded-lg border p-5 space-y-5">
