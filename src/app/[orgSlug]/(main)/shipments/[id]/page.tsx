@@ -67,7 +67,21 @@ export default async function ShipmentDetailPage({ params }: Props) {
         <Link href={orgPath(params.orgSlug, '/shipments')} className="text-gray-400 hover:text-gray-600 text-sm">← 出貨單列表</Link>
         <span className="text-gray-300">/</span>
         <h1 className="text-xl font-bold text-gray-800 font-mono">{shipment.shipmentNo}</h1>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {!shipment.trackingNo && (
+            <Link
+              href={orgPath(params.orgSlug, `/shipping?slsShipmentId=${shipment.id}`)}
+              className="text-xs px-3 py-1.5 rounded border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors">
+              🚚 用 UPS 出貨
+            </Link>
+          )}
+          {shipment.trackingNo && (
+            <Link
+              href={orgPath(params.orgSlug, `/shipping?slsShipmentId=${shipment.id}`)}
+              className="text-xs px-3 py-1.5 rounded border border-gray-200 text-gray-400 hover:border-blue-300 hover:text-blue-500 transition-colors">
+              🚚 重新建 UPS 提單
+            </Link>
+          )}
           <ConfirmShipmentButton
             shipmentId={shipment.id}
             alreadyConfirmed={shipment.stockMovements.length > 0}
