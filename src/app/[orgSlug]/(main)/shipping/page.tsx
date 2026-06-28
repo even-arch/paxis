@@ -522,9 +522,11 @@ export default function ShippingPage() {
               })
             }
             const g = groupMap.get(key)!
-            g.totalGw  += it.grossWeightKg ?? 0
-            g.totalNw  += it.netWeightKg   ?? 0
-            g.totalCbm += it.cbm           ?? 0
+            // GW/NW/CBM 是整組箱子的值，每個品項重複存相同數據
+            // 只取第一個非零值，不能累加（否則多品項時會乘以品項數）
+            if (g.totalGw  === 0 && (it.grossWeightKg ?? 0) > 0) g.totalGw  = it.grossWeightKg!
+            if (g.totalNw  === 0 && (it.netWeightKg   ?? 0) > 0) g.totalNw  = it.netWeightKg!
+            if (g.totalCbm === 0 && (it.cbm           ?? 0) > 0) g.totalCbm = it.cbm!
             g.items.push(it)
           }
         } else {
@@ -1475,14 +1477,6 @@ export default function ShippingPage() {
                                           </tr>
                                         )
                                       })}
-                                      {/* 品項小計 */}
-                                      {boxes > 1 && pkgAmt > 0 && (
-                                        <tr className="text-[10px] text-gray-400 bg-gray-50/50">
-                                          <td colSpan={8} className="pl-8 pr-2 py-0.5 text-right">本組小計（{boxes} 箱）：</td>
-                                          <td className="px-2 py-0.5 text-right tabular-nums font-medium text-gray-600">{pkgAmt.toFixed(2)}</td>
-                                          <td></td>
-                                        </tr>
-                                      )}
                                       <tr>
                                         <td colSpan={10} className="pl-8 py-0.5">
                                           <button type="button" onClick={() => addItem(pkgIdx)}
