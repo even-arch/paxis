@@ -50,7 +50,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
             select: {
               unitPrice: true,
               unit: true,
-              product: { select: { name: true, sku: true, specification: true } },
+              product: { select: { name: true, sku: true, modelNo: true, specification: true, htsCode: true } },
             },
           },
         },
@@ -60,10 +60,11 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
   if (!shipment) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const totalQty          = shipment.items.reduce((s, i) => s + i.quantity, 0)
-  const totalCartons      = shipment.items.reduce((s, i) => s + (i.cartons ?? 0), 0)
+  const totalQty           = shipment.items.reduce((s, i) => s + i.quantity, 0)
+  const totalCartons       = shipment.items.reduce((s, i) => s + (i.cartons ?? 0), 0)
   const totalGrossWeightKg = shipment.items.reduce((s, i) => s + (i.grossWeightKg != null ? parseFloat(i.grossWeightKg.toString()) : 0), 0)
-  const totalCbm          = shipment.items.reduce((s, i) => s + (i.cbm != null ? parseFloat(i.cbm.toString()) : 0), 0)
+  const totalNetWeightKg   = shipment.items.reduce((s, i) => s + (i.netWeightKg  != null ? parseFloat(i.netWeightKg.toString())  : 0), 0)
+  const totalCbm           = shipment.items.reduce((s, i) => s + (i.cbm != null ? parseFloat(i.cbm.toString()) : 0), 0)
 
   // PI 清單（對外核對用的單據號碼）
   const piList = shipment.pis.map(sp => ({
@@ -102,20 +103,24 @@ export async function GET(_req: NextRequest, { params }: Params) {
       } : null,
       // 貨物摘要
       totalQty,
-      totalCartons:       totalCartons || null,
-      totalGrossWeightKg: totalGrossWeightKg || null,
-      totalCbm:           totalCbm || null,
-      // 品項清單
+      totalCartons:        totalCartons || null,
+      totalGrossWeightKg:  totalGrossWeightKg || null,
+      totalNetWeightKg:    totalNetWeightKg || null,
+      totalCbm:            totalCbm || null,
+      // 品項清單（優先用連結的 slsItem，fallback 到 Patisco raw 欄位）
       items: shipment.items.map(i => ({
         id:            i.id,
-        sku:           i.slsItem?.product.sku ?? '',
-        name:          i.slsItem?.product.name ?? '（未知商品）',
+        sku:           i.slsItem?.product.sku    ?? i.rawSku ?? '',
+        modelNo:       i.slsItem?.product.modelNo ?? '',
+        name:          i.slsItem?.product.name   ?? i.rawProductName ?? '（未知商品）',
         specification: i.slsItem?.product.specification ?? '',
+        htsCode:       i.slsItem?.product.htsCode ?? '',
         quantity:      i.quantity,
         unitPrice:     i.slsItem?.unitPrice != null ? parseFloat(i.slsItem.unitPrice.toString()) : null,
         unit:          i.slsItem?.unit ?? 'PC',
         cartons:       i.cartons,
         grossWeightKg: i.grossWeightKg != null ? parseFloat(i.grossWeightKg.toString()) : null,
+        netWeightKg:   i.netWeightKg   != null ? parseFloat(i.netWeightKg.toString())  : null,
         cbm:           i.cbm != null ? parseFloat(i.cbm.toString()) : null,
       })),
     },

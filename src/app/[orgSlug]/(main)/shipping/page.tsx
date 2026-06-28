@@ -464,10 +464,9 @@ export default function ShippingPage() {
         id: number; shipmentNo: string; piId: number | null; piNo: string | null
         currencyCode: string
         recipient: { name: string; address: string; city: string; countryCode: string; postalCode: string; taxId: string } | null
-        totalCartons: number | null; totalGrossWeightKg: number | null; totalCbm: number | null
-        items: Array<{ sku: string; name: string; specification: string; quantity: number
-          unitPrice: number | null; unit: string
-          cbm: number | null; grossWeightKg: number | null }>
+        totalCartons: number | null; totalGrossWeightKg: number | null; totalNetWeightKg: number | null; totalCbm: number | null
+        items: Array<{ sku: string; modelNo: string; name: string; specification: string; htsCode: string; quantity: number
+          unitPrice: number | null; unit: string; cbm: number | null; grossWeightKg: number | null; netWeightKg: number | null }>
       }; error?: string }) => {
         if (!json.ok || !json.data) return
         const d = json.data
@@ -487,28 +486,33 @@ export default function ShippingPage() {
           })
         }
 
-        // 預填貨物：永遠只建 1 箱，所有品項放進去，重量 / 材積是全部加總
-        const totalWeightKg = d.totalGrossWeightKg ?? 0
+        // 預填貨物：1 組 Package，quantity = 箱數，重量為「每箱平均」
+        const boxes = d.totalCartons || 1
+        const totalGw = d.totalGrossWeightKg ?? 0
+        const totalNw = d.totalNetWeightKg ?? 0
         const totalCbm = d.totalCbm ?? 0
-        const totalCft = totalCbm * CBM_TO_CFT
+        const gwPerBox = totalGw > 0 ? (totalGw / boxes).toFixed(2) : ''
+        const nwPerBox = totalNw > 0 ? (totalNw / boxes).toFixed(2) : ''
+        const cbmPerBox = totalCbm > 0 ? (totalCbm / boxes) : 0
+        const cftPerBox = cbmPerBox * CBM_TO_CFT
 
         setPackages([{
-          grossWeightKg: totalWeightKg > 0 ? totalWeightKg.toFixed(2) : '',
-          netWeightKg: '',
+          grossWeightKg: gwPerBox,
+          netWeightKg: nwPerBox,
           lengthCm: '',
           widthCm: '',
           heightCm: '',
-          cbmStr: totalCbm > 0 ? totalCbm.toFixed(4) : '',
-          cftStr: totalCft > 0 ? totalCft.toFixed(3) : '',
-          dimsFromCbm: totalCbm > 0,
-          quantity: String(d.totalCartons || 1),   // 箱數放在 quantity 欄
+          cbmStr: cbmPerBox > 0 ? cbmPerBox.toFixed(4) : '',
+          cftStr: cftPerBox > 0 ? cftPerBox.toFixed(3) : '',
+          dimsFromCbm: cbmPerBox > 0,
+          quantity: String(boxes),
           packageType: 'package',
           items: d.items.map(it => ({
             sku: it.sku || '',
-            modelNo: '',
+            modelNo: it.modelNo || '',
             desc: it.name,
             specification: it.specification || '',
-            htsCode: '',
+            htsCode: it.htsCode || '',
             qty: String(it.quantity),
             unitPrice: it.unitPrice != null ? String(it.unitPrice) : '',
             unit: it.unit || 'PC',
