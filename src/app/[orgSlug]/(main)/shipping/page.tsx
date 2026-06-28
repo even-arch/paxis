@@ -466,7 +466,8 @@ export default function ShippingPage() {
         recipient: { name: string; address: string; city: string; countryCode: string; postalCode: string; taxId: string } | null
         totalCartons: number | null; totalGrossWeightKg: number | null; totalNetWeightKg: number | null; totalCbm: number | null
         items: Array<{ sku: string; modelNo: string; name: string; specification: string; htsCode: string; quantity: number
-          unitPrice: number | null; unit: string; cbm: number | null; grossWeightKg: number | null; netWeightKg: number | null }>
+          unitPrice: number | null; unit: string; cbm: number | null; grossWeightKg: number | null; netWeightKg: number | null
+          cartons: number | null; cartonNoFrom: number | null; cartonNoTo: number | null }>
       }; error?: string }) => {
         if (!json.ok || !json.data) return
         const d = json.data
@@ -486,39 +487,77 @@ export default function ShippingPage() {
           })
         }
 
-        // 預填貨物：1 組 Package，quantity = 箱數，重量為「每箱平均」
-        const boxes = d.totalCartons || 1
-        const totalGw = d.totalGrossWeightKg ?? 0
-        const totalNw = d.totalNetWeightKg ?? 0
-        const totalCbm = d.totalCbm ?? 0
-        const gwPerBox = totalGw > 0 ? (totalGw / boxes).toFixed(2) : ''
-        const nwPerBox = totalNw > 0 ? (totalNw / boxes).toFixed(2) : ''
-        const cbmPerBox = totalCbm > 0 ? (totalCbm / boxes) : 0
-        const cftPerBox = cbmPerBox * CBM_TO_CFT
+        // 按箱號範圍分組 → 每個唯一範圍 = 一個 Package
+        // 若沒有箱號資訊，fallback 到單一 Package（全部加總平均）
+        const hasCartonNos = d.items.some(it => it.cartonNoFrom != null && it.cartonNoTo != null)
 
-        setPackages([{
-          grossWeightKg: gwPerBox,
-          netWeightKg: nwPerBox,
-          lengthCm: '',
-          widthCm: '',
-          heightCm: '',
-          cbmStr: cbmPerBox > 0 ? cbmPerBox.toFixed(4) : '',
-          cftStr: cftPerBox > 0 ? cftPerBox.toFixed(3) : '',
-          dimsFromCbm: cbmPerBox > 0,
-          quantity: String(boxes),
-          packageType: 'package',
-          items: d.items.map(it => ({
-            sku: it.sku || '',
-            modelNo: it.modelNo || '',
-            desc: it.name,
-            specification: it.specification || '',
-            htsCode: it.htsCode || '',
-            qty: String(it.quantity),
-            unitPrice: it.unitPrice != null ? String(it.unitPrice) : '',
-            unit: it.unit || 'PC',
-            currencyCode: d.currencyCode || 'USD',
-          })),
-        }])
+        type BoxGroup = {
+          key: string; from: number; to: number; boxCount: number
+          totalGw: number; totalNw: number; totalCbm: number
+          items: typeof d.items
+        }
+        const groupMap = new Map<string, BoxGroup>()
+
+        if (hasCartonNos) {
+          for (const it of d.items) {
+            const from = it.cartonNoFrom ?? 0
+            const to   = it.cartonNoTo   ?? (from + (it.cartons ?? 1) - 1)
+            const key  = `${from}-${to}`
+            if (!groupMap.has(key)) {
+              groupMap.set(key, { key, from, to, boxCount: to - from + 1, totalGw: 0, totalNw: 0, totalCbm: 0, items: [] })
+            }
+            const g = groupMap.get(key)!
+            g.totalGw  += it.grossWeightKg ?? 0
+            g.totalNw  += it.netWeightKg   ?? 0
+            g.totalCbm += it.cbm           ?? 0
+            g.items.push(it)
+          }
+        } else {
+          // fallback：所有品項放同一組，箱數用 totalCartons
+          const fallbackBoxes = d.totalCartons || 1
+          groupMap.set('all', {
+            key: 'all', from: 1, to: fallbackBoxes, boxCount: fallbackBoxes,
+            totalGw:  d.totalGrossWeightKg ?? 0,
+            totalNw:  d.totalNetWeightKg   ?? 0,
+            totalCbm: d.totalCbm           ?? 0,
+            items: d.items,
+          })
+        }
+
+        const newPackages = Array.from(groupMap.values())
+          // 依箱號順序排列
+          .sort((a, b) => a.from - b.from)
+          .map(g => {
+            const gwPerBox  = g.totalGw  > 0 ? (g.totalGw  / g.boxCount).toFixed(2) : ''
+            const nwPerBox  = g.totalNw  > 0 ? (g.totalNw  / g.boxCount).toFixed(2) : ''
+            const cbmPerBox = g.totalCbm > 0 ? g.totalCbm / g.boxCount : 0
+            const cftPerBox = cbmPerBox * CBM_TO_CFT
+            return {
+              grossWeightKg: gwPerBox,
+              netWeightKg: nwPerBox,
+              lengthCm: '',
+              widthCm: '',
+              heightCm: '',
+              cbmStr: cbmPerBox > 0 ? cbmPerBox.toFixed(4) : '',
+              cftStr: cftPerBox > 0 ? cftPerBox.toFixed(3) : '',
+              dimsFromCbm: cbmPerBox > 0,
+              quantity: String(g.boxCount),
+              packageType: 'package' as const,
+              items: g.items.map(it => ({
+                sku: it.sku || '',
+                modelNo: it.modelNo || '',
+                desc: it.name,
+                specification: it.specification || '',
+                htsCode: it.htsCode || '',
+                qty: String(it.quantity),
+                unitPrice: it.unitPrice != null ? String(it.unitPrice) : '',
+                unit: it.unit || 'PC',
+                currencyCode: d.currencyCode || 'USD',
+              })),
+            }
+          })
+
+        setPackages(newPackages)
 
         if (d.currencyCode) setDeclaredCurrency(d.currencyCode)
         // 申報總金額 = 品項 qty × unitPrice 加總

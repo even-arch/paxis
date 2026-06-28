@@ -119,6 +119,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
         unitPrice:     i.slsItem?.unitPrice != null ? parseFloat(i.slsItem.unitPrice.toString()) : null,
         unit:          i.slsItem?.unit ?? 'PC',
         cartons:       i.cartons,
+        cartonNoFrom:  i.cartonNoFrom,
+        cartonNoTo:    i.cartonNoTo,
         grossWeightKg: i.grossWeightKg != null ? parseFloat(i.grossWeightKg.toString()) : null,
         netWeightKg:   i.netWeightKg   != null ? parseFloat(i.netWeightKg.toString())  : null,
         cbm:           i.cbm != null ? parseFloat(i.cbm.toString()) : null,
