@@ -45,7 +45,7 @@ export async function GET(req: Request) {
               unitPrice: true,
               unit: true,
               product: {
-                select: { sku: true, modelNo: true, name: true, specification: true },
+                select: { sku: true, modelNo: true, name: true, specification: true, htsCode: true },
               },
             },
           },
@@ -60,7 +60,7 @@ export async function GET(req: Request) {
           productId: true,
           slsItemId: true,
           product: {
-            select: { sku: true, modelNo: true, name: true, specification: true },
+            select: { sku: true, modelNo: true, name: true, specification: true, htsCode: true },
           },
         },
       },
@@ -81,6 +81,7 @@ export async function GET(req: Request) {
           modelNo: it.product.modelNo ?? '',
           name: it.product.name,
           specification: it.product.specification ?? '',
+          htsCode: it.product.htsCode ?? '',
           quantity: it.quantity,
           unitPrice: Number(it.unitPrice),
           unit: it.unit ?? 'PC',
@@ -92,6 +93,7 @@ export async function GET(req: Request) {
           modelNo: it.product?.modelNo ?? '',
           name: it.product?.name ?? '',
           specification: it.product?.specification ?? '',
+          htsCode: it.product?.htsCode ?? '',
           quantity: it.quantity,
           unitPrice: Number(it.unitPrice),
           unit: it.unit ?? 'PC',

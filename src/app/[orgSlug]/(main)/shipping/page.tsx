@@ -20,6 +20,7 @@ interface PackageItem {
   modelNo: string
   desc: string
   specification: string
+  htsCode: string
   qty: string
   unitPrice: string
   unit: string
@@ -68,6 +69,7 @@ interface PiItem {
   modelNo: string
   name: string
   specification: string
+  htsCode?: string
   quantity: number
   unitPrice: number
   unit: string
@@ -122,7 +124,7 @@ const TIER_STYLE: Record<string, { label: string; cls: string }> = {
 const CBM_TO_CFT = 35.3147
 
 const emptyPackageItem = (): PackageItem => ({
-  sku: '', modelNo: '', desc: '', specification: '',
+  sku: '', modelNo: '', desc: '', specification: '', htsCode: '',
   qty: '1', unitPrice: '', unit: 'PC', currencyCode: 'USD',
 })
 
@@ -387,13 +389,12 @@ export default function ShippingPage() {
         return { l: side.toFixed(1), w: side.toFixed(1), h: side.toFixed(1) }
       }
 
-      const newPkgs = Array.from({ length: cartons }, (_, i): Package => {
-        const hasDims = dims != null
-        const calcDims = (!hasDims && cftEach) ? backCalcDims(cftEach) : null
-        const cbmEach = cftEach
-          ? (parseFloat(cftEach) / CBM_TO_CFT).toFixed(4)
-          : ''
-        return ({
+      const hasDims = dims != null
+      const calcDims = (!hasDims && cftEach) ? backCalcDims(cftEach) : null
+      const cbmEach = cftEach
+        ? (parseFloat(cftEach) / CBM_TO_CFT).toFixed(4)
+        : ''
+      const newPkgs: Package[] = [{
         grossWeightKg: weightEach,
         netWeightKg: '',
         lengthCm: hasDims ? String(dims!.l) : (calcDims?.l ?? ''),
@@ -402,23 +403,22 @@ export default function ShippingPage() {
         cbmStr: cbmEach,
         cftStr: cftEach,
         dimsFromCbm: !hasDims && !!cftEach,
-        quantity: '1',
+        quantity: String(cartons),   // 箱數放在 quantity，後端展開成 N 張 Label
         packageType: 'package',
-        // 品項只填在第一箱，其餘留空
-        items: i === 0 && d.items?.length > 0
+        items: d.items?.length > 0
           ? d.items.map(it => ({
               sku: it.itemNo,
               modelNo: '',
               desc: it.description || '',
               specification: '',
+              htsCode: '',
               qty: String(it.qty),
               unitPrice: it.unitPrice != null ? String(it.unitPrice) : '',
               unit: it.unit || 'PC',
               currencyCode: it.currency || 'EUR',
             }))
           : [emptyPackageItem()],
-      })
-      })
+      }]
       setPackages(newPkgs)
 
       if (d.totalAmount != null) {
@@ -508,6 +508,7 @@ export default function ShippingPage() {
             modelNo: '',
             desc: it.name,
             specification: it.specification || '',
+            htsCode: '',
             qty: String(it.quantity),
             unitPrice: it.unitPrice != null ? String(it.unitPrice) : '',
             unit: it.unit || 'PC',
@@ -619,6 +620,7 @@ export default function ShippingPage() {
             modelNo: it.modelNo,
             desc: it.name,
             specification: it.specification,
+            htsCode: it.htsCode ?? '',
             qty: String(it.quantity),
             unitPrice: String(it.unitPrice),
             unit: it.unit,
@@ -662,11 +664,12 @@ export default function ShippingPage() {
           const updated = [...prev]
           updated[0] = {
             ...updated[0],
-            items: d.items.map((it: { sku?: string; modelNo?: string; name?: string; specification?: string; quantity?: number; unitPrice?: number; unit?: string }) => ({
+            items: d.items.map((it: { sku?: string; modelNo?: string; name?: string; specification?: string; htsCode?: string; quantity?: number; unitPrice?: number; unit?: string }) => ({
               sku: it.sku ?? '',
               modelNo: it.modelNo ?? '',
               desc: it.name ?? '',
               specification: it.specification ?? '',
+              htsCode: it.htsCode ?? '',
               qty: String(it.quantity ?? 1),
               unitPrice: it.unitPrice ? String(it.unitPrice) : '',
               unit: it.unit ?? 'PC',
@@ -1272,6 +1275,9 @@ export default function ShippingPage() {
                       <input value={it.specification} onChange={e => updateItem(i, j, 'specification', e.target.value)}
                         placeholder="規格 Specification"
                         className="w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white" />
+                      <input value={it.htsCode} onChange={e => updateItem(i, j, 'htsCode', e.target.value)}
+                        placeholder="HS Code（選填，海關申報用）"
+                        className="w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white font-mono" />
                       <div className="grid grid-cols-3 gap-1">
                         <div className="flex gap-1 items-center">
                           <input type="number" min={1} value={it.qty}

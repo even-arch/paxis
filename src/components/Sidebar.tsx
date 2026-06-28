@@ -16,7 +16,8 @@ const b2bGroups: NavGroup[] = [
   {
     section: '',
     items: [
-      { label: '總覽', href: '/dashboard', icon: '📊', exact: true },
+      { label: '總覽',     href: '/dashboard', icon: '📊', exact: true },
+      { label: '資料警示', href: '/alerts',    icon: '⚠️' },
     ],
   },
   {
