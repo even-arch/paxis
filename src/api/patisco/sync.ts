@@ -623,14 +623,17 @@ export async function step4_slsOrders(prisma: PrismaClient, jobId: number): Prom
       const orderNo = rec.patiscoDocNo?.trim() || rec.patiscoDocId
       if (!orderNo) { r.skipped++; continue }
 
-      const existing = await prisma.pO_CustomerCopy.findUnique({
+      const existing = await prisma.pO_CustomerCopy.findFirst({
+        where: { patiscoDocId: rec.patiscoDocId },
+        select: { id: true, source: true, orderNo: true },
+      }) ?? await prisma.pO_CustomerCopy.findUnique({
         where: { orderNo },
-        select: { id: true, source: true },
+        select: { id: true, source: true, orderNo: true },
       })
       if (existing) {
         if (existing.source === 'PATISCO') {
           await prisma.pO_CustomerCopy.update({
-            where: { orderNo },
+            where: { id: existing.id },
             data: { patiscoDocId: rec.patiscoDocId },
           })
           r.updated++
@@ -822,6 +825,9 @@ export async function step6_poSupplierPIs(prisma: PrismaClient, jobId: number): 
       if (!piNo) { r.skipped++; continue }
 
       const existingPI = await prisma.pI_SupplierCopy.findFirst({
+        where: { patiscoDocId: rec.patiscoDocId },
+        select: { id: true },
+      }) ?? await prisma.pI_SupplierCopy.findFirst({
         where: { piNo },
         select: { id: true },
       })
@@ -1047,11 +1053,12 @@ export async function step7_buildOnePIFromDocId(
   const piNo = rec.patiscoDocNo?.trim()
   if (!piNo) throw new Error('此記錄沒有 PI 號碼')
 
-  // 若 PI 已存在，刪除後重建（用戶選擇覆蓋）
-  const existingPI = await prisma.pI.findUnique({ where: { piNo } })
+  // 優先以 patiscoDocId (UID) 查，單據號碼可能被使用者改過
+  const existingPI = await prisma.pI.findFirst({ where: { patiscoDocId: rec.patiscoDocId } })
+    ?? await prisma.pI.findUnique({ where: { piNo } })
   if (existingPI) {
     await prisma.pI_Item.deleteMany({ where: { piId: existingPI.id } })
-    await prisma.pI.delete({ where: { piNo } })
+    await prisma.pI.delete({ where: { id: existingPI.id } })
   }
 
   await initSelfKeywords(prisma)
@@ -1134,9 +1141,13 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
       const shipmentNo = (detail.no ?? rec.patiscoDocNo ?? '').trim()
       if (!shipmentNo) { r.skipped++; continue }
 
-      const existing = await prisma.sLS.findUnique({
+      // 優先以 patiscoDocId (UID) 查，單據號碼可能被使用者改過
+      const existing = await prisma.sLS.findFirst({
+        where: { patiscoDocId: rec.patiscoDocId },
+        select: { id: true, source: true, archivedAt: true, shipmentNo: true },
+      }) ?? await prisma.sLS.findUnique({
         where: { shipmentNo },
-        select: { id: true, source: true, archivedAt: true },
+        select: { id: true, source: true, archivedAt: true, shipmentNo: true },
       })
 
       const buyerName = detail.buyer?.name?.trim()
@@ -1346,13 +1357,22 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
           // 已封存的出貨單不受 sync 影響，保持封存狀態
           r.skipped++
         } else if (existing.source === 'PATISCO') {
-          // 既有記錄：更新幣別 + PI 連結 + 品項（全部重建，修正舊 sync 的錯誤）
+          // 既有記錄：更新所有可從 Patisco 取得的欄位 + PI 連結 + 品項（含單據號碼異動）
           await prisma.sLS.update({
-            where: { shipmentNo },
+            where: { id: existing.id },
             data: {
+              shipmentNo,  // 單據號碼可能在 Patisco 改過，以 UID 為準更新
               customerId: customer?.id ?? undefined,
               poOrderId: poOrderId ?? undefined,
               currencyCode: shipmentCurrency ?? undefined,
+              actualShipDate: shipDate ?? undefined,
+              portOfLoading: detail.port?.trim() ?? undefined,
+              trackingNo: detail.shipNo?.trim() ?? undefined,
+              packingListNo: pl?.no ?? undefined,
+              commercialInvNo: ci?.no ?? undefined,
+              doCreatedDate: parsePatiscoDate(detail.createdDate) ?? undefined,
+              doExpiredDate: parsePatiscoDate(detail.expiredDate ?? raw.listMeta?.listExpiredDate) ?? undefined,
+              doCompletedDate: parsePatiscoDate(raw.listMeta?.completedDate) ?? undefined,
               ciExchangeRate: ciExchangeRate ?? undefined,
               ciAdditionalChargesForeign: ciAdditionalChargesForeign ?? undefined,
               ciExtraCharges: ciExtraCharges ?? undefined,
