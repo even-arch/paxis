@@ -821,7 +821,7 @@ export async function step6_poSupplierPIs(prisma: PrismaClient, jobId: number): 
 
   for (const rec of records) {
     try {
-      const raw = rec.result as { sellerName?: string | null; buyerName?: string | null }
+      const raw = rec.result as { sellerName?: string | null; buyerName?: string | null; products?: Array<{ sku?: string | null }> }
       // PI_COPY = 供應商 PI 副本寄給我方（我方是 buyer），sellerName 是供應商名稱
       const sellerName = raw?.sellerName?.trim()
       if (!sellerName) { r.skipped++; continue }
@@ -838,23 +838,35 @@ export async function step6_poSupplierPIs(prisma: PrismaClient, jobId: number): 
       })
       if (existingPI) { r.skipped++; continue }
 
-      // 找對應 PO：用供應商名稱找最近的
-      const supplier = sellerName
-        ? await prisma.sUP_Supplier.findFirst({ where: { name: sellerName }, select: { id: true } })
-        : null
-
-      const poOrder = supplier
-        ? await prisma.pO.findFirst({
-            where: { supplierId: supplier.id },
-            orderBy: { createdAt: 'desc' },
-            select: { id: true },
-          })
-        : null
-
-      if (!poOrder) {
-        r.errors.push(`PI_COPY ${rec.patiscoDocId}: 找不到對應的 PO，供應商="${sellerName}"`)
-        continue
+      // 找對應 PO：用「供應商 + 品項集合」比對；只有『唯一強匹配』才連。
+      // 模糊(對到多張)或找不到，一律留白待人工確認，不再接「該供應商最新的 PO」
+      //（舊做法會 94% 接錯，破壞檢查點 A：供應商有沒有改量改價）。
+      const supplier = await prisma.sUP_Supplier.findFirst({ where: { name: sellerName }, select: { id: true } })
+      if (!supplier) {
+        r.errors.push(`PI_COPY ${rec.patiscoDocId}: 找不到供應商 "${sellerName}"`)
+        r.skipped++; continue
       }
+
+      const piSkus = new Set(
+        (raw.products ?? []).map(p => p.sku?.trim()).filter(Boolean) as string[]
+      )
+      const supplierPOs = await prisma.pO.findMany({
+        where: { supplierId: supplier.id },
+        select: { id: true, items: { select: { product: { select: { sku: true } } } } },
+      })
+      // 強匹配 = 這張供應商 PI 的品項，全部出現在該 PO 內
+      const strong = piSkus.size > 0
+        ? supplierPOs.filter(po => {
+            const poSkus = new Set(po.items.map(it => it.product?.sku).filter(Boolean) as string[])
+            return Array.from(piSkus).every(s => poSkus.has(s))
+          })
+        : []
+
+      if (strong.length !== 1) {
+        r.errors.push(`PI_COPY ${rec.patiscoDocId}: 品項無法唯一對應 PO（供應商="${sellerName}" 候選PO=${supplierPOs.length} 強匹配=${strong.length}），留白待確認`)
+        r.skipped++; continue
+      }
+      const poOrder = strong[0]
 
       await prisma.pI_SupplierCopy.create({
         data: {
@@ -882,6 +894,33 @@ export async function step7_slsPIs(prisma: PrismaClient, jobId: number): Promise
   const r: SyncStepResult = { created: 0, updated: 0, skipped: 0, errors: [], conflicts: [] }
   const records = await getRawRecords(prisma, 'PI')
 
+  // 同一單號可能有多個 Patisco 原始實例（demo 重複、Patisco 無法硬刪）。
+  // 去重時優先保留「被出貨單引用的那個實例」，讓 PI.patiscoDocId 對得上出貨的 sourceOrderID，
+  // 否則 step8 會因為 PI 表留了「沒出貨的分身」而漏連。
+  const shippedOrderIds = new Set<string>()
+  for (const doRec of await getRawRecords(prisma, 'DO')) {
+    const draw = doRec.result as { packingList?: PatiscoShipmentDetail; commercialInvoice?: PatiscoShipmentDetail }
+    for (const doc of [draw?.packingList, draw?.commercialInvoice]) {
+      for (const p of (doc?.packings ?? [])) {
+        const sid = (p as { sourceOrderID?: string }).sourceOrderID?.trim()
+        if (sid) shippedOrderIds.add(sid)
+      }
+    }
+  }
+  const dedupIdxByPiNo = new Map<string, number>() // piNo -> index in dedupedRecords
+  const dedupedRecords: typeof records = []
+  for (const rec of records) {
+    const key = rec.patiscoDocNo?.trim()
+    if (!key) { dedupedRecords.push(rec); continue }
+    const idx = dedupIdxByPiNo.get(key)
+    if (idx === undefined) { dedupIdxByPiNo.set(key, dedupedRecords.length); dedupedRecords.push(rec); continue }
+    // 已有同單號：若新實例是「被出貨引用的」而現有不是，就換成新的
+    const prev = dedupedRecords[idx]
+    if (shippedOrderIds.has(rec.patiscoDocId) && !shippedOrderIds.has(prev.patiscoDocId)) {
+      dedupedRecords[idx] = rec
+    }
+  }
+
   // 預載 lookup 表，避免迴圈內重複 DB 查詢
   const [allProducts, allCustomers, allOrders, allPIs] = await Promise.all([
     prisma.pRD_Product.findMany({ select: { id: true, sku: true } }),
@@ -894,7 +933,7 @@ export async function step7_slsPIs(prisma: PrismaClient, jobId: number): Promise
   const orderMap = new Map(allOrders.map(o => [o.orderNo, o.id]))
   const piMap = new Map(allPIs.map(p => [p.piNo, p]))
 
-  for (const rec of records) {
+  for (const rec of dedupedRecords) {
     try {
       const raw = rec.result as {
         header?: ReturnType<typeof extractOrderDetail>
@@ -1160,20 +1199,56 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
         ? await prisma.cUS_Customer.findFirst({ where: { name: buyerName }, select: { id: true } })
         : null
 
-      // 出貨單連 PI：DO 裡的 orders[].no 可能含前後綴（如 "Order E2520244 KY"）
-      // 同時搜完整字串、抽出的文件號（extractDocNo）、第一個空格前的 base，取聯集
-      const rawOrderNos = (detail.orders ?? [])
-        .map((o: { no?: string }) => o.no?.trim())
-        .filter(Boolean) as string[]
-      const basePiNos = rawOrderNos.flatMap(no => [extractDocNo(no), no.split(' ')[0]]).filter(Boolean)
-      const allPiNosToSearch = Array.from(new Set([...rawOrderNos, ...basePiNos]))
+      // 出貨單連 PI（確定性優先，逐單 fallback）
+      // 每一行帶 sourceOrderID(該 PI 實例的 UID) + sourceOrderNo(單號)。
+      //   主：sourceOrderID == PI.patiscoDocId → 精確對到「實際出貨的那個 PI 實例」。
+      //   備：該 sourceOrderID 在 PI 表找不到（多為 Patisco demo 重複實例只留了另一份），
+      //       退回用 sourceOrderNo 對 piNo，至少連到同單號的 PI，避免漏連。
+      const srcPairs = new Map<string, string>() // sourceOrderID -> sourceOrderNo
+      for (const p of [...(pl?.packings ?? []), ...(ci?.packings ?? [])]) {
+        const sid = p.sourceOrderID?.trim()
+        if (sid) srcPairs.set(sid, (p.sourceOrderNo ?? '').trim())
+      }
 
-      const linkedPIs = allPiNosToSearch.length > 0
-        ? await prisma.pI.findMany({
+      let linkedPIs: { id: number; piNo: string; orderId: number | null }[] = []
+      if (srcPairs.size > 0) {
+        const exact = await prisma.pI.findMany({
+          where: { patiscoDocId: { in: Array.from(srcPairs.keys()) } },
+          select: { id: true, piNo: true, orderId: true, patiscoDocId: true },
+        })
+        const resolved = new Set(exact.map(p => p.patiscoDocId))
+        linkedPIs = exact.map(({ id, piNo, orderId }) => ({ id, piNo, orderId }))
+
+        // 對「還沒被實例對到」的 sourceOrderID，用它的單號補連
+        const missNos = Array.from(srcPairs.entries())
+          .filter(([sid]) => !resolved.has(sid))
+          .flatMap(([, no]) => (no ? [no, extractDocNo(no), no.split(' ')[0]] : []))
+          .filter(Boolean)
+        if (missNos.length > 0) {
+          const byNo = await prisma.pI.findMany({
+            where: { piNo: { in: Array.from(new Set(missNos)) } },
+            select: { id: true, piNo: true, orderId: true },
+          })
+          const have = new Set(linkedPIs.map(p => p.id))
+          for (const p of byNo) if (!have.has(p.id)) { linkedPIs.push(p); have.add(p.id) }
+        }
+      }
+
+      // 最終 fallback：完全沒有 sourceOrderID（極舊資料）時，退回舊的 orders[].no 比對
+      if (linkedPIs.length === 0) {
+        // DO 裡的 orders[].no 可能含前後綴（如 "Order E2520244 KY"）
+        const rawOrderNos = (detail.orders ?? [])
+          .map((o: { no?: string }) => o.no?.trim())
+          .filter(Boolean) as string[]
+        const basePiNos = rawOrderNos.flatMap(no => [extractDocNo(no), no.split(' ')[0]]).filter(Boolean)
+        const allPiNosToSearch = Array.from(new Set([...rawOrderNos, ...basePiNos]))
+        if (allPiNosToSearch.length > 0) {
+          linkedPIs = await prisma.pI.findMany({
             where: { piNo: { in: allPiNosToSearch } },
             select: { id: true, piNo: true, orderId: true },
           })
-        : []
+        }
+      }
 
       // 回查採購訂單：優先用 slsPiId FK，次用 poNo=piNo 字串比對
       let poOrderId: number | undefined = undefined
