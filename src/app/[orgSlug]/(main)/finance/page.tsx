@@ -110,6 +110,64 @@ type EstimateRow = {
   nullAmountPos: string[]
 }
 
+type Sort = { key: string; dir: 'asc' | 'desc' } | null
+function nextSort(prev: Sort, key: string): Sort {
+  if (prev?.key === key) return prev.dir === 'asc' ? { key, dir: 'desc' } : null
+  return { key, dir: 'asc' }
+}
+function sortBy<T>(rows: T[], sort: Sort, val: (r: T, k: string) => number | string | null): T[] {
+  if (!sort) return rows
+  const s = sort.dir === 'asc' ? 1 : -1
+  return [...rows].sort((a, b) => {
+    const av = val(a, sort.key), bv = val(b, sort.key)
+    if (av == null && bv == null) return 0
+    if (av == null) return 1
+    if (bv == null) return -1
+    if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * s
+    return String(av).localeCompare(String(bv), 'zh-TW') * s
+  })
+}
+function SortTh({ label, k, sort, onSort, align = 'left' }: {
+  label: string; k: string; sort: Sort; onSort: (k: string) => void; align?: 'left' | 'right'
+}) {
+  const active = sort?.key === k
+  return (
+    <th onClick={() => onSort(k)}
+      className={`${align === 'right' ? 'text-right' : 'text-left'} px-4 py-3 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-800 whitespace-nowrap`}>
+      {label}
+      <span className={`ml-1 ${active ? 'text-gray-700' : 'text-gray-300'}`}>{active ? (sort.dir === 'asc' ? '▲' : '▼') : '↕'}</span>
+    </th>
+  )
+}
+function payVal(p: Payable, k: string): number | string | null {
+  switch (k) {
+    case 'supplier': return p.supplier?.shortName ?? p.supplier?.name ?? ''
+    case 'shipment': return p.shipment?.shipmentNo ?? ''
+    case 'po': return p.po?.poNo ?? p.receipt?.order?.poNo ?? ''
+    case 'shipDate': { const d = p.shipment?.actualShipDate ?? p.receipt?.performedAt; return d ? new Date(d).getTime() : null }
+    case 'due': return p.dueDate ? new Date(p.dueDate).getTime() : null
+    case 'amount': return Number(p.amountTWD)
+    case 'paid': return p.paidAmountTWD != null ? Number(p.paidAmountTWD) : null
+    case 'status': return p.status
+    default: return null
+  }
+}
+function recVal(r: Receivable, k: string): number | string | null {
+  switch (k) {
+    case 'customer': return r.customer?.shortName ?? r.customer?.name ?? r.customerName ?? ''
+    case 'shipment': return r.shipment?.shipmentNo ?? ''
+    case 'shipDate': return r.shipment?.actualShipDate ? new Date(r.shipment.actualShipDate).getTime() : null
+    case 'due': return r.dueDate ? new Date(r.dueDate).getTime() : null
+    case 'receivable': return Number(r.amountTWD ?? r.amountForeign)
+    case 'collected': return r.collectedTWD != null ? Number(r.collectedTWD) : null
+    case 'rateInvoice': return r.rateAtInvoice != null ? Number(r.rateAtInvoice) : null
+    case 'rateCollection': return r.rateAtCollection != null ? Number(r.rateAtCollection) : null
+    case 'fx': return r.fxGainLoss != null ? Number(r.fxGainLoss) : null
+    case 'status': return r.status
+    default: return null
+  }
+}
+
 export default function FinancePage() {
   const toOrgPath = useOrgPath()
   const [tab, setTab] = useState<'pay' | 'rec' | 'est' | 'recon'>('pay')
@@ -117,6 +175,8 @@ export default function FinancePage() {
   const [recFilter, setRecFilter] = useState('')
   const [payables, setPayables] = useState<Payable[]>([])
   const [receivables, setReceivables] = useState<Receivable[]>([])
+  const [paySort, setPaySort] = useState<Sort>(null)
+  const [recSort, setRecSort] = useState<Sort>(null)
   const [loading, setLoading] = useState(true)
   const [backfilling, setBackfilling] = useState(false)
   const [backfillResult, setBackfillResult] = useState<{ ar: { created: number; skipped: number }; ap: { created: number; skipped: number } } | null>(null)
@@ -433,19 +493,19 @@ export default function FinancePage() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">供應商</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">出貨單</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">採購單</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">出貨日</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">到期日</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600">應付 (TWD)</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600">已付 (TWD)</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">狀態</th>
+                  <SortTh label="供應商" k="supplier" sort={paySort} onSort={k => setPaySort(s => nextSort(s, k))} />
+                  <SortTh label="出貨單" k="shipment" sort={paySort} onSort={k => setPaySort(s => nextSort(s, k))} />
+                  <SortTh label="採購單" k="po" sort={paySort} onSort={k => setPaySort(s => nextSort(s, k))} />
+                  <SortTh label="出貨日" k="shipDate" sort={paySort} onSort={k => setPaySort(s => nextSort(s, k))} />
+                  <SortTh label="到期日" k="due" sort={paySort} onSort={k => setPaySort(s => nextSort(s, k))} />
+                  <SortTh label="應付 (TWD)" k="amount" sort={paySort} onSort={k => setPaySort(s => nextSort(s, k))} align="right" />
+                  <SortTh label="已付 (TWD)" k="paid" sort={paySort} onSort={k => setPaySort(s => nextSort(s, k))} align="right" />
+                  <SortTh label="狀態" k="status" sort={paySort} onSort={k => setPaySort(s => nextSort(s, k))} />
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {payables.map(p => {
+                {sortBy(payables, paySort, payVal).map(p => {
                   const overdue = isOverdue(p.dueDate, p.status)
                   const soon = isDueSoon(p.dueDate, p.status)
                   // 出貨單 / 採購單 / 日期：優先用新路徑（shipment+po），fallback 舊路徑（receipt）
@@ -496,7 +556,7 @@ export default function FinancePage() {
                   )
                 })}
                 {payables.length === 0 && (
-                  <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400 text-sm">無資料</td></tr>
+                  <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400 text-sm">無資料</td></tr>
                 )}
               </tbody>
             </table>
@@ -516,21 +576,21 @@ export default function FinancePage() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">客戶</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">出貨單 / PI</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">出貨日</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">到期日</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600">應收 (TWD)</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600">實收 (TWD)</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600">報帳匯率</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600">押匯匯率</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600">匯差 (TWD)</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">狀態</th>
+                  <SortTh label="客戶" k="customer" sort={recSort} onSort={k => setRecSort(s => nextSort(s, k))} />
+                  <SortTh label="出貨單 / PI" k="shipment" sort={recSort} onSort={k => setRecSort(s => nextSort(s, k))} />
+                  <SortTh label="出貨日" k="shipDate" sort={recSort} onSort={k => setRecSort(s => nextSort(s, k))} />
+                  <SortTh label="到期日" k="due" sort={recSort} onSort={k => setRecSort(s => nextSort(s, k))} />
+                  <SortTh label="應收 (TWD)" k="receivable" sort={recSort} onSort={k => setRecSort(s => nextSort(s, k))} align="right" />
+                  <SortTh label="實收 (TWD)" k="collected" sort={recSort} onSort={k => setRecSort(s => nextSort(s, k))} align="right" />
+                  <SortTh label="報帳匯率" k="rateInvoice" sort={recSort} onSort={k => setRecSort(s => nextSort(s, k))} align="right" />
+                  <SortTh label="押匯匯率" k="rateCollection" sort={recSort} onSort={k => setRecSort(s => nextSort(s, k))} align="right" />
+                  <SortTh label="匯差 (TWD)" k="fx" sort={recSort} onSort={k => setRecSort(s => nextSort(s, k))} align="right" />
+                  <SortTh label="狀態" k="status" sort={recSort} onSort={k => setRecSort(s => nextSort(s, k))} />
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {receivables.map(r => {
+                {sortBy(receivables, recSort, recVal).map(r => {
                   const overdue = isOverdue(r.dueDate, r.status)
                   const soon = isDueSoon(r.dueDate, r.status)
                   const custName = r.customer?.shortName ?? r.customer?.name ?? r.customerName ?? '—'
@@ -568,6 +628,7 @@ export default function FinancePage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right font-mono">{fmt(String(rTWD(r)), 0)}</td>
+                      <td className="px-4 py-3 text-right font-mono text-green-700">{r.collectedTWD ? fmt(r.collectedTWD, 0) : '—'}</td>
                       <td className="px-4 py-3 text-right font-mono text-xs">{fmt(r.rateAtInvoice, 4)}</td>
                       <td className="px-4 py-3 text-right font-mono text-xs">{r.rateAtCollection ? fmt(r.rateAtCollection, 4) : '—'}</td>
                       <td className="px-4 py-3 text-right font-mono text-xs">
@@ -621,7 +682,7 @@ export default function FinancePage() {
                   )
                 })}
                 {receivables.length === 0 && (
-                  <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400 text-sm">無資料</td></tr>
+                  <tr><td colSpan={11} className="px-4 py-8 text-center text-gray-400 text-sm">無資料</td></tr>
                 )}
               </tbody>
             </table>
