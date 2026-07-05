@@ -6,11 +6,13 @@ import { Prisma } from '@prisma/client'
 
 /**
  * POST /api/shipments/[id]/confirm
- * 驅動出貨的連鎖反應：
+ * 確認出貨並記錄相關的財務資訊：
  * 1. INV_Movement type=4（quantity--, reservedQty--）
  * 2. PO_CustomerCopy_Item.shippedQty 更新
- * 3. FIN_Receivable 建立（AR：等客戶付款）
- * 4. FIN_Payable 建立（AP：若 PO_Receipt 已存在）
+ * 3. FIN_Receivable 建立（AR：應收帳款）
+ * 4. PI.status = 2（已出貨）
+ *
+ * 注意：應付帳款不自動創建，由用戶在對帳頁面手工確認。
  * 冪等保護：已有 type=4 Movement 則拒絕重複。
  */
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
@@ -83,7 +85,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     }
   }
 
-  const result = { invConfirmed: 0, invSkipped: 0, arCreated: false, apCreated: 0, apSkipped: 0 }
+  const result = { invConfirmed: 0, invSkipped: 0, arCreated: false }
 
   try {
     // ── 1. INV_Movement type=4 + PO_CustomerCopy_Item.shippedQty ─────────────────────
@@ -205,116 +207,9 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       }
     }
 
-    // ── 3. FIN_Payable（AP）：找出此出貨關聯的 PO ─────────────────
-    // 使用優先級邏輯（而非 OR）避免多路徑重複：
-    // 優先 1：PO.slsPiId → PI.id（明確 FK 連結，最可靠）
-    // 優先 2：PO.poNo = PI.piNo（號碼完全相等時的 fallback）
-    // 優先 3：PO.salesOrderId → PO_CustomerCopy（訂單連結，最後手段）
-    const allPiIds = shipment.pis.map(sp => sp.pi.id)
-    const allPiNos = shipment.pis.map(sp => sp.pi.piNo)
-    const slsOrderIds = shipment.pis
-      .map(sp => sp.pi.order?.id)
-      .filter((id): id is number => id != null)
-
-    let poOrders: Array<{ id: number; totalAmount: string | null; exchangeRate: string | null; supplierId: number; receipts: { id: number }[] }> = []
-
-    // 優先 1：明確 FK 連結
-    if (allPiIds.length > 0) {
-      poOrders = await prisma.pO.findMany({
-        where: { slsPiId: { in: allPiIds } },
-        select: {
-          id: true,
-          totalAmount: true,
-          exchangeRate: true,
-          supplierId: true,
-          receipts: { select: { id: true }, take: 1 },
-        },
-      })
-    }
-
-    // 優先 2：號碼完全相等（only if priority 1 found nothing）
-    if (poOrders.length === 0 && allPiNos.length > 0) {
-      poOrders = await prisma.pO.findMany({
-        where: { poNo: { in: allPiNos } },
-        select: {
-          id: true,
-          totalAmount: true,
-          exchangeRate: true,
-          supplierId: true,
-          receipts: { select: { id: true }, take: 1 },
-        },
-      })
-    }
-
-    // 優先 3：訂單連結（only if priority 1&2 found nothing）
-    if (poOrders.length === 0 && slsOrderIds.length > 0) {
-      poOrders = await prisma.pO.findMany({
-        where: { salesOrderId: { in: slsOrderIds } },
-        select: {
-          id: true,
-          totalAmount: true,
-          exchangeRate: true,
-          supplierId: true,
-          receipts: { select: { id: true }, take: 1 },
-        },
-      })
-    }
-
-    if (poOrders.length > 0) {
-      // 去重：同一個 PO 只處理一次
-      const processedPoIds = new Set<number>()
-
-      for (const po of poOrders) {
-        if (processedPoIds.has(po.id)) continue
-        processedPoIds.add(po.id)
-
-        let receipt = po.receipts[0]
-
-        // 貿易商模式：沒有入庫記錄時，以出貨日自動建立虛擬 PO_Receipt
-        // ⚠️ 虛擬 receipt 必須基於 PO（不是 shipment），確保同一個 PO 只有一個 receipt
-        // 這樣同一個 PO 被多個出貨確認時，不會創建重複的應付帳款
-        if (!receipt) {
-          const receiptNo = `VIRTUAL-PO-${po.id}`
-          // 先試著找是否已存在該 PO 的虛擬 receipt
-          receipt = await prisma.pO_Receipt.findFirst({
-            where: {
-              orderId: po.id,
-              receiptNo: { startsWith: 'VIRTUAL-PO-' },
-            },
-          })
-          // 若不存在才建立
-          if (!receipt) {
-            receipt = await prisma.pO_Receipt.create({
-              data: {
-                orderId: po.id,
-                receiptNo,
-                receiptDate: shipment.actualShipDate ?? new Date(),
-                source: 'MANUAL',
-                performedBy,
-                note: `貿易商出貨自動建立`,
-              },
-            })
-          }
-        }
-
-        const existing = await prisma.fIN_Payable.findUnique({ where: { receiptId: receipt.id } })
-        if (existing) continue
-
-        const base = po.totalAmount ? Number(po.totalAmount) : 0
-        const amountTWD = base * Number(po.exchangeRate ?? 1)
-        if (amountTWD <= 0) { result.apSkipped++; continue }
-
-        await prisma.fIN_Payable.create({
-          data: {
-            supplierId: po.supplierId,
-            receiptId: receipt.id,
-            amountTWD: new Prisma.Decimal(amountTWD),
-            status: 0,
-          },
-        })
-        result.apCreated++
-      }
-    }
+    // ── 3. 應付帳款由用戶手工創建 ──────────────────────────────────────
+    // 不要自動產生虛擬 Receipt 或應付帳款
+    // 應付帳款應該通過對帳介面手工確認創建
 
     // ── 4. PI.status = 2（已出貨）────────────────────────────────────
     const piIds = shipment.pis.map(sp => sp.pi.id)
