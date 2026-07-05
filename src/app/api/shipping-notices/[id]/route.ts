@@ -74,13 +74,11 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
   const existing = await prisma.pO_ShippingNotice.findUnique({
     where: { id },
-    select: { status: true },
+    select: { status: true, noticeNo: true },
   })
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  if (existing.status !== 'DRAFT') {
-    return NextResponse.json({ error: '只有草稿狀態的通知單可以刪除' }, { status: 400 })
-  }
 
+  // 任何狀態都可以退回，直接刪除（cascade 會自動刪除 items）
   await prisma.pO_ShippingNotice.delete({ where: { id } })
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, noticeNo: existing.noticeNo })
 }

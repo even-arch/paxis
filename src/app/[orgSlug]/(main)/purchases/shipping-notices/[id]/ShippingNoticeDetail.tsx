@@ -44,6 +44,8 @@ export default function ShippingNoticeDetail({ notice }: ShippingNoticeDetailPro
   const [emailError, setEmailError] = useState('')
   const [emailSuccess, setEmailSuccess] = useState(false)
   const [poHistory, setPoHistory] = useState<Record<number, PONotificationHistory[]>>({})
+  const [reverting, setReverting] = useState(false)
+  const [revertError, setRevertError] = useState('')
 
   // 載入每張 PO 的通知歷史
   useEffect(() => {
@@ -90,6 +92,25 @@ export default function ShippingNoticeDetail({ notice }: ShippingNoticeDetailPro
     }
   }
 
+  async function handleRevert() {
+    if (!confirm(`確定要退回通知單 ${notice.noticeNo} 嗎？\n已通知的數量將全部還原。`)) return
+
+    setReverting(true)
+    setRevertError('')
+
+    try {
+      const res = await fetch(`/api/shipping-notices/${notice.id}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) throw new Error((await res.json()).error ?? '退回失敗')
+      // 返回清單
+      window.location.href = window.location.pathname.split('/').slice(0, -1).join('/')
+    } catch (err) {
+      setRevertError(err instanceof Error ? err.message : '退回失敗')
+      setReverting(false)
+    }
+  }
+
   const totalNotified = notice.items.reduce((sum, item) => sum + item.notifiedQuantity, 0)
 
   return (
@@ -119,19 +140,29 @@ export default function ShippingNoticeDetail({ notice }: ShippingNoticeDetailPro
             </div>
           </div>
 
-          {notice.status === 'DRAFT' && notice.supplier.email && (
+          <div className="flex gap-2">
+            {notice.status === 'DRAFT' && notice.supplier.email && (
+              <button
+                onClick={handleSendEmail}
+                disabled={sendingEmail}
+                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg whitespace-nowrap"
+              >
+                {sendingEmail ? '寄送中...' : '📧 Email 寄送'}
+              </button>
+            )}
             <button
-              onClick={handleSendEmail}
-              disabled={sendingEmail}
-              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg whitespace-nowrap"
+              onClick={handleRevert}
+              disabled={reverting}
+              className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg whitespace-nowrap"
             >
-              {sendingEmail ? '寄送中...' : '📧 Email 寄送'}
+              {reverting ? '退回中...' : '🔄 退回'}
             </button>
-          )}
+          </div>
         </div>
 
         {emailError && <p className="text-sm text-red-500 mt-2">{emailError}</p>}
         {emailSuccess && <p className="text-sm text-green-600 mt-2">✅ 郵件已寄送！</p>}
+        {revertError && <p className="text-sm text-red-500 mt-2">{revertError}</p>}
 
         {notice.note && (
           <div className="mt-4 pt-4 border-t border-gray-100">
