@@ -271,18 +271,30 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
         let receipt = po.receipts[0]
 
         // 貿易商模式：沒有入庫記錄時，以出貨日自動建立虛擬 PO_Receipt
+        // ⚠️ 虛擬 receipt 必須基於 PO（不是 shipment），確保同一個 PO 只有一個 receipt
+        // 這樣同一個 PO 被多個出貨確認時，不會創建重複的應付帳款
         if (!receipt) {
-          const receiptNo = `VIRTUAL-${shipment.shipmentNo}-${po.id}`
-          receipt = await prisma.pO_Receipt.create({
-            data: {
+          const receiptNo = `VIRTUAL-PO-${po.id}`
+          // 先試著找是否已存在該 PO 的虛擬 receipt
+          receipt = await prisma.pO_Receipt.findFirst({
+            where: {
               orderId: po.id,
-              receiptNo,
-              receiptDate: shipment.actualShipDate ?? new Date(),
-              source: 'MANUAL',
-              performedBy,
-              note: `貿易商出貨自動建立（出貨單 ${shipment.shipmentNo}）`,
+              receiptNo: { startsWith: 'VIRTUAL-PO-' },
             },
           })
+          // 若不存在才建立
+          if (!receipt) {
+            receipt = await prisma.pO_Receipt.create({
+              data: {
+                orderId: po.id,
+                receiptNo,
+                receiptDate: shipment.actualShipDate ?? new Date(),
+                source: 'MANUAL',
+                performedBy,
+                note: `貿易商出貨自動建立`,
+              },
+            })
+          }
         }
 
         const existing = await prisma.fIN_Payable.findUnique({ where: { receiptId: receipt.id } })
