@@ -13,13 +13,15 @@ export async function GET(req: NextRequest) {
   const search = searchParams.get('search') ?? ''
   const status = searchParams.get('status')
   const page = Math.max(1, Number(searchParams.get('page') ?? 1))
-  const limit = 20
+  const supplierId = searchParams.get('supplierId')
+  const limit = Math.min(Number(searchParams.get('limit') ?? 20), 100)
 
   const showArchived = searchParams.get('archived') === 'true'
   const where: Record<string, unknown> = {
     archivedAt: showArchived ? { not: null } : null,
   }
   if (status !== null && status !== '') where.status = Number(status)
+  if (supplierId) where.supplierId = Number(supplierId)
   if (search) {
     where.OR = [
       { poNo: { contains: search } },
@@ -37,12 +39,19 @@ export async function GET(req: NextRequest) {
       take: limit,
       include: {
         supplier: { select: { id: true, name: true, shortName: true } },
+        items: {
+          select: {
+            id: true,
+            quantity: true,
+            product: { select: { id: true, sku: true, name: true, unit: true } },
+          },
+        },
         _count: { select: { items: true } },
       },
     }),
   ])
 
-  return NextResponse.json({ orders, total, page, totalPages: Math.ceil(total / limit) })
+  return NextResponse.json({ purchases: orders, orders, total, page, totalPages: Math.ceil(total / limit) })
 }
 
 export async function POST(req: NextRequest) {

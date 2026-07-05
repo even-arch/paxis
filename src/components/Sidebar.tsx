@@ -42,6 +42,7 @@ const b2bGroups: NavGroup[] = [
     items: [
       { label: '供應商',   href: '/suppliers', icon: '🏭' },
       { label: '採購訂單', href: '/purchases', icon: '🛒' },
+      { label: '出貨通知單', href: '/purchases/shipping-notices', icon: '📬' },
     ],
   },
   {

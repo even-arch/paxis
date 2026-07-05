@@ -76,3 +76,80 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string, compa
     `,
   })
 }
+
+export interface ShippingNoticeEmailData {
+  noticeNo: string
+  supplierName: string
+  issueDate: string
+  items: Array<{
+    poNo: string
+    productSku: string | null
+    productName: string
+    notifiedQuantity: number
+    unit: string
+  }>
+  companyName: string
+  companyEmail?: string
+  noticeUrl?: string
+}
+
+export async function sendShippingNoticeEmail(to: string, data: ShippingNoticeEmailData) {
+  const { noticeNo, supplierName, issueDate, items, companyName, companyEmail, noticeUrl } = data
+
+  const itemsHtml = items.map(item => `
+    <tr style="border-bottom:1px solid #e5e7eb">
+      <td style="padding:8px;text-align:left">${item.poNo}</td>
+      <td style="padding:8px;text-align:left">${item.productSku || '—'}</td>
+      <td style="padding:8px;text-align:left">${item.productName}</td>
+      <td style="padding:8px;text-align:right">${item.notifiedQuantity}</td>
+      <td style="padding:8px;text-align:center">${item.unit || 'PCS'}</td>
+    </tr>
+  `).join('')
+
+  const html = `
+    <div style="font-family:sans-serif;max-width:700px;margin:0 auto;padding:32px">
+      <h2 style="color:#1e40af;margin-bottom:8px">${companyName}</h2>
+      <p style="color:#374151">親愛的 ${supplierName}，</p>
+      <p style="color:#374151">我們特此通知您，以下訂單的貨物將準備出貨。請根據通知內容準備相應的產品。</p>
+
+      <div style="background:#f3f4f6;padding:16px;border-radius:8px;margin:24px 0">
+        <p style="color:#374151;margin:0 0 12px 0"><strong>出貨通知單號：</strong>${noticeNo}</p>
+        <p style="color:#374151;margin:0"><strong>通知日期：</strong>${issueDate}</p>
+      </div>
+
+      <h3 style="color:#1e40af;margin:24px 0 12px 0">出貨品項清單</h3>
+      <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb">
+        <thead style="background:#f9fafb">
+          <tr>
+            <th style="padding:8px;text-align:left;border-bottom:1px solid #d1d5db;font-weight:600">訂單號</th>
+            <th style="padding:8px;text-align:left;border-bottom:1px solid #d1d5db;font-weight:600">產品 SKU</th>
+            <th style="padding:8px;text-align:left;border-bottom:1px solid #d1d5db;font-weight:600">品名</th>
+            <th style="padding:8px;text-align:right;border-bottom:1px solid #d1d5db;font-weight:600">數量</th>
+            <th style="padding:8px;text-align:center;border-bottom:1px solid #d1d5db;font-weight:600">單位</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemsHtml}
+        </tbody>
+      </table>
+
+      <p style="color:#374151;margin:24px 0">請在準備好貨物後盡快回覆確認。如有任何問題，歡迎與我們聯繫。</p>
+
+      ${noticeUrl ? `
+        <a href="${noticeUrl}" style="display:inline-block;margin:24px 0;padding:12px 24px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;font-weight:500">
+          查看完整通知單
+        </a>
+      ` : ''}
+
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:32px 0">
+      <p style="color:#6b7280;font-size:13px;margin:0">聯絡我們：${companyEmail || 'noreply@paxis.app'}</p>
+      <p style="color:#9ca3af;font-size:12px;margin:8px 0 0 0">${companyName} · PAXIS 系統</p>
+    </div>
+  `
+
+  await sendMail({
+    to,
+    subject: `${companyName} — 出貨通知單 ${noticeNo}`,
+    html,
+  })
+}

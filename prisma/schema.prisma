@@ -126,6 +126,7 @@ model SYS_User {
   invAdjustments   INV_Adjustment[]
   deliveryNotes    SLS_DeliveryNote[]
   upsShipments     UPS_Shipment[]
+  shippingNotices  PO_ShippingNotice[]
 
   @@map("SYS_User")
 }
@@ -315,6 +316,7 @@ model PRD_Product {
   invMovements      INV_Movement[]
   invAdjustments    INV_Adjustment[]
   deliveryNoteItems SLS_DeliveryNoteItem[]
+  shippingNoticeItems PO_ShippingNoticeItem[]
 
   @@index([sku])
   @@index([modelNo])
@@ -418,6 +420,7 @@ model SUP_Supplier {
   companyAliases SYS_CompanyAlias[]
   fobAllocations  SLS_FobCostAllocation[]
   paymentVouchers FIN_PaymentVoucher[]
+  shippingNotices PO_ShippingNotice[]
 
   @@index([name])
   @@map("SUP_Supplier")
@@ -623,6 +626,7 @@ model PO {
   receipts      PO_Receipt[]
   shipments     SLS[]
   payables      FIN_Payable[]  @relation("PO_Payables")
+  shippingNoticeItems PO_ShippingNoticeItem[]
 
   @@index([supplierId, status])
   @@index([poNo])
@@ -843,6 +847,64 @@ model PO_CustomerCopy_Item {
   @@index([orderId])
   @@index([productId])
   @@map("PO_CustomerCopy_Item")
+}
+
+// =============================================================================
+// PO_ShippingNotice — 出貨通知單
+// 買家通知供應商：這些訂單的這些品項要準備出貨
+// 可細分追蹤「哪張 PO 的哪個產品已通知多少數量」，方便後續勾稽
+// =============================================================================
+
+model PO_ShippingNotice {
+  id            Int    @id @default(autoincrement())
+  noticeNo      String @unique    // SN-YYYYMMDD-XXXX
+  supplierId    Int
+  supplier      SUP_Supplier @relation(fields: [supplierId], references: [id])
+
+  issueDate     DateTime
+  status        String @default("DRAFT")  // DRAFT | SENT | CONFIRMED
+
+  note          String?
+
+  // 操作稽審
+  performedBy   Int?
+  performer     SYS_User? @relation(fields: [performedBy], references: [id])
+  performedAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  items         PO_ShippingNoticeItem[]
+
+  @@index([supplierId, status])
+  @@index([noticeNo])
+  @@index([issueDate])
+  @@map("PO_ShippingNotice")
+}
+
+model PO_ShippingNoticeItem {
+  id                  Int    @id @default(autoincrement())
+  noticeId            Int
+  notice              PO_ShippingNotice @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+
+  poId                Int
+  po                  PO @relation(fields: [poId], references: [id])
+
+  productId           Int
+  product             PRD_Product @relation(fields: [productId], references: [id])
+
+  // 原始 PO 中的數量
+  poQuantity          Int
+
+  // 本次通知出貨的數量（可能小於 poQuantity，允許分次通知）
+  notifiedQuantity    Int
+
+  unit                String?
+  unitPrice           Decimal?
+
+  @@index([noticeId])
+  @@index([poId])
+  @@index([productId])
+  @@map("PO_ShippingNoticeItem")
 }
 
 // 節點 2：我發出 PI 正本給客戶
