@@ -206,30 +206,68 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     }
 
     // ── 3. FIN_Payable（AP）：找出此出貨關聯的 PO ─────────────────
-    // 主路徑 A：PO.slsPiId → PI.id（正式 FK，最可靠）
-    // 主路徑 B：PO.poNo = PI.piNo（號碼相同時的 fallback）
-    // 次路徑：PO.salesOrderId → PO_CustomerCopy（最後手段，有 PO_CustomerCopy 連結時）
+    // 使用優先級邏輯（而非 OR）避免多路徑重複：
+    // 優先 1：PO.slsPiId → PI.id（明確 FK 連結，最可靠）
+    // 優先 2：PO.poNo = PI.piNo（號碼完全相等時的 fallback）
+    // 優先 3：PO.salesOrderId → PO_CustomerCopy（訂單連結，最後手段）
     const allPiIds = shipment.pis.map(sp => sp.pi.id)
     const allPiNos = shipment.pis.map(sp => sp.pi.piNo)
     const slsOrderIds = shipment.pis
       .map(sp => sp.pi.order?.id)
       .filter((id): id is number => id != null)
 
-    const poOrderConditions: Record<string, unknown>[] = []
-    if (allPiIds.length > 0) poOrderConditions.push({ slsPiId: { in: allPiIds } })
-    if (allPiNos.length > 0) poOrderConditions.push({ poNo: { in: allPiNos } })
-    if (slsOrderIds.length > 0) poOrderConditions.push({ salesOrderId: { in: slsOrderIds } })
+    let poOrders: Array<{ id: number; totalAmount: string | null; exchangeRate: string | null; supplierId: number; receipts: { id: number }[] }> = []
 
-    if (poOrderConditions.length > 0) {
-      const poOrders = await prisma.pO.findMany({
-        where: { OR: poOrderConditions },
-        include: {
-          receipts: { take: 1 },
-          supplier: { select: { id: true } },
+    // 優先 1：明確 FK 連結
+    if (allPiIds.length > 0) {
+      poOrders = await prisma.pO.findMany({
+        where: { slsPiId: { in: allPiIds } },
+        select: {
+          id: true,
+          totalAmount: true,
+          exchangeRate: true,
+          supplierId: true,
+          receipts: { select: { id: true }, take: 1 },
         },
       })
+    }
+
+    // 優先 2：號碼完全相等（only if priority 1 found nothing）
+    if (poOrders.length === 0 && allPiNos.length > 0) {
+      poOrders = await prisma.pO.findMany({
+        where: { poNo: { in: allPiNos } },
+        select: {
+          id: true,
+          totalAmount: true,
+          exchangeRate: true,
+          supplierId: true,
+          receipts: { select: { id: true }, take: 1 },
+        },
+      })
+    }
+
+    // 優先 3：訂單連結（only if priority 1&2 found nothing）
+    if (poOrders.length === 0 && slsOrderIds.length > 0) {
+      poOrders = await prisma.pO.findMany({
+        where: { salesOrderId: { in: slsOrderIds } },
+        select: {
+          id: true,
+          totalAmount: true,
+          exchangeRate: true,
+          supplierId: true,
+          receipts: { select: { id: true }, take: 1 },
+        },
+      })
+    }
+
+    if (poOrders.length > 0) {
+      // 去重：同一個 PO 只處理一次
+      const processedPoIds = new Set<number>()
 
       for (const po of poOrders) {
+        if (processedPoIds.has(po.id)) continue
+        processedPoIds.add(po.id)
+
         let receipt = po.receipts[0]
 
         // 貿易商模式：沒有入庫記錄時，以出貨日自動建立虛擬 PO_Receipt
