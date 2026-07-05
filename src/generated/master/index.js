@@ -146,7 +146,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "/Users/Even/Documents/Claude/Projects/Point Asia/paxis/src/generated/master",
+      "value": "/Users/Even/Claude/Projects/paxis_tw/src/generated/master",
       "fromEnvVar": null
     },
     "config": {
@@ -162,7 +162,7 @@ const config = {
     "previewFeatures": [
       "driverAdapters"
     ],
-    "sourceFilePath": "/Users/Even/Documents/Claude/Projects/Point Asia/paxis/prisma-master/schema.prisma",
+    "sourceFilePath": "/Users/Even/Claude/Projects/paxis_tw/prisma-master/schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {

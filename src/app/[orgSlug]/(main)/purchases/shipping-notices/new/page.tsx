@@ -29,7 +29,7 @@ export default async function NewShippingNoticePage({ params }: { params: { orgS
         </div>
       </div>
 
-      <ShippingNoticeForm suppliers={suppliers} />
+      <ShippingNoticeForm suppliers={suppliers} orgSlug={params.orgSlug} />
     </div>
   )
 }
