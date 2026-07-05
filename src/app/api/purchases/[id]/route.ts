@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getRequestPrisma } from '@/lib/request-db'
@@ -80,6 +81,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   const order = await prisma.pO.update({ where: { id }, data })
+
+  // 當更新 slsPiId 時，清除毛利估算緩存，讓下次訪問時重新計算
+  if ('slsPiId' in body) {
+    revalidatePath('/api/finance/estimates')
+    revalidatePath('/(main)/finance')
+  }
+
   return NextResponse.json(order)
 }
 

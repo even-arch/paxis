@@ -218,7 +218,7 @@ export default function FinancePage() {
   async function loadEstimates(force = false) {
     if (!force && estimatesLoaded) return
     setEstimatesLoaded(false)
-    const data = await fetch('/api/finance/estimates').then(r => r.json())
+    const data = await fetch('/api/finance/estimates', { cache: 'no-store' }).then(r => r.json())
     setEstimates(data)
     setEstimatesLoaded(true)
   }
@@ -226,15 +226,15 @@ export default function FinancePage() {
   async function loadRecon(force = false) {
     if (!force && reconLoaded) return
     setReconLoaded(false)
-    const data = await fetch('/api/finance/reconciliation').then(r => r.json())
+    const data = await fetch('/api/finance/reconciliation', { cache: 'no-store' }).then(r => r.json())
     setRecon(data)
     setReconLoaded(true)
   }
 
   function switchTab(t: 'pay' | 'rec' | 'est' | 'recon') {
     setTab(t)
-    if (t === 'est') loadEstimates()
-    if (t === 'recon') loadRecon()
+    if (t === 'est') loadEstimates(true)  // 每次切換到毛利頁面時強制刷新
+    if (t === 'recon') loadRecon(true)     // 每次切換到對帳頁面時強制刷新
   }
 
   async function handleBackfill() {
