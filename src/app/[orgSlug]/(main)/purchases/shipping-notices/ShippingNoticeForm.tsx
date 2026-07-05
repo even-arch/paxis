@@ -9,6 +9,13 @@ type POOption = {
   items: { id: number; product: { id: number; sku: string | null; name: string; unit: string | null } | null; quantity: number }[]
 }
 type ChargeTemplate = { id: number; name: string; description: string | null }
+type PORemaining = {
+  poId: number
+  poNo: string
+  totalOriginal: number
+  totalNotified: number
+  totalRemaining: number
+}
 
 type LineItem = {
   poId: number
@@ -37,13 +44,15 @@ export default function ShippingNoticeForm({
   const [items, setItems] = useState<LineItem[]>([])
 
   const [poOptions, setPoOptions] = useState<POOption[]>([])
+  const [poRemaining, setPoRemaining] = useState<Record<number, PORemaining>>({})
   const [chargeTemplates, setChargeTemplates] = useState<ChargeTemplate[]>([])
   const [loadingPos, setLoadingPos] = useState(false)
 
-  // 選供應商後，拉該供應商的 PO 訂單 + 費用樣板
+  // 選供應商後，拉該供應商的 PO 訂單、費用樣板、以及每張 PO 的剩餘量
   useEffect(() => {
     if (!supplierId) {
       setPoOptions([])
+      setPoRemaining({})
       return
     }
     setLoadingPos(true)
@@ -51,15 +60,34 @@ export default function ShippingNoticeForm({
       fetch(`/api/purchases?supplierId=${supplierId}&limit=50`).then(r => r.json()),
       fetch(`/api/charge-templates`).then(r => r.json()),
     ])
-      .then(([purchaseData, templateData]) => {
-        setPoOptions(purchaseData.purchases ?? [])
+      .then(async ([purchaseData, templateData]) => {
+        const pos = purchaseData.purchases ?? []
+        setPoOptions(pos)
         setChargeTemplates(Array.isArray(templateData) ? templateData : templateData.templates ?? [])
+
+        // 並行查詢每張 PO 的剩餘量
+        const remainingMap: Record<number, PORemaining> = {}
+        await Promise.all(
+          pos.map(async (po: POOption) => {
+            try {
+              const res = await fetch(`/api/purchases/${po.id}/remaining`)
+              if (res.ok) {
+                const data = await res.json()
+                remainingMap[po.id] = data
+              }
+            } catch (e) {
+              console.error(`Failed to fetch remaining for PO ${po.id}`, e)
+            }
+          })
+        )
+        setPoRemaining(remainingMap)
       })
       .finally(() => setLoadingPos(false))
   }, [supplierId])
 
   function importFromPO(poId: string) {
-    const po = poOptions.find(p => String(p.id) === poId)
+    const poNum = Number(poId)
+    const po = poOptions.find(p => p.id === poNum)
     if (!po) return
 
     const newItems: LineItem[] = po.items
@@ -75,7 +103,6 @@ export default function ShippingNoticeForm({
       }))
 
     if (newItems.length > 0) {
-      // 追加到現有品項（而非替換），避免覆蓋其他 PO 的品項
       setItems(prev => [...prev, ...newItems])
     }
   }
@@ -87,6 +114,9 @@ export default function ShippingNoticeForm({
   function updateItem<K extends keyof LineItem>(i: number, key: K, val: LineItem[K]) {
     setItems(prev => prev.map((it, idx) => idx === i ? { ...it, [key]: val } : it))
   }
+
+  // 已選過的 PO ID
+  const selectedPoIds = new Set(items.map(it => it.poId))
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -148,13 +178,25 @@ export default function ShippingNoticeForm({
 
         <div className="grid grid-cols-2 gap-4">
           <F label={`PO 訂單（${loadingPos ? '載入中...' : `${poOptions.length} 筆`}）`}>
-            <select className={ic} onChange={e => importFromPO(e.target.value)} disabled={loadingPos || !supplierId}>
+            <select
+              className={ic}
+              onChange={e => importFromPO(e.target.value)}
+              disabled={loadingPos || !supplierId}
+            >
               <option value="">-- 選擇訂單並帶入品項 --</option>
-              {poOptions.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.poNo}
-                </option>
-              ))}
+              {poOptions.map(p => {
+                const remaining = poRemaining[p.id]
+                const isSelected = selectedPoIds.has(p.id)
+                const displayText = remaining
+                  ? `${p.poNo} (已通知 ${remaining.totalNotified}/${remaining.totalOriginal}，剩餘 ${remaining.totalRemaining})`
+                  : p.poNo
+
+                return (
+                  <option key={p.id} value={p.id} disabled={isSelected}>
+                    {displayText}
+                  </option>
+                )
+              })}
             </select>
           </F>
           <F label="備註版模">

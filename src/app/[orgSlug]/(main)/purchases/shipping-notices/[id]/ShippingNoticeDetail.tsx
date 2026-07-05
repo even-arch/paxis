@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { formatDate } from '@/lib/utils'
 
 interface ShippingNoticeDetailProps {
@@ -28,10 +28,42 @@ interface ShippingNoticeDetailProps {
   }
 }
 
+interface PONotificationHistory {
+  noticeNo: string
+  issueDate: string
+  status: string
+  items: Array<{
+    productSku: string | null
+    productName: string
+    notifiedQuantity: number
+  }>
+}
+
 export default function ShippingNoticeDetail({ notice }: ShippingNoticeDetailProps) {
   const [sendingEmail, setSendingEmail] = useState(false)
   const [emailError, setEmailError] = useState('')
   const [emailSuccess, setEmailSuccess] = useState(false)
+  const [poHistory, setPoHistory] = useState<Record<number, PONotificationHistory[]>>({})
+
+  // 載入每張 PO 的通知歷史
+  useEffect(() => {
+    const uniquePoIds = Array.from(new Set(notice.items.map(it => it.po.id)))
+    const histories: Record<number, PONotificationHistory[]> = {}
+
+    Promise.all(
+      uniquePoIds.map(async poId => {
+        try {
+          const res = await fetch(`/api/shipping-notices/po/${poId}/history`)
+          if (res.ok) {
+            const data = await res.json()
+            histories[poId] = data.history || []
+          }
+        } catch (e) {
+          console.error(`Failed to fetch history for PO ${poId}`, e)
+        }
+      })
+    ).then(() => setPoHistory(histories))
+  }, [notice.items])
 
   async function handleSendEmail() {
     if (!notice.supplier.email) {
@@ -147,6 +179,53 @@ export default function ShippingNoticeDetail({ notice }: ShippingNoticeDetailPro
             </tr>
           </tfoot>
         </table>
+      </div>
+
+      {/* 通知歷史 */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100">
+          <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">訂單出貨通知歷史</h2>
+          <p className="text-xs text-gray-400 mt-1">顯示該訂單在所有通知單中的通知記錄（分次通知追蹤）</p>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+          {Object.entries(poHistory).length === 0 ? (
+            <p className="text-xs text-gray-400">載入中或無通知歷史...</p>
+          ) : (
+            Object.entries(poHistory).map(([poId, notifications]) => (
+              <div key={poId} className="border border-gray-200 rounded p-4">
+                <p className="text-sm font-medium text-gray-800 mb-3">
+                  訂單 {notice.items.find(it => String(it.po.id) === poId)?.po.poNo}
+                </p>
+                {notifications.length === 0 ? (
+                  <p className="text-xs text-gray-400">此訂單尚無通知記錄</p>
+                ) : (
+                  <div className="space-y-3">
+                    {notifications.map((notif: any, idx: number) => (
+                      <div key={idx} className="bg-gray-50 rounded p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-mono text-blue-600">{notif.noticeNo}</span>
+                          <span className="text-xs text-gray-500">{notif.issueDate}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${notif.status === 'SENT' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                            {notif.status === 'SENT' ? '已寄送' : '已確認'}
+                          </span>
+                        </div>
+                        <div className="text-xs space-y-1">
+                          {notif.items.map((item: any, i: number) => (
+                            <div key={i} className="flex justify-between text-gray-600">
+                              <span>{item.productSku ? `${item.productSku} - ` : ''}{item.productName}</span>
+                              <span className="font-medium">通知 {item.notifiedQuantity} 件</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   )
