@@ -225,8 +225,8 @@ const DOC_CONFIGS: Array<{
   listFn: (creds: PatiscoCredentials, page: number) => Promise<{ ok: boolean; data?: { items: Record<string, unknown>[]; hasNextPage: boolean } | null }>
   getIdNo: (item: Record<string, unknown>) => { id: string; no: string }
   fetchDetail: (creds: PatiscoCredentials, item: Record<string, unknown>) => Promise<unknown>
-  // false = 清單 API 沒有 lastModifiedDate，必須每次都重抓 detail
-  hasModifiedDate?: boolean
+  // 自訂最後變動時間取值（預設：lastModifiedDate → createdDate）
+  getModifiedAt?: (item: Record<string, unknown>) => Date | null
 }> = [
   {
     docType: 'PO_COPY',
@@ -257,7 +257,12 @@ const DOC_CONFIGS: Array<{
     listFn: (c, p) => listDeliveryOrders(c, p) as ReturnType<typeof listDeliveryOrders>,
     getIdNo: (i) => ({ id: String(i.id ?? i.ID ?? ''), no: String(i.no ?? i.No ?? '') }),
     fetchDetail: fetchDetailForDO,
-    hasModifiedDate: false, // DO 清單沒有 lastModifiedDate，必須每次重抓
+    // DO 的 lastModifiedDate 是新欄位，歷史資料為 null：
+    // null → 用 completedDate 備援；連 completedDate 都沒有 → 視為 2026-06-01 最後變動
+    getModifiedAt: (i) =>
+      parsePatiscoDate(String(i.lastModifiedDate ?? i.LastModifiedDate ?? ''))
+      ?? parsePatiscoDate(String(i.completedDate ?? i.CompletedDate ?? ''))
+      ?? new Date(2026, 5, 1),
   },
 ]
 
@@ -287,15 +292,17 @@ export async function phase1FetchAll(
     })
     const existingMap = new Map(existingRecords.map(r => [r.patiscoDocId, r.patiscoModifiedAt]))
 
+    // 取得單筆最後變動時間：優先用 config 自訂邏輯，否則 lastModifiedDate → createdDate
+    const getModifiedAt = cfg.getModifiedAt ?? ((item: Record<string, unknown>) =>
+      parsePatiscoDate(
+        String(item.LastModifiedDate ?? item.lastModifiedDate ?? item.CreatedDate ?? item.createdDate ?? ''),
+      ))
+
     // 過濾出需要更新的項目
-    // 若清單 API 沒有 lastModifiedDate（hasModifiedDate === false），永遠重抓 detail
     const itemsToFetch = items.filter(item => {
       const { id } = cfg.getIdNo(item)
       if (!id) return false
-      if (cfg.hasModifiedDate === false) return true  // 強制重抓
-      const patiscoModifiedAt = parsePatiscoDate(
-        String(item.LastModifiedDate ?? item.lastModifiedDate ?? item.CreatedDate ?? item.createdDate ?? ''),
-      )
+      const patiscoModifiedAt = getModifiedAt(item)
       const existingModifiedAt = existingMap.get(id)
       if (existingModifiedAt && patiscoModifiedAt && patiscoModifiedAt <= existingModifiedAt) {
         done++
@@ -311,9 +318,7 @@ export async function phase1FetchAll(
       const batch = itemsToFetch.slice(i, i + CONCURRENCY)
       await Promise.all(batch.map(async (item) => {
         const { id, no } = cfg.getIdNo(item)
-        const patiscoModifiedAt = parsePatiscoDate(
-          String(item.LastModifiedDate ?? item.lastModifiedDate ?? item.CreatedDate ?? item.createdDate ?? ''),
-        )
+        const patiscoModifiedAt = getModifiedAt(item)
         try {
           const detail = await cfg.fetchDetail(creds, item)
           await prisma.sYS_PatiscoSync.upsert({
