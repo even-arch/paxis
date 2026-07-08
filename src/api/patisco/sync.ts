@@ -1505,6 +1505,7 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
               ciExchangeRate: ciExchangeRate ?? undefined,
               ciAdditionalChargesForeign: ciAdditionalChargesForeign ?? undefined,
               ciExtraCharges: ciExtraCharges ?? undefined,
+              shippingMarks: pl?.termAndCondition?.trim() || undefined,
             },
           })
           await prisma.sLS_PI_Link.deleteMany({ where: { shipmentId: existing.id } })
@@ -1544,6 +1545,7 @@ export async function step8_slsShipments(prisma: PrismaClient, jobId: number): P
           ciExchangeRate: ciExchangeRate ?? undefined,
           ciAdditionalChargesForeign: ciAdditionalChargesForeign ?? undefined,
           ciExtraCharges: ciExtraCharges ?? undefined,
+          shippingMarks: pl?.termAndCondition?.trim() || undefined,
           syncJobId: jobId,
           performedBy: null,
         },

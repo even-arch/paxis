@@ -158,6 +158,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       warehouseInUntil: shipment.warehouseInUntil,
       forwarderName: shipment.forwarderName,
       forwarderContact: shipment.forwarderContact,
+      shippingMarks: shipment.shippingMarks,
     } : null,
     packingRows,
   })

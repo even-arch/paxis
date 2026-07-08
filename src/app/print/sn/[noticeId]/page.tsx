@@ -78,6 +78,7 @@ type SNData = {
     warehouseInUntil: string | null
     forwarderName: string | null
     forwarderContact: string | null
+    shippingMarks: string | null
   } | null
   packingRows: PackingRow[]
 }
@@ -354,6 +355,23 @@ function SNDocument({ data }: { data: SNData }) {
         <div style={{ marginTop: '8pt', fontSize: '9pt' }}>
           <b>Remarks:</b>
           <div style={{ whiteSpace: 'pre-wrap' }}>{notice.note}</div>
+        </div>
+      )}
+
+      {/* 麥頭：Patisco DO 其它資訊原文，供供應商出貨前核對 */}
+      {shipment?.shippingMarks && (
+        <div style={{ marginTop: '10pt', fontSize: '9pt' }}>
+          <b>Shipping Marks（嘜頭 — 請於出貨前核對）:</b>
+          <div style={{
+            whiteSpace: 'pre-wrap',
+            border: '1px solid #000',
+            padding: '6pt 8pt',
+            marginTop: '3pt',
+            fontFamily: '"Courier New", monospace',
+            fontSize: '8.5pt',
+            columnCount: 2,
+            columnGap: '16pt',
+          }}>{shipment.shippingMarks}</div>
         </div>
       )}
     </div>

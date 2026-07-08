@@ -1067,6 +1067,10 @@ model SLS {
   forwarderContact   String?    // Forwarder 聯絡資訊
   soNote             String?    // SO 注意事項摘要
 
+  // 麥頭（Shipping Marks）：Patisco DO packingList.termAndCondition 原文
+  // 多張 PI 合併出貨時包含多個 Remark: 區塊，各自對應 PI 號與箱號範圍
+  shippingMarks      String?  @db.Text
+
   // 關聯的 PI 清單（多對多；同一張出貨可包含同一客戶的多張 PI）
   pis            SLS_PI_Link[]
   items          SLS_Item[]

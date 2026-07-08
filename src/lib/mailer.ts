@@ -85,6 +85,7 @@ export interface ShippingNoticeEmailData {
   deliverToName?: string | null
   deliverToAddress?: string | null
   deliverToContact?: string | null
+  shippingMarks?: string | null
   items: Array<{
     poNo: string
     productSku: string | null
@@ -101,7 +102,7 @@ export async function sendShippingNoticeEmail(to: string, data: ShippingNoticeEm
   const {
     noticeNo, supplierName, supplierContact, issueDate,
     deliverToName, deliverToAddress, deliverToContact,
-    items, companyName, companyEmail, noticeUrl,
+    shippingMarks, items, companyName, companyEmail, noticeUrl,
   } = data
 
   const itemsHtml = items.map(item => `
@@ -149,6 +150,12 @@ export async function sendShippingNoticeEmail(to: string, data: ShippingNoticeEm
           ${itemsHtml}
         </tbody>
       </table>
+
+      ${shippingMarks ? `
+        <h3 style="color:#1e40af;margin:24px 0 12px 0">嘜頭 Shipping Marks（請於出貨前核對）</h3>
+        <pre style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;font-family:'Courier New',monospace;font-size:12px;color:#374151;white-space:pre-wrap;margin:0 0 8px 0">${shippingMarks}</pre>
+        <p style="color:#6b7280;font-size:12px;margin:0 0 16px 0">請核對上列嘜頭、訂單號與箱號範圍是否與貴司備貨一致，如有出入請儘速告知。</p>
+      ` : ''}
 
       <p style="color:#374151;margin:24px 0">請在準備好貨物後盡快回覆確認。如有任何問題，歡迎與我們聯繫。</p>
 

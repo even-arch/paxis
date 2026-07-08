@@ -25,6 +25,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
             product: { select: { sku: true, name: true } },
           },
         },
+        sourceShipment: { select: { shippingMarks: true } },
       },
     })
 
@@ -45,6 +46,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
       deliverToName: notice.deliverToName,
       deliverToAddress: notice.deliverToAddress,
       deliverToContact: notice.deliverToContact,
+      shippingMarks: notice.sourceShipment?.shippingMarks ?? null,
       items: notice.items.map(item => ({
         poNo: item.po.poNo,
         productSku: item.product.sku,
