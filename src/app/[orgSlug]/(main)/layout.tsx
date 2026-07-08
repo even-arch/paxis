@@ -28,7 +28,10 @@ export default async function MainLayout({
   let companyName = 'PAXIS'
   try {
     const company = await db.sYS_Company.findFirst()
-    companyName = company?.shortName || company?.nameZh || 'PAXIS'
+    if (!company || (!company.nameZh && !company.nameEn && !company.shortName)) {
+      redirect(`/${params.orgSlug}/onboarding`)
+    }
+    companyName = company.shortName || company.nameZh || 'PAXIS'
   } catch { /* schema 尚未建好時不 crash */ }
 
   return (
