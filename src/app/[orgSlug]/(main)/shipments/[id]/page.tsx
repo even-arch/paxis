@@ -7,6 +7,7 @@ import { formatDate } from '@/lib/utils'
 import ShipmentItemTable, { type ShipmentGroupData } from './ShipmentItemTable'
 import ConfirmShipmentButton from './ConfirmShipmentButton'
 import ShippingNoticePanel from './ShippingNoticePanel'
+import SOImportButton from './SOImportButton'
 import LinkPOButton from '@/app/[orgSlug]/(main)/sales/pi/[piId]/LinkPOButton'
 
 type Props = { params: { orgSlug: string; id: string } }
@@ -217,6 +218,49 @@ export default async function ShipmentDetailPage({ params }: Props) {
           </div>
         )
       })()}
+
+      <div className="bg-white rounded-lg shadow p-5 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">船務資訊（SO）</h2>
+          <SOImportButton shipmentId={shipment.id} />
+        </div>
+        {shipment.soNo || shipment.vesselVoyage || shipment.containerYard ? (
+          <div className="grid grid-cols-2 gap-x-8">
+            <div>
+              <Row label="S/O 號碼" value={shipment.soNo && <span className="font-mono">{shipment.soNo}</span>} />
+              <Row label="船名 / 航次" value={shipment.vesselVoyage} />
+              <Row label="船公司" value={shipment.shippingLine} />
+              <Row label="貨櫃場" value={shipment.containerYard && <span className="font-medium text-indigo-700">{shipment.containerYard}</span>} />
+              <Row label="Forwarder" value={shipment.forwarderName} />
+            </div>
+            <div>
+              <Row label="結關日" value={formatDate(shipment.customsClosingDate)} />
+              <Row label="進倉期間" value={
+                (shipment.warehouseInFrom || shipment.warehouseInUntil)
+                  ? `${formatDate(shipment.warehouseInFrom) ?? '?'} ～ ${formatDate(shipment.warehouseInUntil) ?? '?'}`
+                  : null
+              } />
+              <Row label="ETD / ETA" value={
+                (shipment.soEtd || shipment.soEta)
+                  ? `${formatDate(shipment.soEtd) ?? '?'} → ${formatDate(shipment.soEta) ?? '?'}`
+                  : null
+              } />
+              <Row label="收貨地" value={shipment.placeOfReceipt} />
+            </div>
+            {shipment.soNote && (
+              <div className="col-span-2 mt-2 pt-2 border-t border-gray-100">
+                <p className="text-xs text-gray-400 mb-1">SO 注意事項</p>
+                <p className="text-xs text-gray-600 whitespace-pre-wrap">{shipment.soNote}</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-xs text-gray-400">
+            尚未匯入 SO。收到報關行的裝船通知單後，按右上角按鈕上傳（支援 Word / PDF / Excel / 圖片），
+            AI 會解析出 S/O 號碼、船名航次、結關日、貨櫃場、進倉期限，並自動帶入出貨通知單的交貨地點。
+          </p>
+        )}
+      </div>
 
       <ShippingNoticePanel shipmentId={shipment.id} />
 

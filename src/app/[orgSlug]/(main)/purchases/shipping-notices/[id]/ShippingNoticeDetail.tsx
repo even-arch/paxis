@@ -200,6 +200,13 @@ export default function ShippingNoticeDetail({ notice }: ShippingNoticeDetailPro
           </div>
 
           <div className="flex gap-2">
+            <a
+              href={`/print/sn/${notice.id}`}
+              target="_blank"
+              className="border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 text-sm px-4 py-2 rounded-lg whitespace-nowrap"
+            >
+              🖨 A4 列印
+            </a>
             {notice.status === 'DRAFT' && notice.supplier.email && (
               <button
                 onClick={handleSendEmail}

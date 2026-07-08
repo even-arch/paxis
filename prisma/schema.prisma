@@ -1052,6 +1052,21 @@ model SLS {
 
   note        String?
 
+  // 裝船通知單（SO / Shipping Order）資料 — 由報關行文件 AI 匯入
+  soNo               String?    // S/O 號碼（如 S312）
+  vesselVoyage       String?    // 船名/航次（如 YM TOPMOST 025W）
+  shippingLine       String?    // 船公司（如 陽明 YML）
+  customsClosingDate DateTime?  // 結關日
+  soEtd              DateTime?  // 預計開船日
+  soEta              DateTime?  // 預計到港日
+  containerYard      String?    // 貨櫃場（供應商交貨地點，如 桃園長榮 5 庫）
+  placeOfReceipt     String?    // 收貨地（如 KEELUNG）
+  warehouseInFrom    DateTime?  // 最早進倉日
+  warehouseInUntil   DateTime?  // 最晚進倉期限
+  forwarderName      String?    // Forwarder 名稱
+  forwarderContact   String?    // Forwarder 聯絡資訊
+  soNote             String?    // SO 注意事項摘要
+
   // 關聯的 PI 清單（多對多；同一張出貨可包含同一客戶的多張 PI）
   pis            SLS_PI_Link[]
   items          SLS_Item[]

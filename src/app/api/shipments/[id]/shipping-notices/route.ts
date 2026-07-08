@@ -42,6 +42,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
   const shipment = await prisma.sLS.findUnique({
     where: { id: shipmentId },
     include: {
+      // SO 船務資料（自動帶入通知單交貨地點/期限）在 scalar 欄位上，include 自動包含
       pis: {
         include: {
           pi: {
@@ -181,6 +182,17 @@ export async function POST(_req: NextRequest, { params }: Params) {
     countToday++
     const noticeNo = `SN-${today}-${String(countToday).padStart(4, '0')}`
 
+    // 交貨地點與期限：優先帶 SO 資料（貨櫃場 + 進倉期限）
+    const noteLines = [`由出貨單 ${shipment.shipmentNo} 產生`]
+    if (shipment.warehouseInUntil) {
+      const d = shipment.warehouseInUntil.toISOString().slice(0, 10)
+      noteLines.push(`最晚進倉期限：${d}`)
+    }
+    if (shipment.customsClosingDate) {
+      const d = shipment.customsClosingDate.toISOString().slice(0, 10)
+      noteLines.push(`結關日：${d}`)
+    }
+
     const notice = await prisma.pO_ShippingNotice.create({
       data: {
         noticeNo,
@@ -188,7 +200,8 @@ export async function POST(_req: NextRequest, { params }: Params) {
         issueDate: new Date(),
         status: 'DRAFT',
         sourceShipmentId: shipmentId,
-        note: `由出貨單 ${shipment.shipmentNo} 產生`,
+        deliverToName: shipment.containerYard ?? null,
+        note: noteLines.join('\n'),
         performedBy: userId,
         items: { create: items },
       },

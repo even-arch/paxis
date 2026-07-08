@@ -73,6 +73,13 @@ export async function extractFileText(buffer: Buffer, mimeType: string, filename
     return lines.join('\n')
   }
 
+  if (ext === 'docx' || mimeType.includes('wordprocessingml')) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mammoth = require('mammoth') as { extractRawText: (o: { buffer: Buffer }) => Promise<{ value: string }> }
+    const result = await mammoth.extractRawText({ buffer })
+    return result.value
+  }
+
   if (ext === 'pdf' || mimeType === 'application/pdf') {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
