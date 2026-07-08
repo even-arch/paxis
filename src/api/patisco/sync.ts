@@ -705,7 +705,26 @@ export async function step4_slsOrders(prisma: PrismaClient, jobId: number): Prom
 
 export async function step5_poOrders(prisma: PrismaClient, jobId: number): Promise<SyncStepResult> {
   const r: SyncStepResult = { created: 0, updated: 0, skipped: 0, errors: [] }
-  const records = await getRawRecords(prisma, 'PO')
+  const allRecords = await getRawRecords(prisma, 'PO')
+
+  // Patisco 可能有同號多 doc（誤建空殼、修訂重開）。每個 poNo 只取一筆：
+  // 優先取有 products 的；同樣有 products 時取 docId 較大（較晚建立）的
+  const byNo = new Map<string, RawSyncRecord>()
+  for (const rec of allRecords) {
+    const no = rec.patiscoDocNo.trim() || rec.patiscoDocId
+    const productCount = ((rec.result as { products?: unknown[] })?.products ?? []).length
+    const prev = byNo.get(no)
+    if (!prev) { byNo.set(no, rec); continue }
+    const prevCount = ((prev.result as { products?: unknown[] })?.products ?? []).length
+    const better =
+      (productCount > 0 && prevCount === 0) ||
+      (productCount > 0 && prevCount > 0 && rec.patiscoDocId > prev.patiscoDocId)
+    if (better) byNo.set(no, rec)
+  }
+  const records = Array.from(byNo.values())
+  if (records.length < allRecords.length) {
+    console.log(`[step5] 同號去重：${allRecords.length} → ${records.length} 筆（略過空殼/舊版 doc）`)
+  }
 
   for (const rec of records) {
     try {
@@ -737,7 +756,7 @@ export async function step5_poOrders(prisma: PrismaClient, jobId: number): Promi
 
       const existing = await prisma.pO.findUnique({
         where: { poNo },
-        select: { id: true },
+        select: { id: true, _count: { select: { items: true } } },
       })
 
       // 嘗試連結 PO_CustomerCopy（同訂單號碼）
@@ -755,6 +774,7 @@ export async function step5_poOrders(prisma: PrismaClient, jobId: number): Promi
 
       if (existing) {
         // 既有記錄：更新幣別、金額、狀態（不改 source/supplier/poNo）
+        // patiscoOrderId 一併更新，確保指向去重後選中的 doc（有品項的那張）
         await prisma.pO.update({
           where: { id: existing.id },
           data: {
@@ -763,11 +783,35 @@ export async function step5_poOrders(prisma: PrismaClient, jobId: number): Promi
             orderDate,
             expectedDate,
             patiscoCreatedAt,
+            patiscoOrderId: rec.patiscoDocId,
+            patiscoOrderNo: rec.patiscoDocNo,
             patiscoStatus,
             salesOrderId: salesOrder?.id ?? undefined,
             syncJobId: jobId,
           },
         })
+
+        // 既有 PO 沒有品項但 raw 有 products → 補品項
+        // （曾被空殼 doc 建立、或品項後來才在 Patisco 填上的情況）
+        if (existing._count.items === 0 && (raw.products ?? []).length > 0) {
+          for (const p of (raw.products ?? [])) {
+            const sku = p.sku?.trim()
+            if (!sku) continue
+            const product = await prisma.pRD_Product.findUnique({ where: { sku }, select: { id: true } })
+            if (!product) continue
+            await prisma.pO_Item.create({
+              data: {
+                orderId: existing.id,
+                productId: product.id,
+                unitPrice: toDecimal(p.price),
+                quantity: toInt(p.quantity),
+                unit: p.unit?.trim() ?? undefined,
+                productNameSnapshot: p.specification?.trim() || p.modelNo?.trim() || undefined,
+              },
+            })
+          }
+          console.log(`[step5] PO ${poNo} 原本 0 品項，已從 doc ${rec.patiscoDocId} 補上`)
+        }
         r.updated++
         continue
       }
