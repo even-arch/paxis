@@ -14,7 +14,10 @@ export default async function MainLayout({
   params: { orgSlug: string }
 }) {
   const session = await getServerSession(authOptions)
-  if (!session) redirect(`/${params.orgSlug}/login`)
+  // 防止 A 租戶的 session cookie 滲透到 B 租戶的頁面
+  if (!session || (session.user as { orgSlug?: string })?.orgSlug !== params.orgSlug) {
+    redirect(`/${params.orgSlug}/login`)
+  }
 
   const org = await masterPrisma.oRG.findUnique({
     where: { slug: params.orgSlug },

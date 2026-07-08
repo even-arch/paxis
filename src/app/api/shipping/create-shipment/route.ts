@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getRequestPrisma } from '@/lib/request-db'
-import { getSystemSetting, setSystemSetting } from '@/lib/system-settings'
+import { resolveUpsCreds } from '@/lib/ups'
 import { getUpsAccessToken } from '@/lib/shipping/ups-auth'
 import { createUpsShipment } from '@/lib/shipping/ups-shipment'
 import type { ShippingAddress, ShippingPackage } from '@/lib/shipping/types'
@@ -42,14 +42,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const [dbAccountNo] = await Promise.all([
-      getSystemSetting('ups_xinosys_account_no'),
-    ])
-    const accountNo = dbAccountNo?.trim() || process.env.XINOSYS_UPS_ACCOUNT_NO || process.env.UPS_ACCOUNT_NO
-    if (!accountNo) {
-      return NextResponse.json({ error: 'UPS 帳號未設定，請至 /admin/settings/ups 設定' }, { status: 503 })
+    const creds = await resolveUpsCreds(prisma)
+    if (!creds) {
+      return NextResponse.json({ error: 'UPS 服務尚未開通，請聯繫錫諾系統或至「設定 → UPS」設定自有帳號' }, { status: 503 })
     }
 
+    const { accountNo } = creds
     const accessToken = await getUpsAccessToken()
 
     const result = await createUpsShipment({

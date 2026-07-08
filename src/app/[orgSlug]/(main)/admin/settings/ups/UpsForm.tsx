@@ -1,131 +1,136 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
-type Source = 'db' | 'env' | 'none'
-
-interface Props {
-  initialAccountNo: string | null
-  source: Source
-  initialMultiplier: number | null
+interface UpsConfig {
+  upsMode: 'disabled' | 'managed' | 'own'
+  ownAccountNo: string
+  ownDiscountMultiplier: number | null
 }
 
-export default function UpsForm({ initialAccountNo, source, initialMultiplier }: Props) {
-  const [accountNo, setAccountNo] = useState(initialAccountNo ?? '')
-  const [multiplier, setMultiplier] = useState(
-    initialMultiplier != null ? String(initialMultiplier) : ''
-  )
+export default function UpsForm() {
+  const [config, setConfig] = useState<UpsConfig | null>(null)
+  const [ownAccountNo, setOwnAccountNo] = useState('')
+  const [ownMultiplier, setOwnMultiplier] = useState('')
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault()
-    setSaving(true)
-    setMsg(null)
+  useEffect(() => {
+    fetch('/api/settings/ups').then(r => r.json()).then((d: UpsConfig) => {
+      setConfig(d)
+      setOwnAccountNo(d.ownAccountNo ?? '')
+      setOwnMultiplier(d.ownDiscountMultiplier != null ? String(d.ownDiscountMultiplier) : '')
+    })
+  }, [])
 
-    // 驗證折扣係數
-    const multiplierVal = multiplier.trim()
-    if (multiplierVal !== '') {
-      const n = parseFloat(multiplierVal)
-      if (isNaN(n) || n <= 0 || n > 1) {
-        setMsg({ type: 'err', text: '折扣係數必須介於 0（不含）至 1 之間，例如 0.35' })
+  async function save(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true); setMsg(null)
+    try {
+      const multiplierVal = ownMultiplier.trim() ? parseFloat(ownMultiplier) : null
+      if (ownMultiplier.trim() && (isNaN(multiplierVal!) || multiplierVal! <= 0 || multiplierVal! > 1)) {
+        setMsg({ type: 'err', text: '折扣係數須介於 0（不含）至 1 之間' })
         setSaving(false)
         return
       }
-    }
-
-    try {
-      const res = await fetch('/api/admin/settings/ups', {
+      const res = await fetch('/api/settings/ups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accountNo,
-          discountMultiplier: multiplierVal === '' ? null : parseFloat(multiplierVal),
-        }),
+        body: JSON.stringify({ ownAccountNo, ownDiscountMultiplier: multiplierVal }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? '儲存失敗')
-      setMsg({ type: 'ok', text: '已儲存' })
-    } catch (err: unknown) {
-      setMsg({ type: 'err', text: err instanceof Error ? err.message : '儲存失敗' })
+      if (res.ok) {
+        setMsg({ type: 'ok', text: '已儲存' })
+        const updated: UpsConfig = await fetch('/api/settings/ups').then(r => r.json())
+        setConfig(updated)
+      } else {
+        const d = await res.json() as { error?: string }
+        setMsg({ type: 'err', text: d.error ?? '儲存失敗' })
+      }
+    } catch (err) {
+      setMsg({ type: 'err', text: `網路錯誤：${err instanceof Error ? err.message : String(err)}` })
     } finally {
       setSaving(false)
     }
   }
 
-  const sourceLabel: Record<Source, string> = {
-    db: '✅ 目前使用 DB 設定',
-    env: '⚠️ 目前使用環境變數（XINOSYS_UPS_ACCOUNT_NO）',
-    none: '❌ 尚未設定',
-  }
+  if (!config) return <div className="text-sm text-gray-400">載入中…</div>
+
+  const platformEnabled = config.upsMode === 'managed'
+  const hasOwnAccount = !!config.ownAccountNo.trim()
+  const activeSource = hasOwnAccount ? 'own' : platformEnabled ? 'managed' : 'none'
 
   return (
-    <form onSubmit={handleSave} className="space-y-6">
+    <div className="space-y-8">
 
-      {/* Account Number */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-medium text-gray-700">帳號設定</h3>
-        <div className="text-xs px-3 py-2 rounded-md bg-gray-50 border text-gray-500">
-          {sourceLabel[source]}
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-sm text-gray-600">錫諾系統 UPS Account Number</label>
-          <input
-            type="text"
-            value={accountNo}
-            onChange={e => setAccountNo(e.target.value)}
-            placeholder="例：872Y1F"
-            className="w-full border rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <p className="text-xs text-gray-400">
-            留空可清除 DB 值，系統將 fallback 至環境變數 XINOSYS_UPS_ACCOUNT_NO。
-          </p>
-        </div>
+      {/* ── 目前狀態 ─── */}
+      <div className={`rounded-lg border px-4 py-3 text-sm ${
+        activeSource === 'none'
+          ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
+          : 'bg-green-50 border-green-200 text-green-800'
+      }`}>
+        {activeSource === 'own' && <span>✓ 目前使用自有 UPS 帳號（{config.ownAccountNo.slice(0,2)}****）</span>}
+        {activeSource === 'managed' && <span>✓ 目前使用平台代管 UPS 服務（錫諾系統帳號）</span>}
+        {activeSource === 'none' && <span>⚠ UPS 服務尚未開通。若需使用出貨功能，請聯繫錫諾系統開通，或填寫自有帳號。</span>}
       </div>
 
-      {/* Discount Multiplier */}
-      <div className="space-y-3 border-t pt-5">
-        <div>
-          <h3 className="text-sm font-medium text-gray-700">契約折扣係數</h3>
-          <p className="text-xs text-gray-400 mt-0.5">
-            實際帳單金額 ÷ UPS API 報價。例如帳單 NT$11,316 ÷ API 報價 NT$31,329 ≈ <strong>0.361</strong>
-          </p>
-          <p className="text-xs text-gray-400 mt-0.5">
-            套用後，查詢結果顯示的「契約估算金額」= API 報價 × 此係數。留空則不套用。
-          </p>
+      {/* ── 平台代管 ─── */}
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-gray-700">平台代管 UPS（由錫諾系統提供）</h2>
+        <div className={`rounded-lg border px-4 py-3 text-sm ${
+          platformEnabled
+            ? 'border-blue-200 bg-blue-50 text-blue-800'
+            : 'border-gray-200 bg-gray-50 text-gray-500'
+        }`}>
+          {platformEnabled
+            ? '✓ 錫諾系統已為您開通平台代管 UPS，享有錫諾合約折扣費率。'
+            : '目前尚未開通。請聯繫錫諾系統，由後台為您開通。'}
         </div>
-        <div className="flex items-center gap-3">
-          <input
-            type="number"
-            value={multiplier}
-            onChange={e => setMultiplier(e.target.value)}
-            min={0.01}
-            max={1}
-            step={0.001}
-            placeholder="例：0.361"
-            className="w-36 border rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          {multiplier && (
-            <span className="text-xs text-gray-500">
-              = API 報價打 {(parseFloat(multiplier) * 10).toFixed(2)} 折
-            </span>
+        <p className="text-xs text-gray-400">平台代管帳號由錫諾系統管理，優先順序低於自有帳號。</p>
+      </section>
+
+      {/* ── 自有帳號 ─── */}
+      <section>
+        <h2 className="text-sm font-semibold text-gray-700 mb-3">自有 UPS 帳號（選填）</h2>
+        <form onSubmit={save} className="space-y-4">
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">UPS Account Number</label>
+            <input
+              type="text"
+              value={ownAccountNo}
+              onChange={e => setOwnAccountNo(e.target.value)}
+              placeholder="6 位英數字，例：872Y1F"
+              className="w-64 border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-xs text-gray-400 mt-1">填入後將優先使用自有帳號，清空則恢復使用平台代管（若已開通）。</p>
+          </div>
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">合約折扣係數（選填）</label>
+            <input
+              type="number"
+              value={ownMultiplier}
+              onChange={e => setOwnMultiplier(e.target.value)}
+              min={0.01} max={1} step={0.001}
+              placeholder="例：0.361"
+              className="w-36 border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-xs text-gray-400 mt-1">實際帳單 ÷ API 報價，用於估算契約金額。</p>
+          </div>
+
+          {msg && (
+            <p className={`text-sm ${msg.type === 'ok' ? 'text-green-600' : 'text-red-600'}`}>
+              {msg.type === 'ok' ? '✓ ' : '✗ '}{msg.text}
+            </p>
           )}
-        </div>
-      </div>
 
-      {msg && (
-        <p className={`text-xs ${msg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>
-          {msg.type === 'ok' ? '✅ ' : '❌ '}{msg.text}
-        </p>
-      )}
-
-      <button
-        type="submit"
-        disabled={saving}
-        className="bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
-      >
-        {saving ? '儲存中…' : '儲存'}
-      </button>
-    </form>
+          <button
+            type="submit"
+            disabled={saving}
+            className="bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? '儲存中…' : '儲存自有帳號設定'}
+          </button>
+        </form>
+      </section>
+    </div>
   )
 }

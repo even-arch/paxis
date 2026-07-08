@@ -8,7 +8,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getUpsAccessToken } from '@/lib/shipping/ups-auth'
 import { getUpsRates } from '@/lib/shipping/ups-rating'
-import { getSystemSetting, setSystemSetting } from '@/lib/system-settings'
+import { getRequestPrisma } from '@/lib/request-db'
+import { resolveUpsCreds } from '@/lib/ups'
 import type { GetRatesInput } from '@/lib/shipping/types'
 
 export async function POST(req: NextRequest) {
@@ -24,17 +25,14 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const [dbAccountNo, dbMultiplier] = await Promise.all([
-      getSystemSetting('ups_xinosys_account_no'),
-      getSystemSetting('ups_discount_multiplier'),
-    ])
+    const tenantDb = await getRequestPrisma()
+    const creds = await resolveUpsCreds(tenantDb)
 
-    const accountNo = dbAccountNo?.trim() || process.env.XINOSYS_UPS_ACCOUNT_NO || process.env.UPS_ACCOUNT_NO
-    if (!accountNo) {
-      return NextResponse.json({ error: 'UPS 帳號未設定，請至 /admin/settings/ups 設定' }, { status: 503 })
+    if (!creds) {
+      return NextResponse.json({ error: 'UPS 服務尚未開通，請聯繫錫諾系統或至「設定 → UPS」設定自有帳號', upsNotEnabled: true }, { status: 503 })
     }
 
-    const discountMultiplier = dbMultiplier?.trim() ? parseFloat(dbMultiplier) : null
+    const { accountNo, discountMultiplier } = creds
 
     const accessToken = await getUpsAccessToken()
     const options = await getUpsRates(

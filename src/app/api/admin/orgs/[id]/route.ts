@@ -72,7 +72,7 @@ export async function PATCH(
       }
     }
 
-    // Create first user in org DB if we have credentials
+    // Create first user and company record in org DB if we have credentials
     if (pendingCreds) {
       try {
         const db = getOrgPrisma(databaseUrl, org.slug)
@@ -86,6 +86,13 @@ export async function PATCH(
           },
           update: {},
         })
+        // 寫入受邀方在申請時填寫的公司名稱，避免第一次登入還要重填
+        const existingCompany = await db.sYS_Company.findFirst()
+        if (!existingCompany) {
+          await db.sYS_Company.create({
+            data: { nameZh: org.name ?? '', email: org.ownerEmail ?? '' },
+          })
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         return NextResponse.json({ error: `建立使用者失敗：${msg}` }, { status: 500 })
