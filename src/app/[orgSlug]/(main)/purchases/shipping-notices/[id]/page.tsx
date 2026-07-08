@@ -17,7 +17,7 @@ export default async function ShippingNoticeDetailPage({
   const notice = await prisma.pO_ShippingNotice.findUnique({
     where: { id },
     include: {
-      supplier: { select: { id: true, name: true, email: true, contactPerson: true } },
+      supplier: { select: { id: true, name: true, email: true, contactPerson: true, phoneNo: true, address: true, city: true, countryCode: true } },
       items: {
         include: {
           po: { select: { id: true, poNo: true } },
@@ -25,10 +25,17 @@ export default async function ShippingNoticeDetailPage({
         },
       },
       performer: { select: { id: true, name: true } },
+      sourceShipment: { select: { id: true, shipmentNo: true } },
     },
   })
 
   if (!notice) notFound()
+
+  // Decimal → string，避免 Server → Client 序列化錯誤
+  const serialized = {
+    ...notice,
+    items: notice.items.map(it => ({ ...it, unitPrice: it.unitPrice?.toString() ?? null })),
+  }
 
   return (
     <div className="max-w-4xl">
@@ -43,7 +50,7 @@ export default async function ShippingNoticeDetailPage({
         </span>
       </div>
 
-      <ShippingNoticeDetail notice={notice} />
+      <ShippingNoticeDetail notice={serialized} />
     </div>
   )
 }

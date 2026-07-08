@@ -18,7 +18,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
     const notice = await globalPrisma.pO_ShippingNotice.findUnique({
       where: { id },
       include: {
-        supplier: { select: { id: true, name: true, email: true } },
+        supplier: { select: { id: true, name: true, email: true, contactPerson: true } },
         items: {
           include: {
             po: { select: { poNo: true } },
@@ -40,7 +40,11 @@ export async function POST(_req: NextRequest, { params }: Params) {
     const emailData = {
       noticeNo: notice.noticeNo,
       supplierName: notice.supplier.name,
+      supplierContact: notice.supplier.contactPerson,
       issueDate: notice.issueDate.toISOString().slice(0, 10),
+      deliverToName: notice.deliverToName,
+      deliverToAddress: notice.deliverToAddress,
+      deliverToContact: notice.deliverToContact,
       items: notice.items.map(item => ({
         poNo: item.po.poNo,
         productSku: item.product.sku,

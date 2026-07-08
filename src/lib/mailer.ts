@@ -80,7 +80,11 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string, compa
 export interface ShippingNoticeEmailData {
   noticeNo: string
   supplierName: string
+  supplierContact?: string | null
   issueDate: string
+  deliverToName?: string | null
+  deliverToAddress?: string | null
+  deliverToContact?: string | null
   items: Array<{
     poNo: string
     productSku: string | null
@@ -94,7 +98,11 @@ export interface ShippingNoticeEmailData {
 }
 
 export async function sendShippingNoticeEmail(to: string, data: ShippingNoticeEmailData) {
-  const { noticeNo, supplierName, issueDate, items, companyName, companyEmail, noticeUrl } = data
+  const {
+    noticeNo, supplierName, supplierContact, issueDate,
+    deliverToName, deliverToAddress, deliverToContact,
+    items, companyName, companyEmail, noticeUrl,
+  } = data
 
   const itemsHtml = items.map(item => `
     <tr style="border-bottom:1px solid #e5e7eb">
@@ -109,13 +117,22 @@ export async function sendShippingNoticeEmail(to: string, data: ShippingNoticeEm
   const html = `
     <div style="font-family:sans-serif;max-width:700px;margin:0 auto;padding:32px">
       <h2 style="color:#1e40af;margin-bottom:8px">${companyName}</h2>
-      <p style="color:#374151">親愛的 ${supplierName}，</p>
+      <p style="color:#374151">親愛的 ${supplierName}${supplierContact ? `（${supplierContact}）` : ''}，</p>
       <p style="color:#374151">我們特此通知您，以下訂單的貨物將準備出貨。請根據通知內容準備相應的產品。</p>
 
       <div style="background:#f3f4f6;padding:16px;border-radius:8px;margin:24px 0">
         <p style="color:#374151;margin:0 0 12px 0"><strong>出貨通知單號：</strong>${noticeNo}</p>
         <p style="color:#374151;margin:0"><strong>通知日期：</strong>${issueDate}</p>
       </div>
+
+      ${(deliverToName || deliverToAddress) ? `
+        <div style="background:#fefce8;border:1px solid #fde047;padding:16px;border-radius:8px;margin:24px 0">
+          <h3 style="color:#a16207;margin:0 0 12px 0;font-size:15px">📦 交貨地點</h3>
+          ${deliverToName ? `<p style="color:#374151;margin:0 0 8px 0"><strong>收貨方：</strong>${deliverToName}</p>` : ''}
+          ${deliverToAddress ? `<p style="color:#374151;margin:0 0 8px 0"><strong>地址：</strong>${deliverToAddress}</p>` : ''}
+          ${deliverToContact ? `<p style="color:#374151;margin:0"><strong>聯絡人：</strong>${deliverToContact}</p>` : ''}
+        </div>
+      ` : ''}
 
       <h3 style="color:#1e40af;margin:24px 0 12px 0">出貨品項清單</h3>
       <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb">

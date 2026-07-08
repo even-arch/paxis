@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { formatDate } from '@/lib/utils'
+import { useOrgPath } from '@/lib/use-org-path'
 
 interface ShippingNoticeDetailProps {
   notice: {
@@ -10,11 +11,19 @@ interface ShippingNoticeDetailProps {
     issueDate: Date
     status: string
     note: string | null
+    deliverToName: string | null
+    deliverToAddress: string | null
+    deliverToContact: string | null
+    sourceShipment: { id: number; shipmentNo: string } | null
     supplier: {
       id: number
       name: string
       email: string | null
       contactPerson: string | null
+      phoneNo: string | null
+      address: string | null
+      city: string | null
+      countryCode: string | null
     }
     items: Array<{
       id: number
@@ -40,12 +49,38 @@ interface PONotificationHistory {
 }
 
 export default function ShippingNoticeDetail({ notice }: ShippingNoticeDetailProps) {
+  const orgPath = useOrgPath()
   const [sendingEmail, setSendingEmail] = useState(false)
   const [emailError, setEmailError] = useState('')
   const [emailSuccess, setEmailSuccess] = useState(false)
   const [poHistory, setPoHistory] = useState<Record<number, PONotificationHistory[]>>({})
   const [reverting, setReverting] = useState(false)
   const [revertError, setRevertError] = useState('')
+
+  // 交貨地點編輯
+  const [deliverToName, setDeliverToName] = useState(notice.deliverToName ?? '')
+  const [deliverToAddress, setDeliverToAddress] = useState(notice.deliverToAddress ?? '')
+  const [deliverToContact, setDeliverToContact] = useState(notice.deliverToContact ?? '')
+  const [savingDeliver, setSavingDeliver] = useState(false)
+  const [deliverSaved, setDeliverSaved] = useState(false)
+
+  async function saveDeliverTo() {
+    setSavingDeliver(true)
+    setDeliverSaved(false)
+    try {
+      const res = await fetch(`/api/shipping-notices/${notice.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deliverToName, deliverToAddress, deliverToContact }),
+      })
+      if (res.ok) {
+        setDeliverSaved(true)
+        setTimeout(() => setDeliverSaved(false), 2000)
+      }
+    } finally {
+      setSavingDeliver(false)
+    }
+  }
 
   // 載入每張 PO 的通知歷史
   useEffect(() => {
@@ -78,6 +113,12 @@ export default function ShippingNoticeDetail({ notice }: ShippingNoticeDetailPro
     setEmailSuccess(false)
 
     try {
+      // 寄出前先存交貨地點，確保 Email 帶到最新內容
+      await fetch(`/api/shipping-notices/${notice.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deliverToName, deliverToAddress, deliverToContact }),
+      })
       const res = await fetch(`/api/shipping-notices/${notice.id}/send-email`, {
         method: 'POST',
       })
@@ -134,9 +175,27 @@ export default function ShippingNoticeDetail({ notice }: ShippingNoticeDetailPro
                 <span className="text-gray-800 font-mono text-xs">{notice.supplier.email || '未設定'}</span>
               </div>
               <div className="flex gap-4">
+                <span className="text-gray-400 w-24">電話</span>
+                <span className="text-gray-800">{notice.supplier.phoneNo || '—'}</span>
+              </div>
+              <div className="flex gap-4">
+                <span className="text-gray-400 w-24">地址</span>
+                <span className="text-gray-800">
+                  {[notice.supplier.address, notice.supplier.city, notice.supplier.countryCode].filter(Boolean).join(', ') || '—'}
+                </span>
+              </div>
+              <div className="flex gap-4">
                 <span className="text-gray-400 w-24">通知日期</span>
                 <span className="text-gray-800">{formatDate(notice.issueDate)}</span>
               </div>
+              {notice.sourceShipment && (
+                <div className="flex gap-4">
+                  <span className="text-gray-400 w-24">來源出貨單</span>
+                  <a href={orgPath(`/shipments/${notice.sourceShipment.id}`)} className="text-teal-600 hover:underline font-mono text-xs">
+                    {notice.sourceShipment.shipmentNo}
+                  </a>
+                </div>
+              )}
             </div>
           </div>
 
@@ -168,6 +227,64 @@ export default function ShippingNoticeDetail({ notice }: ShippingNoticeDetailPro
           <div className="mt-4 pt-4 border-t border-gray-100">
             <p className="text-xs text-gray-500 mb-1">備註</p>
             <p className="text-sm text-gray-700 whitespace-pre-wrap">{notice.note}</p>
+          </div>
+        )}
+      </div>
+
+      {/* 交貨地點 */}
+      <div className="bg-white rounded-lg shadow p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">交貨地點（供應商要出貨到哪裡）</h2>
+          {notice.status === 'DRAFT' && (
+            <div className="flex items-center gap-2">
+              {deliverSaved && <span className="text-xs text-green-600">✓ 已儲存</span>}
+              <button
+                onClick={saveDeliverTo}
+                disabled={savingDeliver}
+                className="text-xs px-3 py-1.5 rounded border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50">
+                {savingDeliver ? '儲存中...' : '儲存'}
+              </button>
+            </div>
+          )}
+        </div>
+        {notice.status === 'DRAFT' ? (
+          <div className="grid grid-cols-1 gap-3">
+            <label className="text-sm">
+              <span className="text-gray-400 text-xs block mb-1">收貨方名稱（集貨供應商 / 貨櫃廠 / 我方辦公室）</span>
+              <input value={deliverToName} onChange={e => setDeliverToName(e.target.value)}
+                placeholder="例：○○貨櫃場、△△供應商倉庫"
+                className="w-full px-3 py-2 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            </label>
+            <label className="text-sm">
+              <span className="text-gray-400 text-xs block mb-1">收貨地址</span>
+              <input value={deliverToAddress} onChange={e => setDeliverToAddress(e.target.value)}
+                placeholder="完整地址"
+                className="w-full px-3 py-2 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            </label>
+            <label className="text-sm">
+              <span className="text-gray-400 text-xs block mb-1">收貨聯絡人 / 電話</span>
+              <input value={deliverToContact} onChange={e => setDeliverToContact(e.target.value)}
+                placeholder="例：王先生 0912-345-678"
+                className="w-full px-3 py-2 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            </label>
+            {!deliverToName && !deliverToAddress && (
+              <p className="text-xs text-amber-600">⚠ 尚未填寫交貨地點，寄出前建議先填寫，供應商才知道貨要出到哪裡</p>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2 text-sm">
+            <div className="flex gap-4">
+              <span className="text-gray-400 w-24">收貨方</span>
+              <span className="text-gray-800">{notice.deliverToName || '—'}</span>
+            </div>
+            <div className="flex gap-4">
+              <span className="text-gray-400 w-24">地址</span>
+              <span className="text-gray-800">{notice.deliverToAddress || '—'}</span>
+            </div>
+            <div className="flex gap-4">
+              <span className="text-gray-400 w-24">聯絡人</span>
+              <span className="text-gray-800">{notice.deliverToContact || '—'}</span>
+            </div>
           </div>
         )}
       </div>

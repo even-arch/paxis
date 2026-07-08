@@ -6,6 +6,7 @@ import { orgPath } from '@/lib/org-path'
 import { formatDate } from '@/lib/utils'
 import ShipmentItemTable, { type ShipmentGroupData } from './ShipmentItemTable'
 import ConfirmShipmentButton from './ConfirmShipmentButton'
+import ShippingNoticePanel from './ShippingNoticePanel'
 import LinkPOButton from '@/app/[orgSlug]/(main)/sales/pi/[piId]/LinkPOButton'
 
 type Props = { params: { orgSlug: string; id: string } }
@@ -216,6 +217,8 @@ export default async function ShipmentDetailPage({ params }: Props) {
           </div>
         )
       })()}
+
+      <ShippingNoticePanel shipmentId={shipment.id} />
 
       {shipment.items.length > 0 && (() => {
         // 序列化 Decimal → string，以 PI 分組，傳給 Client Component

@@ -864,6 +864,15 @@ model PO_ShippingNotice {
   issueDate     DateTime
   status        String @default("DRAFT")  // DRAFT | SENT | CONFIRMED
 
+  // 交貨地點：供應商要把貨出到哪裡（集貨供應商 / 貨櫃廠 / 我方辦公室）
+  deliverToName    String?
+  deliverToAddress String?
+  deliverToContact String?   // 聯絡人 / 電話
+
+  // 由哪張出貨單（SLS）驅動產生；手動建立時為 null
+  sourceShipmentId Int?
+  sourceShipment   SLS? @relation(fields: [sourceShipmentId], references: [id])
+
   note          String?
 
   // 操作稽審
@@ -878,6 +887,7 @@ model PO_ShippingNotice {
   @@index([supplierId, status])
   @@index([noticeNo])
   @@index([issueDate])
+  @@index([sourceShipmentId])
   @@map("PO_ShippingNotice")
 }
 
@@ -1050,6 +1060,7 @@ model SLS {
   payables       FIN_Payable[]  @relation("SLS_Payables")
   fobCostItems   SLS_FobCostItem[]
   upsShipments   UPS_Shipment[]
+  shippingNotices PO_ShippingNotice[]
 
   @@index([customerId])
   @@map("SLS")
