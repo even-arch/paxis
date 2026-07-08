@@ -76,13 +76,15 @@ export async function PATCH(
     if (pendingCreds) {
       try {
         const db = getOrgPrisma(databaseUrl, org.slug)
-        await db.sYS_User.create({
-          data: {
+        await db.sYS_User.upsert({
+          where: { loginId: pendingCreds.adminEmail },
+          create: {
             name: org.name || org.ownerEmail,
             loginId: pendingCreds.adminEmail,
             password: pendingCreds.hashedPassword,
             isEnabled: true,
           },
+          update: {},
         })
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
