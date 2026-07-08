@@ -35,6 +35,11 @@ interface ShippingNoticeDetailProps {
     }>
     performer: { id: number; name: string } | null
   }
+  deliverPresets: {
+    office: { name: string; address: string; contact: string } | null
+    containerYard: string | null
+    suppliers: Array<{ id: number; label: string; name: string; address: string; contact: string }>
+  }
 }
 
 interface PONotificationHistory {
@@ -48,7 +53,7 @@ interface PONotificationHistory {
   }>
 }
 
-export default function ShippingNoticeDetail({ notice }: ShippingNoticeDetailProps) {
+export default function ShippingNoticeDetail({ notice, deliverPresets }: ShippingNoticeDetailProps) {
   const orgPath = useOrgPath()
   const [sendingEmail, setSendingEmail] = useState(false)
   const [emailError, setEmailError] = useState('')
@@ -63,6 +68,31 @@ export default function ShippingNoticeDetail({ notice }: ShippingNoticeDetailPro
   const [deliverToContact, setDeliverToContact] = useState(notice.deliverToContact ?? '')
   const [savingDeliver, setSavingDeliver] = useState(false)
   const [deliverSaved, setDeliverSaved] = useState(false)
+  const [deliverMode, setDeliverMode] = useState<'office' | 'supplier' | 'yard' | 'other' | null>(null)
+
+  function applyPreset(mode: 'office' | 'supplier' | 'yard' | 'other', supplierId?: number) {
+    setDeliverMode(mode)
+    if (mode === 'office' && deliverPresets.office) {
+      setDeliverToName(deliverPresets.office.name)
+      setDeliverToAddress(deliverPresets.office.address)
+      setDeliverToContact(deliverPresets.office.contact)
+    } else if (mode === 'yard' && deliverPresets.containerYard) {
+      setDeliverToName(deliverPresets.containerYard)
+      setDeliverToAddress('')
+      setDeliverToContact('')
+    } else if (mode === 'supplier' && supplierId != null) {
+      const s = deliverPresets.suppliers.find(x => x.id === supplierId)
+      if (s) {
+        setDeliverToName(s.name)
+        setDeliverToAddress(s.address)
+        setDeliverToContact(s.contact)
+      }
+    } else if (mode === 'other') {
+      setDeliverToName('')
+      setDeliverToAddress('')
+      setDeliverToContact('')
+    }
+  }
 
   async function saveDeliverTo() {
     setSavingDeliver(true)
@@ -256,6 +286,39 @@ export default function ShippingNoticeDetail({ notice }: ShippingNoticeDetailPro
         </div>
         {notice.status === 'DRAFT' ? (
           <div className="grid grid-cols-1 gap-3">
+            {/* 快速代入 */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {deliverPresets.office && (
+                <button
+                  onClick={() => applyPreset('office')}
+                  className={`text-xs px-3 py-1.5 rounded border ${deliverMode === 'office' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-300 text-gray-600 hover:border-blue-400'}`}>
+                  🏢 我方辦公室
+                </button>
+              )}
+              {deliverPresets.suppliers.length > 0 && (
+                <select
+                  value={deliverMode === 'supplier' ? '' : ''}
+                  onChange={e => { if (e.target.value) applyPreset('supplier', Number(e.target.value)) }}
+                  className={`text-xs px-2 py-1.5 rounded border ${deliverMode === 'supplier' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-300 text-gray-600'}`}>
+                  <option value="">🏭 集貨供應商...</option>
+                  {deliverPresets.suppliers.map(s => (
+                    <option key={s.id} value={s.id}>{s.label}</option>
+                  ))}
+                </select>
+              )}
+              {deliverPresets.containerYard && (
+                <button
+                  onClick={() => applyPreset('yard')}
+                  className={`text-xs px-3 py-1.5 rounded border ${deliverMode === 'yard' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-300 text-gray-600 hover:border-blue-400'}`}>
+                  🚢 貨櫃場（{deliverPresets.containerYard}）
+                </button>
+              )}
+              <button
+                onClick={() => applyPreset('other')}
+                className={`text-xs px-3 py-1.5 rounded border ${deliverMode === 'other' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-300 text-gray-600 hover:border-blue-400'}`}>
+                ✏️ 其他（手動填寫）
+              </button>
+            </div>
             <label className="text-sm">
               <span className="text-gray-400 text-xs block mb-1">收貨方名稱（集貨供應商 / 貨櫃廠 / 我方辦公室）</span>
               <input value={deliverToName} onChange={e => setDeliverToName(e.target.value)}

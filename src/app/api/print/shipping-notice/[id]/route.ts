@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getRequestPrisma } from '@/lib/request-db'
+import { filterMarksForDocNos } from '@/lib/shipping-marks'
 
 type Params = { params: { id: string } }
 
@@ -31,7 +32,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       },
       items: {
         include: {
-          po: { select: { id: true, poNo: true } },
+          po: { select: { id: true, poNo: true, slsPi: { select: { piNo: true } } } },
           product: { select: { id: true, sku: true, name: true, unit: true } },
         },
       },
@@ -158,7 +159,13 @@ export async function GET(_req: NextRequest, { params }: Params) {
       warehouseInUntil: shipment.warehouseInUntil,
       forwarderName: shipment.forwarderName,
       forwarderContact: shipment.forwarderContact,
-      shippingMarks: shipment.shippingMarks,
+      // 麥頭只給該供應商相關單號的 Remark 區塊（依 PO 號與其連結 PI 號比對）
+      shippingMarks: shipment.shippingMarks
+        ? filterMarksForDocNos(
+            shipment.shippingMarks,
+            notice.items.flatMap(it => [it.po.poNo, it.po.slsPi?.piNo].filter((s): s is string => !!s)),
+          )
+        : null,
     } : null,
     packingRows,
   })

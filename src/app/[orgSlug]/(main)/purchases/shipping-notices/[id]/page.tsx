@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { getPagePrisma } from '@/lib/page-db'
 import { formatDate } from '@/lib/utils'
 import { orgPath } from '@/lib/org-path'
@@ -25,7 +27,7 @@ export default async function ShippingNoticeDetailPage({
         },
       },
       performer: { select: { id: true, name: true } },
-      sourceShipment: { select: { id: true, shipmentNo: true } },
+      sourceShipment: { select: { id: true, shipmentNo: true, containerYard: true } },
     },
   })
 
@@ -35,6 +37,41 @@ export default async function ShippingNoticeDetailPage({
   const serialized = {
     ...notice,
     items: notice.items.map(it => ({ ...it, unitPrice: it.unitPrice?.toString() ?? null })),
+  }
+
+  // ── 交貨地點快速代入的預設資料 ──────────────────────────────────────────
+  const session = await getServerSession(authOptions)
+  const company = await prisma.sYS_Company.findFirst({
+    select: { nameZh: true, nameEn: true, addressZh: true, addressEn: true, city: true, phone: true },
+  })
+
+  // 同一張出貨單的其他供應商（集貨供應商候選：貨可能出到其中一家）
+  const siblingSuppliers = notice.sourceShipmentId
+    ? (await prisma.pO_ShippingNotice.findMany({
+        where: { sourceShipmentId: notice.sourceShipmentId, supplierId: { not: notice.supplierId } },
+        select: {
+          supplier: {
+            select: { id: true, name: true, shortName: true, address: true, city: true, contactPerson: true, phoneNo: true },
+          },
+        },
+        distinct: ['supplierId'],
+      })).map(n => n.supplier)
+    : []
+
+  const deliverPresets = {
+    office: company ? {
+      name: company.nameZh || company.nameEn,
+      address: [company.addressZh || company.addressEn, company.city].filter(Boolean).join(', '),
+      contact: [session?.user?.name, company.phone].filter(Boolean).join(' '),
+    } : null,
+    containerYard: notice.sourceShipment?.containerYard ?? null,
+    suppliers: siblingSuppliers.map(s => ({
+      id: s.id,
+      label: s.shortName ?? s.name,
+      name: s.name,
+      address: [s.address, s.city].filter(Boolean).join(', '),
+      contact: [s.contactPerson, s.phoneNo].filter(Boolean).join(' '),
+    })),
   }
 
   return (
@@ -50,7 +87,7 @@ export default async function ShippingNoticeDetailPage({
         </span>
       </div>
 
-      <ShippingNoticeDetail notice={serialized} />
+      <ShippingNoticeDetail notice={serialized} deliverPresets={deliverPresets} />
     </div>
   )
 }

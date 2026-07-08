@@ -3,6 +3,7 @@ import { getRequestPrisma } from '@/lib/request-db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { sendShippingNoticeEmail } from '@/lib/mailer'
+import { filterMarksForDocNos } from '@/lib/shipping-marks'
 import { prisma as globalPrisma } from '@/lib/db'
 
 type Params = { params: { id: string } }
@@ -21,7 +22,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
         supplier: { select: { id: true, name: true, email: true, contactPerson: true } },
         items: {
           include: {
-            po: { select: { poNo: true } },
+            po: { select: { poNo: true, slsPi: { select: { piNo: true } } } },
             product: { select: { sku: true, name: true } },
           },
         },
@@ -46,7 +47,12 @@ export async function POST(_req: NextRequest, { params }: Params) {
       deliverToName: notice.deliverToName,
       deliverToAddress: notice.deliverToAddress,
       deliverToContact: notice.deliverToContact,
-      shippingMarks: notice.sourceShipment?.shippingMarks ?? null,
+      shippingMarks: notice.sourceShipment?.shippingMarks
+        ? filterMarksForDocNos(
+            notice.sourceShipment.shippingMarks,
+            notice.items.flatMap(item => [item.po.poNo, item.po.slsPi?.piNo].filter((s): s is string => !!s)),
+          )
+        : null,
       items: notice.items.map(item => ({
         poNo: item.po.poNo,
         productSku: item.product.sku,

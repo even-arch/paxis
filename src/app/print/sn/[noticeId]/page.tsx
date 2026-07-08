@@ -338,6 +338,7 @@ function SNDocument({ data }: { data: SNData }) {
               {notice.deliverToAddress && <div style={{ paddingLeft: '12pt' }}>{notice.deliverToAddress}</div>}
               {notice.deliverToContact && <div style={{ paddingLeft: '12pt' }}>聯絡：{notice.deliverToContact}</div>}
               {shipment?.vesselVoyage && <div><b>Vessel:</b> {shipment.vesselVoyage}{shipment.shippingLine ? `（${shipment.shippingLine}）` : ''}</div>}
+              {shipment?.placeOfReceipt && <div><b>Place of Receipt:</b> {shipment.placeOfReceipt}</div>}
               {shipment?.portOfLoading && <div><b>Port of Loading:</b> {shipment.portOfLoading}</div>}
               {shipment?.forwarderName && <div><b>Forwarder:</b> {shipment.forwarderName}{shipment.forwarderContact ? ` — ${shipment.forwarderContact}` : ''}</div>}
             </td>
