@@ -120,6 +120,14 @@ export default function ShippingNoticePrintPage() {
       .catch(e => setError(e.message))
   }, [params.noticeId])
 
+  // 列印/存 PDF 的預設檔名 = 供應商名稱 + 單號（瀏覽器以頁面標題當檔名）
+  useEffect(() => {
+    if (data) {
+      const supplierLabel = data.supplier.shortName ?? data.supplier.name
+      document.title = `${supplierLabel} ${data.notice.noticeNo}`
+    }
+  }, [data])
+
   if (error) return <div className="p-8 text-red-600">{error}</div>
   if (!data) return <div className="p-8 text-gray-400">載入中...</div>
 
