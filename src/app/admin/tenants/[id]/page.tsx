@@ -3,7 +3,7 @@ import { masterPrisma } from '@/lib/master-db'
 import { getOrgPrisma } from '@/lib/org-db'
 import { prisma as defaultPrisma } from '@/lib/db'
 import { notFound } from 'next/navigation'
-import TenantUpsToggle from './TenantUpsToggle'
+import UpsForm from './UpsForm'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,14 +14,18 @@ export default async function TenantDetailPage({ params }: { params: { id: strin
   const org = await masterPrisma.oRG.findUnique({ where: { id: orgId } })
   if (!org) notFound()
 
-  // 讀取該租戶的 ups_mode
-  let upsMode: 'disabled' | 'managed' = 'disabled'
+  let upsMode: 'managed' | 'disabled' = 'disabled'
+  let ownAccountNo: string | null = null
   const isProvisioned = !!org.databaseUrl && !org.databaseUrl.startsWith('__pending__')
   if (isProvisioned) {
     try {
       const db = getOrgPrisma(org.databaseUrl, org.slug) as typeof defaultPrisma
-      const row = await db.sYS_KeyValue.findUnique({ where: { key: 'ups_mode' } })
-      if (row?.value === 'managed') upsMode = 'managed'
+      const [modeRow, accountRow] = await Promise.all([
+        db.sYS_KeyValue.findUnique({ where: { key: 'ups_mode' } }),
+        db.sYS_KeyValue.findUnique({ where: { key: 'ups_own_account_no' } }),
+      ])
+      if (modeRow?.value === 'managed') upsMode = 'managed'
+      ownAccountNo = accountRow?.value?.trim() || null
     } catch { /* DB 暫時無法連線 */ }
   }
 
@@ -33,12 +37,16 @@ export default async function TenantDetailPage({ params }: { params: { id: strin
       </div>
 
       <div className="bg-white rounded-lg border p-6 space-y-4">
-        <h2 className="font-medium text-gray-800">UPS 代管服務</h2>
-        <p className="text-sm text-gray-500">開啟後，此租戶可使用平台（錫諾系統）的 UPS 帳號出貨，享有合約折扣費率。</p>
+        <h2 className="font-medium text-gray-800">UPS 服務設定</h2>
+        <p className="text-sm text-gray-500">選擇此租戶使用平台代管 UPS 或其自有帳號。</p>
         {!isProvisioned ? (
           <p className="text-sm text-gray-400">租戶 DB 尚未開通，無法設定。</p>
         ) : (
-          <TenantUpsToggle tenantId={orgId} initialEnabled={upsMode === 'managed'} />
+          <UpsForm
+            tenantId={orgId}
+            initialMode={upsMode === 'managed' ? 'managed' : 'own'}
+            initialAccountNo={ownAccountNo}
+          />
         )}
       </div>
     </div>

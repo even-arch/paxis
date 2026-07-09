@@ -11,7 +11,6 @@ interface UpsConfig {
 export default function UpsForm() {
   const [config, setConfig] = useState<UpsConfig | null>(null)
   const [ownAccountNo, setOwnAccountNo] = useState('')
-  const [ownMultiplier, setOwnMultiplier] = useState('')
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
@@ -19,7 +18,6 @@ export default function UpsForm() {
     fetch('/api/settings/ups').then(r => r.json()).then((d: UpsConfig) => {
       setConfig(d)
       setOwnAccountNo(d.ownAccountNo ?? '')
-      setOwnMultiplier(d.ownDiscountMultiplier != null ? String(d.ownDiscountMultiplier) : '')
     })
   }, [])
 
@@ -27,16 +25,10 @@ export default function UpsForm() {
     e.preventDefault()
     setSaving(true); setMsg(null)
     try {
-      const multiplierVal = ownMultiplier.trim() ? parseFloat(ownMultiplier) : null
-      if (ownMultiplier.trim() && (isNaN(multiplierVal!) || multiplierVal! <= 0 || multiplierVal! > 1)) {
-        setMsg({ type: 'err', text: '折扣係數須介於 0（不含）至 1 之間' })
-        setSaving(false)
-        return
-      }
       const res = await fetch('/api/settings/ups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ownAccountNo, ownDiscountMultiplier: multiplierVal }),
+        body: JSON.stringify({ ownAccountNo }),
       })
       if (res.ok) {
         setMsg({ type: 'ok', text: '已儲存' })
@@ -102,18 +94,6 @@ export default function UpsForm() {
               className="w-64 border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <p className="text-xs text-gray-400 mt-1">填入後將優先使用自有帳號，清空則恢復使用平台代管（若已開通）。</p>
-          </div>
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">合約折扣係數（選填）</label>
-            <input
-              type="number"
-              value={ownMultiplier}
-              onChange={e => setOwnMultiplier(e.target.value)}
-              min={0.01} max={1} step={0.001}
-              placeholder="例：0.361"
-              className="w-36 border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="text-xs text-gray-400 mt-1">實際帳單 ÷ API 報價，用於估算契約金額。</p>
           </div>
 
           {msg && (

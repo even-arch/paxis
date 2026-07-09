@@ -29,16 +29,23 @@ export async function PATCH(
     }
 
     const db = getOrgPrisma(org.databaseUrl, org.slug) as typeof prisma
-    const mode = body.upsMode === 'managed' ? 'managed' : 'disabled'
+    const upsert = (key: string, value: string) =>
+      db.sYS_KeyValue.upsert({ where: { key }, create: { key, value }, update: { value } })
 
-    // 設定 ups_mode（平台是否代管）
-    await db.sYS_KeyValue.upsert({
-      where: { key: 'ups_mode' },
-      create: { key: 'ups_mode', value: mode },
-      update: { value: mode },
-    })
+    if (body.upsMode === 'managed') {
+      await upsert('ups_mode', 'managed')
+      await upsert('ups_own_account_no', '')
+    } else if (body.upsMode === 'own') {
+      const accountNo = (body.upsAccountNo ?? '').trim()
+      if (!accountNo) return NextResponse.json({ error: '請輸入 UPS Account Number' }, { status: 400 })
+      await upsert('ups_mode', 'disabled')
+      await upsert('ups_own_account_no', accountNo)
+    } else {
+      await upsert('ups_mode', 'disabled')
+      await upsert('ups_own_account_no', '')
+    }
 
-    return NextResponse.json({ ok: true, upsMode: mode })
+    return NextResponse.json({ ok: true, upsMode: body.upsMode })
   }
 
   return NextResponse.json({ error: '未知操作' }, { status: 400 })

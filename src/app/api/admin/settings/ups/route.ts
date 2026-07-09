@@ -43,8 +43,8 @@ export async function POST(req: NextRequest) {
         await setSystemSetting('ups_discount_multiplier', '')
       } else {
         const n = parseFloat(discountMultiplier)
-        if (isNaN(n) || n <= 0 || n > 1) {
-          return NextResponse.json({ error: '折扣係數必須介於 0（不含）至 1' }, { status: 400 })
+        if (isNaN(n) || n <= 0) {
+          return NextResponse.json({ error: '服務費乘數必須大於 0，例如 1.2 代表加收 20%' }, { status: 400 })
         }
         await setSystemSetting('ups_discount_multiplier', String(n))
       }

@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic'
+import Link from 'next/link'
 import { requireAdminAuth } from '@/lib/admin-auth'
 import { masterPrisma } from '@/lib/master-db'
 import InviteForm from './InviteForm'
@@ -53,7 +54,9 @@ export default async function TenantsPage() {
           <tbody className="divide-y divide-gray-100">
             {orgs.map(org => (
               <tr key={org.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 font-mono text-xs text-gray-700">{org.slug}</td>
+                <td className="px-4 py-3 font-mono text-xs">
+                  <Link href={`/admin/tenants/${org.id}`} className="text-blue-600 hover:underline">{org.slug}</Link>
+                </td>
                 <td className="px-4 py-3 text-gray-800">{org.name || '—'}</td>
                 <td className="px-4 py-3 text-gray-600">{org.ownerEmail}</td>
                 <td className="px-4 py-3">
