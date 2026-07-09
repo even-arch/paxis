@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getRequestPrisma } from '@/lib/request-db'
+import { getPrismaByOrgSlug } from '@/lib/request-db'
 import bcrypt from 'bcryptjs'
 
 export async function POST(req: NextRequest) {
-  const prisma = await getRequestPrisma()
-  const { token, password } = await req.json() as { token?: string; password?: string }
+  const { token, password, orgSlug } = await req.json() as {
+    token?: string
+    password?: string
+    orgSlug?: string
+  }
 
   if (!token || !password || password.length < 8) {
     return NextResponse.json({ error: '密碼至少 8 個字元' }, { status: 400 })
   }
+
+  const prisma = await getPrismaByOrgSlug(orgSlug)
 
   const reset = await prisma.sYS_PasswordReset.findUnique({ where: { token } }).catch(() => null)
 

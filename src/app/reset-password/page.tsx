@@ -7,6 +7,7 @@ function ResetPasswordForm() {
   const params = useSearchParams()
   const router = useRouter()
   const token = params.get('token') ?? ''
+  const orgSlug = params.get('org') ?? ''
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
@@ -24,7 +25,7 @@ function ResetPasswordForm() {
     const res = await fetch('/api/auth/reset-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, password }),
+      body: JSON.stringify({ token, password, orgSlug }),
     })
 
     setLoading(false)

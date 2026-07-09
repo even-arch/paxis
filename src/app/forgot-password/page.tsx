@@ -3,6 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 
 export default function ForgotPasswordPage() {
+  const [orgSlug, setOrgSlug] = useState('')
   const [email, setEmail] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
@@ -17,7 +18,7 @@ export default function ForgotPasswordPage() {
     const res = await fetch('/api/auth/forgot-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, orgSlug: orgSlug.trim().toLowerCase() }),
     })
 
     setLoading(false)
@@ -37,7 +38,7 @@ export default function ForgotPasswordPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="bg-white p-8 rounded-xl shadow-md w-full max-w-sm">
         <h1 className="text-lg font-bold text-gray-800 mb-1">忘記密碼</h1>
-        <p className="text-sm text-gray-500 mb-6">輸入您的 Email，我們會寄送重設連結給您。</p>
+        <p className="text-sm text-gray-500 mb-6">輸入公司代碼與 Email，我們會寄送重設連結給您。</p>
 
         {submitted ? (
           <div className="space-y-4">
@@ -56,6 +57,17 @@ export default function ForgotPasswordPage() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">公司代碼</label>
+              <input
+                type="text"
+                value={orgSlug}
+                onChange={e => setOrgSlug(e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="例如：pointasia"
+                required
+              />
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
               <input

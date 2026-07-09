@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getRequestPrisma } from '@/lib/request-db'
+import { getPrismaByOrgSlug } from '@/lib/request-db'
 import { randomBytes } from 'crypto'
 import { sendPasswordResetEmail } from '@/lib/mailer'
 
 export async function POST(req: NextRequest) {
-  const prisma = await getRequestPrisma()
-  const { email } = await req.json() as { email?: string }
+  const { email, orgSlug } = await req.json() as { email?: string; orgSlug?: string }
 
   if (!email || !email.includes('@')) {
     return NextResponse.json({ error: '請輸入有效的 Email' }, { status: 400 })
   }
+  if (!orgSlug) {
+    return NextResponse.json({ error: '請輸入公司代碼' }, { status: 400 })
+  }
+
+  const prisma = await getPrismaByOrgSlug(orgSlug)
 
   const user = await prisma.sYS_User.findUnique({ where: { loginId: email.toLowerCase() } })
 
@@ -22,7 +26,7 @@ export async function POST(req: NextRequest) {
     })
 
     const baseUrl = process.env.NEXTAUTH_URL ?? 'http://localhost:3000'
-    const resetUrl = `${baseUrl}/reset-password?token=${token}`
+    const resetUrl = `${baseUrl}/reset-password?token=${token}&org=${encodeURIComponent(orgSlug)}`
 
     const company = await prisma.sYS_Company.findFirst({ where: { id: 1 } })
     const companyName = company?.nameEn || company?.nameZh || 'PAXIS'
