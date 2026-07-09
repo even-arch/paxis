@@ -8,7 +8,7 @@ import ShipmentItemTable, { type ShipmentGroupData } from './ShipmentItemTable'
 import ConfirmShipmentButton from './ConfirmShipmentButton'
 import ShippingNoticePanel from './ShippingNoticePanel'
 import SOImportButton from './SOImportButton'
-import LinkPOButton from '@/app/[orgSlug]/(main)/sales/pi/[piId]/LinkPOButton'
+import PIOrderPanel from './PIOrderPanel'
 
 type Props = { params: { orgSlug: string; id: string } }
 
@@ -32,6 +32,7 @@ export default async function ShipmentDetailPage({ params }: Props) {
       customer: { select: { id: true, name: true, shortName: true } },
       stockMovements: { where: { type: 4 }, select: { id: true } },
       pis: {
+        orderBy: { sortOrder: 'asc' },
         include: {
           pi: {
             select: {
@@ -127,10 +128,9 @@ export default async function ShipmentDetailPage({ params }: Props) {
       </div>
 
       {await (async () => {
-        // 優先用 SLS_PI_Link junction table；若空（舊資料或 UPS 流程漏建），
-        // 從 items.pi 推導唯一 PI 清單作為 fallback
-        type PiEntry = { piId: number; piNo: string; orderId?: number | null; orderNo?: string | null; etd?: Date | null; poOrders: { id: number; poNo: string; supplier: { shortName: string | null; name: string } }[] }
-        let piList: PiEntry[] = shipment.pis.map(sp => ({
+        // 優先用 SLS_PI_Link junction table（已按 sortOrder 排序）；
+        // 若空（舊資料或 UPS 流程漏建），從 items.pi 推導唯一 PI 清單作為 fallback
+        let piList: import('./PIOrderPanel').PiEntry[] = shipment.pis.map(sp => ({
           piId: sp.piId,
           piNo: sp.pi.piNo,
           orderId: sp.pi.order?.id,
@@ -150,11 +150,10 @@ export default async function ShipmentDetailPage({ params }: Props) {
         if (piList.length === 0) return null
 
         // 模糊補查：poNo 以 piNo 為前綴（含精確相等），補上 slsPiId FK 沒有抓到的拆單 PO
-        // 例如 PI "E2620048" → 可對應 PO "E2620048-1"、"E2620048-2"、"E2620048-A"
         const fuzzyPOs = await prisma.pO.findMany({
           where: {
             OR: piList.map(p => ({ poNo: { startsWith: p.piNo } })),
-            slsPiId: null,  // 已有 FK 連結的不重複撈
+            slsPiId: null,
           },
           select: { id: true, poNo: true, slsPiId: true, supplier: { select: { shortName: true, name: true } } },
         })
@@ -167,55 +166,12 @@ export default async function ShipmentDetailPage({ params }: Props) {
           }
         }
 
-        const missingPO = piList.filter(p => p.poOrders.length === 0)
         return (
-          <div className="bg-white rounded-lg shadow p-5 mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">關聯 PI</h2>
-              {missingPO.length > 0 ? (
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded px-2 py-1">
-                  ⚠ {missingPO.length} 張 PI 尚未連結採購單（PO）
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded px-2 py-1">
-                  ✓ 全部 PI 均已連結 PO
-                </span>
-              )}
-            </div>
-            <div className="flex flex-col gap-2">
-              {piList.map(pi => {
-                const hasPO = pi.poOrders.length > 0
-                return (
-                  <div key={pi.piId} className={`flex items-start gap-3 border rounded px-3 py-2 text-sm ${hasPO ? 'border-gray-200' : 'border-orange-300 bg-orange-50'}`}>
-                    <span className={`mt-0.5 text-base ${hasPO ? 'text-green-500' : 'text-orange-500'}`}>{hasPO ? '✓' : '⚠'}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Link href={orgPath(params.orgSlug, `/sales/pi/${pi.piId}`)} className="font-mono text-teal-600 hover:underline font-medium">
-                          {pi.piNo}
-                        </Link>
-                        {pi.etd && <span className="text-gray-400 text-xs">ETD: {formatDate(pi.etd)}</span>}
-                      </div>
-                      {hasPO ? (
-                        <div className="flex flex-wrap gap-2 mt-1">
-                          {pi.poOrders.map(po => (
-                            <Link key={po.id} href={orgPath(params.orgSlug, `/purchases/${po.id}`)}
-                              className="text-xs text-blue-600 hover:underline font-mono">
-                              PO: {po.poNo} <span className="text-gray-400 font-sans">({po.supplier.shortName ?? po.supplier.name})</span>
-                            </Link>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="mt-1 flex items-center gap-3">
-                          <span className="text-xs text-orange-700">尚未連結採購單</span>
-                          <LinkPOButton piId={pi.piId} linkedPOIds={[]} initialQuery={pi.piNo} />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+          <PIOrderPanel
+            piList={piList}
+            shipmentId={shipment.id}
+            orgSlug={params.orgSlug}
+          />
         )
       })()}
 

@@ -1092,6 +1092,7 @@ model SLS_PI_Link {
   shipment    SLS @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
   piId        Int
   pi          PI       @relation(fields: [piId], references: [id])
+  sortOrder   Int      @default(0)
 
   @@id([shipmentId, piId])
   @@index([piId])

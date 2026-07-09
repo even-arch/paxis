@@ -19,6 +19,7 @@ export async function GET(
     include: {
       customer: true,
       pis: {
+        orderBy: { sortOrder: 'asc' },
         include: {
           pi: {
             select: { piNo: true, id: true },
@@ -52,8 +53,16 @@ export async function GET(
 
   const company = await prisma.sYS_Company.findFirst()
 
+  // 依 SLS_PI_Link.sortOrder 排列品項（pis 已按 sortOrder 查出）
+  const piOrder = new Map(shipment.pis.map((sp, idx) => [sp.piId, idx]))
+  const sortedItems = [...shipment.items].sort((a, b) => {
+    const oa = a.piId != null ? (piOrder.get(a.piId) ?? 999) : 999
+    const ob = b.piId != null ? (piOrder.get(b.piId) ?? 999) : 999
+    return oa !== ob ? oa - ob : a.id - b.id
+  })
+
   // 取得品項金額：從關聯的 PO_CustomerCopy_Item 取單價
-  const items = shipment.items.map(item => {
+  const items = sortedItems.map(item => {
     const product = item.slsItem?.product
     const unitPrice = Number(item.slsItem?.unitPrice ?? 0)
     const quantity = item.quantity
