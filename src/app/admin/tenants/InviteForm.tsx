@@ -7,24 +7,32 @@ export default function InviteForm() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [devUrl, setDevUrl] = useState('')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setMessage('')
-    const res = await fetch('/api/admin/invite', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-    })
-    setLoading(false)
-    const data = await res.json()
-    if (res.ok) {
-      setMessage(`邀請已發送至 ${email}`)
-      setEmail('')
-      setTimeout(() => { setOpen(false); setMessage('') }, 2000)
-    } else {
-      setMessage(data.error ?? '發送失敗')
+    setDevUrl('')
+    try {
+      const res = await fetch('/api/admin/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      const data = await res.json().catch(() => ({})) as { error?: string; devInviteUrl?: string }
+      setLoading(false)
+      if (res.ok) {
+        setMessage(`邀請已發送至 ${email}`)
+        if (data.devInviteUrl) setDevUrl(data.devInviteUrl)
+        setEmail('')
+        if (!data.devInviteUrl) setTimeout(() => { setOpen(false); setMessage('') }, 2000)
+      } else {
+        setMessage(data.error ?? '發送失敗')
+      }
+    } catch (err) {
+      setLoading(false)
+      setMessage(`網路錯誤：${err instanceof Error ? err.message : '請稍後再試'}`)
     }
   }
 
@@ -59,6 +67,12 @@ export default function InviteForm() {
                 <p className={`text-sm ${message.includes('已發送') ? 'text-green-600' : 'text-red-600'}`}>
                   {message}
                 </p>
+              )}
+              {devUrl && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded p-2 text-xs text-yellow-800 break-all">
+                  <p className="font-medium mb-1">開發模式 — 邀請連結：</p>
+                  <a href={devUrl} className="underline">{devUrl}</a>
+                </div>
               )}
               <div className="flex gap-2 justify-end">
                 <button

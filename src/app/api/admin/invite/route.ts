@@ -33,27 +33,39 @@ export async function POST(req: Request) {
   const baseUrl = process.env.NEXTAUTH_URL ?? 'https://paxis.tw'
   const inviteUrl = `${baseUrl}/invite/${token}`
 
-  await sendSystemMail({
-    to: email,
-    subject: 'PAXIS 系統邀請 — 請填寫公司資料',
-    html: `
-      <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px">
-        <h2 style="color:#1e40af;margin-bottom:8px">歡迎加入 PAXIS</h2>
-        <p style="color:#374151">您好，</p>
-        <p style="color:#374151">
-          您已收到 PAXIS 貿易管理系統的邀請。請點擊下方按鈕填寫公司資料並完成開通申請。
-        </p>
-        <a href="${inviteUrl}"
-           style="display:inline-block;margin:24px 0;padding:12px 24px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;font-weight:500">
-          開始申請
-        </a>
-        <p style="color:#6b7280;font-size:13px">此邀請連結將在 <strong>7 天</strong>後失效。</p>
-        <p style="color:#6b7280;font-size:13px">若您有任何問題，請聯繫 even@xinosys.com。</p>
-        <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
-        <p style="color:#9ca3af;font-size:12px">PAXIS · 錫諾系統</p>
-      </div>
-    `,
-  })
+  try {
+    await sendSystemMail({
+      to: email,
+      subject: 'PAXIS 系統邀請 — 請填寫公司資料',
+      html: `
+        <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px">
+          <h2 style="color:#1e40af;margin-bottom:8px">歡迎加入 PAXIS</h2>
+          <p style="color:#374151">您好，</p>
+          <p style="color:#374151">
+            您已收到 PAXIS 貿易管理系統的邀請。請點擊下方按鈕填寫公司資料並完成開通申請。
+          </p>
+          <a href="${inviteUrl}"
+             style="display:inline-block;margin:24px 0;padding:12px 24px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;font-weight:500">
+            開始申請
+          </a>
+          <p style="color:#6b7280;font-size:13px">此邀請連結將在 <strong>7 天</strong>後失效。</p>
+          <p style="color:#6b7280;font-size:13px">若您有任何問題，請聯繫 even@xinosys.com。</p>
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
+          <p style="color:#9ca3af;font-size:12px">PAXIS · 錫諾系統</p>
+        </div>
+      `,
+    })
+  } catch (err) {
+    console.error('[admin/invite] sendSystemMail failed:', err)
+    // Token 已建立，dev 模式下回傳連結讓管理員可以手動轉發
+    if (process.env.NODE_ENV !== 'production') {
+      return NextResponse.json({ ok: true, devInviteUrl: inviteUrl })
+    }
+    return NextResponse.json(
+      { error: `寄信失敗：${err instanceof Error ? err.message : String(err)}` },
+      { status: 500 }
+    )
+  }
 
   return NextResponse.json({ ok: true })
 }
