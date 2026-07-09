@@ -15,6 +15,12 @@ const SETTINGS = [
     desc: '錫諾系統自有 UPS Account Number，managed 模式租戶共用，無需 redeploy 即可更換',
   },
   {
+    href: '/admin/settings/email',
+    icon: '✉️',
+    title: '郵件設定',
+    desc: 'Resend API Key 與寄件人地址，用於寄發邀請信等系統信件',
+  },
+  {
     href: '/admin/settings/general',
     icon: '⚙️',
     title: '一般設定',

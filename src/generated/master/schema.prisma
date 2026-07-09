@@ -24,6 +24,14 @@ model ORG {
   @@map("ORG")
 }
 
+model ADMIN_Setting {
+  key       String   @id
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+
+  @@map("ADMIN_Setting")
+}
+
 model ORG_Invite {
   id        Int       @id @default(autoincrement())
   orgId     Int? // null = 邀請還沒有對應 org（新用戶邀請）

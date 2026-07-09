@@ -132,6 +132,12 @@ exports.Prisma.ORGScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.ADMIN_SettingScalarFieldEnum = {
+  key: 'key',
+  value: 'value',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.ORG_InviteScalarFieldEnum = {
   id: 'id',
   orgId: 'orgId',
@@ -160,6 +166,7 @@ exports.Prisma.NullsOrder = {
 
 exports.Prisma.ModelName = {
   ORG: 'ORG',
+  ADMIN_Setting: 'ADMIN_Setting',
   ORG_Invite: 'ORG_Invite'
 };
 

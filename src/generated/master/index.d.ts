@@ -19,6 +19,11 @@ export type PrismaPromise<T> = $Public.PrismaPromise<T>
  */
 export type ORG = $Result.DefaultSelection<Prisma.$ORGPayload>
 /**
+ * Model ADMIN_Setting
+ * 
+ */
+export type ADMIN_Setting = $Result.DefaultSelection<Prisma.$ADMIN_SettingPayload>
+/**
  * Model ORG_Invite
  * 
  */
@@ -151,6 +156,16 @@ export class PrismaClient<
     * ```
     */
   get oRG(): Prisma.ORGDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.aDMIN_Setting`: Exposes CRUD operations for the **ADMIN_Setting** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more ADMIN_Settings
+    * const aDMIN_Settings = await prisma.aDMIN_Setting.findMany()
+    * ```
+    */
+  get aDMIN_Setting(): Prisma.ADMIN_SettingDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.oRG_Invite`: Exposes CRUD operations for the **ORG_Invite** model.
@@ -603,6 +618,7 @@ export namespace Prisma {
 
   export const ModelName: {
     ORG: 'ORG',
+    ADMIN_Setting: 'ADMIN_Setting',
     ORG_Invite: 'ORG_Invite'
   };
 
@@ -622,7 +638,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "oRG" | "oRG_Invite"
+      modelProps: "oRG" | "aDMIN_Setting" | "oRG_Invite"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -697,6 +713,80 @@ export namespace Prisma {
           count: {
             args: Prisma.ORGCountArgs<ExtArgs>
             result: $Utils.Optional<ORGCountAggregateOutputType> | number
+          }
+        }
+      }
+      ADMIN_Setting: {
+        payload: Prisma.$ADMIN_SettingPayload<ExtArgs>
+        fields: Prisma.ADMIN_SettingFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ADMIN_SettingFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ADMIN_SettingPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ADMIN_SettingFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ADMIN_SettingPayload>
+          }
+          findFirst: {
+            args: Prisma.ADMIN_SettingFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ADMIN_SettingPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ADMIN_SettingFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ADMIN_SettingPayload>
+          }
+          findMany: {
+            args: Prisma.ADMIN_SettingFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ADMIN_SettingPayload>[]
+          }
+          create: {
+            args: Prisma.ADMIN_SettingCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ADMIN_SettingPayload>
+          }
+          createMany: {
+            args: Prisma.ADMIN_SettingCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.ADMIN_SettingCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ADMIN_SettingPayload>[]
+          }
+          delete: {
+            args: Prisma.ADMIN_SettingDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ADMIN_SettingPayload>
+          }
+          update: {
+            args: Prisma.ADMIN_SettingUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ADMIN_SettingPayload>
+          }
+          deleteMany: {
+            args: Prisma.ADMIN_SettingDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ADMIN_SettingUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.ADMIN_SettingUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ADMIN_SettingPayload>[]
+          }
+          upsert: {
+            args: Prisma.ADMIN_SettingUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ADMIN_SettingPayload>
+          }
+          aggregate: {
+            args: Prisma.ADMIN_SettingAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateADMIN_Setting>
+          }
+          groupBy: {
+            args: Prisma.ADMIN_SettingGroupByArgs<ExtArgs>
+            result: $Utils.Optional<ADMIN_SettingGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ADMIN_SettingCountArgs<ExtArgs>
+            result: $Utils.Optional<ADMIN_SettingCountAggregateOutputType> | number
           }
         }
       }
@@ -871,6 +961,7 @@ export namespace Prisma {
   }
   export type GlobalOmitConfig = {
     oRG?: ORGOmit
+    aDMIN_Setting?: ADMIN_SettingOmit
     oRG_Invite?: ORG_InviteOmit
   }
 
@@ -2126,6 +2217,975 @@ export namespace Prisma {
 
 
   /**
+   * Model ADMIN_Setting
+   */
+
+  export type AggregateADMIN_Setting = {
+    _count: ADMIN_SettingCountAggregateOutputType | null
+    _min: ADMIN_SettingMinAggregateOutputType | null
+    _max: ADMIN_SettingMaxAggregateOutputType | null
+  }
+
+  export type ADMIN_SettingMinAggregateOutputType = {
+    key: string | null
+    value: string | null
+    updatedAt: Date | null
+  }
+
+  export type ADMIN_SettingMaxAggregateOutputType = {
+    key: string | null
+    value: string | null
+    updatedAt: Date | null
+  }
+
+  export type ADMIN_SettingCountAggregateOutputType = {
+    key: number
+    value: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type ADMIN_SettingMinAggregateInputType = {
+    key?: true
+    value?: true
+    updatedAt?: true
+  }
+
+  export type ADMIN_SettingMaxAggregateInputType = {
+    key?: true
+    value?: true
+    updatedAt?: true
+  }
+
+  export type ADMIN_SettingCountAggregateInputType = {
+    key?: true
+    value?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type ADMIN_SettingAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ADMIN_Setting to aggregate.
+     */
+    where?: ADMIN_SettingWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ADMIN_Settings to fetch.
+     */
+    orderBy?: ADMIN_SettingOrderByWithRelationInput | ADMIN_SettingOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: ADMIN_SettingWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ADMIN_Settings from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ADMIN_Settings.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned ADMIN_Settings
+    **/
+    _count?: true | ADMIN_SettingCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: ADMIN_SettingMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: ADMIN_SettingMaxAggregateInputType
+  }
+
+  export type GetADMIN_SettingAggregateType<T extends ADMIN_SettingAggregateArgs> = {
+        [P in keyof T & keyof AggregateADMIN_Setting]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateADMIN_Setting[P]>
+      : GetScalarType<T[P], AggregateADMIN_Setting[P]>
+  }
+
+
+
+
+  export type ADMIN_SettingGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ADMIN_SettingWhereInput
+    orderBy?: ADMIN_SettingOrderByWithAggregationInput | ADMIN_SettingOrderByWithAggregationInput[]
+    by: ADMIN_SettingScalarFieldEnum[] | ADMIN_SettingScalarFieldEnum
+    having?: ADMIN_SettingScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ADMIN_SettingCountAggregateInputType | true
+    _min?: ADMIN_SettingMinAggregateInputType
+    _max?: ADMIN_SettingMaxAggregateInputType
+  }
+
+  export type ADMIN_SettingGroupByOutputType = {
+    key: string
+    value: string
+    updatedAt: Date
+    _count: ADMIN_SettingCountAggregateOutputType | null
+    _min: ADMIN_SettingMinAggregateOutputType | null
+    _max: ADMIN_SettingMaxAggregateOutputType | null
+  }
+
+  type GetADMIN_SettingGroupByPayload<T extends ADMIN_SettingGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ADMIN_SettingGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ADMIN_SettingGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ADMIN_SettingGroupByOutputType[P]>
+            : GetScalarType<T[P], ADMIN_SettingGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ADMIN_SettingSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    key?: boolean
+    value?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["aDMIN_Setting"]>
+
+  export type ADMIN_SettingSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    key?: boolean
+    value?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["aDMIN_Setting"]>
+
+  export type ADMIN_SettingSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    key?: boolean
+    value?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["aDMIN_Setting"]>
+
+  export type ADMIN_SettingSelectScalar = {
+    key?: boolean
+    value?: boolean
+    updatedAt?: boolean
+  }
+
+  export type ADMIN_SettingOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"key" | "value" | "updatedAt", ExtArgs["result"]["aDMIN_Setting"]>
+
+  export type $ADMIN_SettingPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "ADMIN_Setting"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      key: string
+      value: string
+      updatedAt: Date
+    }, ExtArgs["result"]["aDMIN_Setting"]>
+    composites: {}
+  }
+
+  type ADMIN_SettingGetPayload<S extends boolean | null | undefined | ADMIN_SettingDefaultArgs> = $Result.GetResult<Prisma.$ADMIN_SettingPayload, S>
+
+  type ADMIN_SettingCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<ADMIN_SettingFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: ADMIN_SettingCountAggregateInputType | true
+    }
+
+  export interface ADMIN_SettingDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['ADMIN_Setting'], meta: { name: 'ADMIN_Setting' } }
+    /**
+     * Find zero or one ADMIN_Setting that matches the filter.
+     * @param {ADMIN_SettingFindUniqueArgs} args - Arguments to find a ADMIN_Setting
+     * @example
+     * // Get one ADMIN_Setting
+     * const aDMIN_Setting = await prisma.aDMIN_Setting.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends ADMIN_SettingFindUniqueArgs>(args: SelectSubset<T, ADMIN_SettingFindUniqueArgs<ExtArgs>>): Prisma__ADMIN_SettingClient<$Result.GetResult<Prisma.$ADMIN_SettingPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one ADMIN_Setting that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {ADMIN_SettingFindUniqueOrThrowArgs} args - Arguments to find a ADMIN_Setting
+     * @example
+     * // Get one ADMIN_Setting
+     * const aDMIN_Setting = await prisma.aDMIN_Setting.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends ADMIN_SettingFindUniqueOrThrowArgs>(args: SelectSubset<T, ADMIN_SettingFindUniqueOrThrowArgs<ExtArgs>>): Prisma__ADMIN_SettingClient<$Result.GetResult<Prisma.$ADMIN_SettingPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ADMIN_Setting that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ADMIN_SettingFindFirstArgs} args - Arguments to find a ADMIN_Setting
+     * @example
+     * // Get one ADMIN_Setting
+     * const aDMIN_Setting = await prisma.aDMIN_Setting.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends ADMIN_SettingFindFirstArgs>(args?: SelectSubset<T, ADMIN_SettingFindFirstArgs<ExtArgs>>): Prisma__ADMIN_SettingClient<$Result.GetResult<Prisma.$ADMIN_SettingPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ADMIN_Setting that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ADMIN_SettingFindFirstOrThrowArgs} args - Arguments to find a ADMIN_Setting
+     * @example
+     * // Get one ADMIN_Setting
+     * const aDMIN_Setting = await prisma.aDMIN_Setting.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends ADMIN_SettingFindFirstOrThrowArgs>(args?: SelectSubset<T, ADMIN_SettingFindFirstOrThrowArgs<ExtArgs>>): Prisma__ADMIN_SettingClient<$Result.GetResult<Prisma.$ADMIN_SettingPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more ADMIN_Settings that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ADMIN_SettingFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all ADMIN_Settings
+     * const aDMIN_Settings = await prisma.aDMIN_Setting.findMany()
+     * 
+     * // Get first 10 ADMIN_Settings
+     * const aDMIN_Settings = await prisma.aDMIN_Setting.findMany({ take: 10 })
+     * 
+     * // Only select the `key`
+     * const aDMIN_SettingWithKeyOnly = await prisma.aDMIN_Setting.findMany({ select: { key: true } })
+     * 
+     */
+    findMany<T extends ADMIN_SettingFindManyArgs>(args?: SelectSubset<T, ADMIN_SettingFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ADMIN_SettingPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a ADMIN_Setting.
+     * @param {ADMIN_SettingCreateArgs} args - Arguments to create a ADMIN_Setting.
+     * @example
+     * // Create one ADMIN_Setting
+     * const ADMIN_Setting = await prisma.aDMIN_Setting.create({
+     *   data: {
+     *     // ... data to create a ADMIN_Setting
+     *   }
+     * })
+     * 
+     */
+    create<T extends ADMIN_SettingCreateArgs>(args: SelectSubset<T, ADMIN_SettingCreateArgs<ExtArgs>>): Prisma__ADMIN_SettingClient<$Result.GetResult<Prisma.$ADMIN_SettingPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many ADMIN_Settings.
+     * @param {ADMIN_SettingCreateManyArgs} args - Arguments to create many ADMIN_Settings.
+     * @example
+     * // Create many ADMIN_Settings
+     * const aDMIN_Setting = await prisma.aDMIN_Setting.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends ADMIN_SettingCreateManyArgs>(args?: SelectSubset<T, ADMIN_SettingCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many ADMIN_Settings and returns the data saved in the database.
+     * @param {ADMIN_SettingCreateManyAndReturnArgs} args - Arguments to create many ADMIN_Settings.
+     * @example
+     * // Create many ADMIN_Settings
+     * const aDMIN_Setting = await prisma.aDMIN_Setting.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many ADMIN_Settings and only return the `key`
+     * const aDMIN_SettingWithKeyOnly = await prisma.aDMIN_Setting.createManyAndReturn({
+     *   select: { key: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends ADMIN_SettingCreateManyAndReturnArgs>(args?: SelectSubset<T, ADMIN_SettingCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ADMIN_SettingPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a ADMIN_Setting.
+     * @param {ADMIN_SettingDeleteArgs} args - Arguments to delete one ADMIN_Setting.
+     * @example
+     * // Delete one ADMIN_Setting
+     * const ADMIN_Setting = await prisma.aDMIN_Setting.delete({
+     *   where: {
+     *     // ... filter to delete one ADMIN_Setting
+     *   }
+     * })
+     * 
+     */
+    delete<T extends ADMIN_SettingDeleteArgs>(args: SelectSubset<T, ADMIN_SettingDeleteArgs<ExtArgs>>): Prisma__ADMIN_SettingClient<$Result.GetResult<Prisma.$ADMIN_SettingPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one ADMIN_Setting.
+     * @param {ADMIN_SettingUpdateArgs} args - Arguments to update one ADMIN_Setting.
+     * @example
+     * // Update one ADMIN_Setting
+     * const aDMIN_Setting = await prisma.aDMIN_Setting.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends ADMIN_SettingUpdateArgs>(args: SelectSubset<T, ADMIN_SettingUpdateArgs<ExtArgs>>): Prisma__ADMIN_SettingClient<$Result.GetResult<Prisma.$ADMIN_SettingPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more ADMIN_Settings.
+     * @param {ADMIN_SettingDeleteManyArgs} args - Arguments to filter ADMIN_Settings to delete.
+     * @example
+     * // Delete a few ADMIN_Settings
+     * const { count } = await prisma.aDMIN_Setting.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends ADMIN_SettingDeleteManyArgs>(args?: SelectSubset<T, ADMIN_SettingDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ADMIN_Settings.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ADMIN_SettingUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many ADMIN_Settings
+     * const aDMIN_Setting = await prisma.aDMIN_Setting.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends ADMIN_SettingUpdateManyArgs>(args: SelectSubset<T, ADMIN_SettingUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ADMIN_Settings and returns the data updated in the database.
+     * @param {ADMIN_SettingUpdateManyAndReturnArgs} args - Arguments to update many ADMIN_Settings.
+     * @example
+     * // Update many ADMIN_Settings
+     * const aDMIN_Setting = await prisma.aDMIN_Setting.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more ADMIN_Settings and only return the `key`
+     * const aDMIN_SettingWithKeyOnly = await prisma.aDMIN_Setting.updateManyAndReturn({
+     *   select: { key: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends ADMIN_SettingUpdateManyAndReturnArgs>(args: SelectSubset<T, ADMIN_SettingUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ADMIN_SettingPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one ADMIN_Setting.
+     * @param {ADMIN_SettingUpsertArgs} args - Arguments to update or create a ADMIN_Setting.
+     * @example
+     * // Update or create a ADMIN_Setting
+     * const aDMIN_Setting = await prisma.aDMIN_Setting.upsert({
+     *   create: {
+     *     // ... data to create a ADMIN_Setting
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the ADMIN_Setting we want to update
+     *   }
+     * })
+     */
+    upsert<T extends ADMIN_SettingUpsertArgs>(args: SelectSubset<T, ADMIN_SettingUpsertArgs<ExtArgs>>): Prisma__ADMIN_SettingClient<$Result.GetResult<Prisma.$ADMIN_SettingPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of ADMIN_Settings.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ADMIN_SettingCountArgs} args - Arguments to filter ADMIN_Settings to count.
+     * @example
+     * // Count the number of ADMIN_Settings
+     * const count = await prisma.aDMIN_Setting.count({
+     *   where: {
+     *     // ... the filter for the ADMIN_Settings we want to count
+     *   }
+     * })
+    **/
+    count<T extends ADMIN_SettingCountArgs>(
+      args?: Subset<T, ADMIN_SettingCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ADMIN_SettingCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a ADMIN_Setting.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ADMIN_SettingAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ADMIN_SettingAggregateArgs>(args: Subset<T, ADMIN_SettingAggregateArgs>): Prisma.PrismaPromise<GetADMIN_SettingAggregateType<T>>
+
+    /**
+     * Group by ADMIN_Setting.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ADMIN_SettingGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends ADMIN_SettingGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ADMIN_SettingGroupByArgs['orderBy'] }
+        : { orderBy?: ADMIN_SettingGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ADMIN_SettingGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetADMIN_SettingGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the ADMIN_Setting model
+   */
+  readonly fields: ADMIN_SettingFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for ADMIN_Setting.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ADMIN_SettingClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the ADMIN_Setting model
+   */
+  interface ADMIN_SettingFieldRefs {
+    readonly key: FieldRef<"ADMIN_Setting", 'String'>
+    readonly value: FieldRef<"ADMIN_Setting", 'String'>
+    readonly updatedAt: FieldRef<"ADMIN_Setting", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * ADMIN_Setting findUnique
+   */
+  export type ADMIN_SettingFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ADMIN_Setting
+     */
+    select?: ADMIN_SettingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ADMIN_Setting
+     */
+    omit?: ADMIN_SettingOmit<ExtArgs> | null
+    /**
+     * Filter, which ADMIN_Setting to fetch.
+     */
+    where: ADMIN_SettingWhereUniqueInput
+  }
+
+  /**
+   * ADMIN_Setting findUniqueOrThrow
+   */
+  export type ADMIN_SettingFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ADMIN_Setting
+     */
+    select?: ADMIN_SettingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ADMIN_Setting
+     */
+    omit?: ADMIN_SettingOmit<ExtArgs> | null
+    /**
+     * Filter, which ADMIN_Setting to fetch.
+     */
+    where: ADMIN_SettingWhereUniqueInput
+  }
+
+  /**
+   * ADMIN_Setting findFirst
+   */
+  export type ADMIN_SettingFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ADMIN_Setting
+     */
+    select?: ADMIN_SettingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ADMIN_Setting
+     */
+    omit?: ADMIN_SettingOmit<ExtArgs> | null
+    /**
+     * Filter, which ADMIN_Setting to fetch.
+     */
+    where?: ADMIN_SettingWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ADMIN_Settings to fetch.
+     */
+    orderBy?: ADMIN_SettingOrderByWithRelationInput | ADMIN_SettingOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ADMIN_Settings.
+     */
+    cursor?: ADMIN_SettingWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ADMIN_Settings from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ADMIN_Settings.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ADMIN_Settings.
+     */
+    distinct?: ADMIN_SettingScalarFieldEnum | ADMIN_SettingScalarFieldEnum[]
+  }
+
+  /**
+   * ADMIN_Setting findFirstOrThrow
+   */
+  export type ADMIN_SettingFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ADMIN_Setting
+     */
+    select?: ADMIN_SettingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ADMIN_Setting
+     */
+    omit?: ADMIN_SettingOmit<ExtArgs> | null
+    /**
+     * Filter, which ADMIN_Setting to fetch.
+     */
+    where?: ADMIN_SettingWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ADMIN_Settings to fetch.
+     */
+    orderBy?: ADMIN_SettingOrderByWithRelationInput | ADMIN_SettingOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ADMIN_Settings.
+     */
+    cursor?: ADMIN_SettingWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ADMIN_Settings from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ADMIN_Settings.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ADMIN_Settings.
+     */
+    distinct?: ADMIN_SettingScalarFieldEnum | ADMIN_SettingScalarFieldEnum[]
+  }
+
+  /**
+   * ADMIN_Setting findMany
+   */
+  export type ADMIN_SettingFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ADMIN_Setting
+     */
+    select?: ADMIN_SettingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ADMIN_Setting
+     */
+    omit?: ADMIN_SettingOmit<ExtArgs> | null
+    /**
+     * Filter, which ADMIN_Settings to fetch.
+     */
+    where?: ADMIN_SettingWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ADMIN_Settings to fetch.
+     */
+    orderBy?: ADMIN_SettingOrderByWithRelationInput | ADMIN_SettingOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing ADMIN_Settings.
+     */
+    cursor?: ADMIN_SettingWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ADMIN_Settings from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ADMIN_Settings.
+     */
+    skip?: number
+    distinct?: ADMIN_SettingScalarFieldEnum | ADMIN_SettingScalarFieldEnum[]
+  }
+
+  /**
+   * ADMIN_Setting create
+   */
+  export type ADMIN_SettingCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ADMIN_Setting
+     */
+    select?: ADMIN_SettingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ADMIN_Setting
+     */
+    omit?: ADMIN_SettingOmit<ExtArgs> | null
+    /**
+     * The data needed to create a ADMIN_Setting.
+     */
+    data: XOR<ADMIN_SettingCreateInput, ADMIN_SettingUncheckedCreateInput>
+  }
+
+  /**
+   * ADMIN_Setting createMany
+   */
+  export type ADMIN_SettingCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many ADMIN_Settings.
+     */
+    data: ADMIN_SettingCreateManyInput | ADMIN_SettingCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * ADMIN_Setting createManyAndReturn
+   */
+  export type ADMIN_SettingCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ADMIN_Setting
+     */
+    select?: ADMIN_SettingSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ADMIN_Setting
+     */
+    omit?: ADMIN_SettingOmit<ExtArgs> | null
+    /**
+     * The data used to create many ADMIN_Settings.
+     */
+    data: ADMIN_SettingCreateManyInput | ADMIN_SettingCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * ADMIN_Setting update
+   */
+  export type ADMIN_SettingUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ADMIN_Setting
+     */
+    select?: ADMIN_SettingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ADMIN_Setting
+     */
+    omit?: ADMIN_SettingOmit<ExtArgs> | null
+    /**
+     * The data needed to update a ADMIN_Setting.
+     */
+    data: XOR<ADMIN_SettingUpdateInput, ADMIN_SettingUncheckedUpdateInput>
+    /**
+     * Choose, which ADMIN_Setting to update.
+     */
+    where: ADMIN_SettingWhereUniqueInput
+  }
+
+  /**
+   * ADMIN_Setting updateMany
+   */
+  export type ADMIN_SettingUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update ADMIN_Settings.
+     */
+    data: XOR<ADMIN_SettingUpdateManyMutationInput, ADMIN_SettingUncheckedUpdateManyInput>
+    /**
+     * Filter which ADMIN_Settings to update
+     */
+    where?: ADMIN_SettingWhereInput
+    /**
+     * Limit how many ADMIN_Settings to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * ADMIN_Setting updateManyAndReturn
+   */
+  export type ADMIN_SettingUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ADMIN_Setting
+     */
+    select?: ADMIN_SettingSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ADMIN_Setting
+     */
+    omit?: ADMIN_SettingOmit<ExtArgs> | null
+    /**
+     * The data used to update ADMIN_Settings.
+     */
+    data: XOR<ADMIN_SettingUpdateManyMutationInput, ADMIN_SettingUncheckedUpdateManyInput>
+    /**
+     * Filter which ADMIN_Settings to update
+     */
+    where?: ADMIN_SettingWhereInput
+    /**
+     * Limit how many ADMIN_Settings to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * ADMIN_Setting upsert
+   */
+  export type ADMIN_SettingUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ADMIN_Setting
+     */
+    select?: ADMIN_SettingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ADMIN_Setting
+     */
+    omit?: ADMIN_SettingOmit<ExtArgs> | null
+    /**
+     * The filter to search for the ADMIN_Setting to update in case it exists.
+     */
+    where: ADMIN_SettingWhereUniqueInput
+    /**
+     * In case the ADMIN_Setting found by the `where` argument doesn't exist, create a new ADMIN_Setting with this data.
+     */
+    create: XOR<ADMIN_SettingCreateInput, ADMIN_SettingUncheckedCreateInput>
+    /**
+     * In case the ADMIN_Setting was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ADMIN_SettingUpdateInput, ADMIN_SettingUncheckedUpdateInput>
+  }
+
+  /**
+   * ADMIN_Setting delete
+   */
+  export type ADMIN_SettingDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ADMIN_Setting
+     */
+    select?: ADMIN_SettingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ADMIN_Setting
+     */
+    omit?: ADMIN_SettingOmit<ExtArgs> | null
+    /**
+     * Filter which ADMIN_Setting to delete.
+     */
+    where: ADMIN_SettingWhereUniqueInput
+  }
+
+  /**
+   * ADMIN_Setting deleteMany
+   */
+  export type ADMIN_SettingDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ADMIN_Settings to delete
+     */
+    where?: ADMIN_SettingWhereInput
+    /**
+     * Limit how many ADMIN_Settings to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * ADMIN_Setting without action
+   */
+  export type ADMIN_SettingDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ADMIN_Setting
+     */
+    select?: ADMIN_SettingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ADMIN_Setting
+     */
+    omit?: ADMIN_SettingOmit<ExtArgs> | null
+  }
+
+
+  /**
    * Model ORG_Invite
    */
 
@@ -3294,6 +4354,15 @@ export namespace Prisma {
   export type ORGScalarFieldEnum = (typeof ORGScalarFieldEnum)[keyof typeof ORGScalarFieldEnum]
 
 
+  export const ADMIN_SettingScalarFieldEnum: {
+    key: 'key',
+    value: 'value',
+    updatedAt: 'updatedAt'
+  };
+
+  export type ADMIN_SettingScalarFieldEnum = (typeof ADMIN_SettingScalarFieldEnum)[keyof typeof ADMIN_SettingScalarFieldEnum]
+
+
   export const ORG_InviteScalarFieldEnum: {
     id: 'id',
     orgId: 'orgId',
@@ -3467,6 +4536,48 @@ export namespace Prisma {
     updatedAt?: DateTimeWithAggregatesFilter<"ORG"> | Date | string
   }
 
+  export type ADMIN_SettingWhereInput = {
+    AND?: ADMIN_SettingWhereInput | ADMIN_SettingWhereInput[]
+    OR?: ADMIN_SettingWhereInput[]
+    NOT?: ADMIN_SettingWhereInput | ADMIN_SettingWhereInput[]
+    key?: StringFilter<"ADMIN_Setting"> | string
+    value?: StringFilter<"ADMIN_Setting"> | string
+    updatedAt?: DateTimeFilter<"ADMIN_Setting"> | Date | string
+  }
+
+  export type ADMIN_SettingOrderByWithRelationInput = {
+    key?: SortOrder
+    value?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ADMIN_SettingWhereUniqueInput = Prisma.AtLeast<{
+    key?: string
+    AND?: ADMIN_SettingWhereInput | ADMIN_SettingWhereInput[]
+    OR?: ADMIN_SettingWhereInput[]
+    NOT?: ADMIN_SettingWhereInput | ADMIN_SettingWhereInput[]
+    value?: StringFilter<"ADMIN_Setting"> | string
+    updatedAt?: DateTimeFilter<"ADMIN_Setting"> | Date | string
+  }, "key">
+
+  export type ADMIN_SettingOrderByWithAggregationInput = {
+    key?: SortOrder
+    value?: SortOrder
+    updatedAt?: SortOrder
+    _count?: ADMIN_SettingCountOrderByAggregateInput
+    _max?: ADMIN_SettingMaxOrderByAggregateInput
+    _min?: ADMIN_SettingMinOrderByAggregateInput
+  }
+
+  export type ADMIN_SettingScalarWhereWithAggregatesInput = {
+    AND?: ADMIN_SettingScalarWhereWithAggregatesInput | ADMIN_SettingScalarWhereWithAggregatesInput[]
+    OR?: ADMIN_SettingScalarWhereWithAggregatesInput[]
+    NOT?: ADMIN_SettingScalarWhereWithAggregatesInput | ADMIN_SettingScalarWhereWithAggregatesInput[]
+    key?: StringWithAggregatesFilter<"ADMIN_Setting"> | string
+    value?: StringWithAggregatesFilter<"ADMIN_Setting"> | string
+    updatedAt?: DateTimeWithAggregatesFilter<"ADMIN_Setting"> | Date | string
+  }
+
   export type ORG_InviteWhereInput = {
     AND?: ORG_InviteWhereInput | ORG_InviteWhereInput[]
     OR?: ORG_InviteWhereInput[]
@@ -3609,6 +4720,48 @@ export namespace Prisma {
     status?: StringFieldUpdateOperationsInput | string
     ownerEmail?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ADMIN_SettingCreateInput = {
+    key: string
+    value: string
+    updatedAt?: Date | string
+  }
+
+  export type ADMIN_SettingUncheckedCreateInput = {
+    key: string
+    value: string
+    updatedAt?: Date | string
+  }
+
+  export type ADMIN_SettingUpdateInput = {
+    key?: StringFieldUpdateOperationsInput | string
+    value?: StringFieldUpdateOperationsInput | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ADMIN_SettingUncheckedUpdateInput = {
+    key?: StringFieldUpdateOperationsInput | string
+    value?: StringFieldUpdateOperationsInput | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ADMIN_SettingCreateManyInput = {
+    key: string
+    value: string
+    updatedAt?: Date | string
+  }
+
+  export type ADMIN_SettingUpdateManyMutationInput = {
+    key?: StringFieldUpdateOperationsInput | string
+    value?: StringFieldUpdateOperationsInput | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ADMIN_SettingUncheckedUpdateManyInput = {
+    key?: StringFieldUpdateOperationsInput | string
+    value?: StringFieldUpdateOperationsInput | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -3812,6 +4965,24 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedDateTimeFilter<$PrismaModel>
     _max?: NestedDateTimeFilter<$PrismaModel>
+  }
+
+  export type ADMIN_SettingCountOrderByAggregateInput = {
+    key?: SortOrder
+    value?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ADMIN_SettingMaxOrderByAggregateInput = {
+    key?: SortOrder
+    value?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ADMIN_SettingMinOrderByAggregateInput = {
+    key?: SortOrder
+    value?: SortOrder
+    updatedAt?: SortOrder
   }
 
   export type IntNullableFilter<$PrismaModel = never> = {

@@ -104,6 +104,12 @@ exports.Prisma.ORGScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.ADMIN_SettingScalarFieldEnum = {
+  key: 'key',
+  value: 'value',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.ORG_InviteScalarFieldEnum = {
   id: 'id',
   orgId: 'orgId',
@@ -132,6 +138,7 @@ exports.Prisma.NullsOrder = {
 
 exports.Prisma.ModelName = {
   ORG: 'ORG',
+  ADMIN_Setting: 'ADMIN_Setting',
   ORG_Invite: 'ORG_Invite'
 };
 /**
@@ -175,7 +182,6 @@ const config = {
     "db"
   ],
   "activeProvider": "postgresql",
-  "postinstall": false,
   "inlineDatasources": {
     "db": {
       "url": {
@@ -184,13 +190,13 @@ const config = {
       }
     }
   },
-  "inlineSchema": "generator client {\n  provider        = \"prisma-client-js\"\n  output          = \"../src/generated/master\"\n  previewFeatures = [\"driverAdapters\"]\n}\n\ndatasource db {\n  provider = \"postgresql\"\n  url      = env(\"MASTER_DATABASE_URL\")\n}\n\nmodel ORG {\n  id          Int      @id @default(autoincrement())\n  slug        String   @unique // URL slug, e.g. \"pointasia\"\n  name        String // 公司顯示名稱\n  databaseUrl String   @db.Text // 該 org 的 Neon DATABASE_URL（加密儲存）\n  status      String   @default(\"pending\") // pending | active | suspended\n  ownerEmail  String // 第一個管理員 email\n  createdAt   DateTime @default(now())\n  updatedAt   DateTime @updatedAt\n\n  invites ORG_Invite[]\n\n  @@map(\"ORG\")\n}\n\nmodel ORG_Invite {\n  id        Int       @id @default(autoincrement())\n  orgId     Int? // null = 邀請還沒有對應 org（新用戶邀請）\n  email     String\n  token     String    @unique // 隨機 token，放在邀請信連結裡\n  expiresAt DateTime\n  usedAt    DateTime? // null = 尚未使用\n  createdAt DateTime  @default(now())\n\n  org ORG? @relation(fields: [orgId], references: [id])\n\n  @@map(\"ORG_Invite\")\n}\n",
-  "inlineSchemaHash": "c73050e8e6e0cfe59495bcd2fb1ba5ce564d4ea44e342e16fd29ffa29f31fe52",
+  "inlineSchema": "generator client {\n  provider        = \"prisma-client-js\"\n  output          = \"../src/generated/master\"\n  previewFeatures = [\"driverAdapters\"]\n}\n\ndatasource db {\n  provider = \"postgresql\"\n  url      = env(\"MASTER_DATABASE_URL\")\n}\n\nmodel ORG {\n  id          Int      @id @default(autoincrement())\n  slug        String   @unique // URL slug, e.g. \"pointasia\"\n  name        String // 公司顯示名稱\n  databaseUrl String   @db.Text // 該 org 的 Neon DATABASE_URL（加密儲存）\n  status      String   @default(\"pending\") // pending | active | suspended\n  ownerEmail  String // 第一個管理員 email\n  createdAt   DateTime @default(now())\n  updatedAt   DateTime @updatedAt\n\n  invites ORG_Invite[]\n\n  @@map(\"ORG\")\n}\n\nmodel ADMIN_Setting {\n  key       String   @id\n  value     String   @db.Text\n  updatedAt DateTime @updatedAt\n\n  @@map(\"ADMIN_Setting\")\n}\n\nmodel ORG_Invite {\n  id        Int       @id @default(autoincrement())\n  orgId     Int? // null = 邀請還沒有對應 org（新用戶邀請）\n  email     String\n  token     String    @unique // 隨機 token，放在邀請信連結裡\n  expiresAt DateTime\n  usedAt    DateTime? // null = 尚未使用\n  createdAt DateTime  @default(now())\n\n  org ORG? @relation(fields: [orgId], references: [id])\n\n  @@map(\"ORG_Invite\")\n}\n",
+  "inlineSchemaHash": "3b53b1637e6e8b65f510c02be0a0abb9a85f155831101c24ded4c32173020bea",
   "copyEngine": true
 }
 config.dirname = '/'
 
-config.runtimeDataModel = JSON.parse("{\"models\":{\"ORG\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"slug\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"databaseUrl\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"status\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"ownerEmail\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"invites\",\"kind\":\"object\",\"type\":\"ORG_Invite\",\"relationName\":\"ORGToORG_Invite\"}],\"dbName\":\"ORG\"},\"ORG_Invite\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"orgId\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"email\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"token\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"expiresAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"usedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"org\",\"kind\":\"object\",\"type\":\"ORG\",\"relationName\":\"ORGToORG_Invite\"}],\"dbName\":\"ORG_Invite\"}},\"enums\":{},\"types\":{}}")
+config.runtimeDataModel = JSON.parse("{\"models\":{\"ORG\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"slug\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"databaseUrl\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"status\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"ownerEmail\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"invites\",\"kind\":\"object\",\"type\":\"ORG_Invite\",\"relationName\":\"ORGToORG_Invite\"}],\"dbName\":\"ORG\"},\"ADMIN_Setting\":{\"fields\":[{\"name\":\"key\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"value\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"}],\"dbName\":\"ADMIN_Setting\"},\"ORG_Invite\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"orgId\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"email\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"token\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"expiresAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"usedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"org\",\"kind\":\"object\",\"type\":\"ORG\",\"relationName\":\"ORGToORG_Invite\"}],\"dbName\":\"ORG_Invite\"}},\"enums\":{},\"types\":{}}")
 defineDmmfProperty(exports.Prisma, config.runtimeDataModel)
 config.engineWasm = {
   getRuntime: async () => require('./query_engine_bg.js'),
