@@ -23,12 +23,12 @@ export default function UpsForm({ initialAccountNo, source, initialMultiplier }:
     setSaving(true)
     setMsg(null)
 
-    // 驗證折扣係數
+    // 驗證服務費乘數
     const multiplierVal = multiplier.trim()
     if (multiplierVal !== '') {
       const n = parseFloat(multiplierVal)
-      if (isNaN(n) || n <= 0 || n > 1) {
-        setMsg({ type: 'err', text: '折扣係數必須介於 0（不含）至 1 之間，例如 0.35' })
+      if (isNaN(n) || n <= 0) {
+        setMsg({ type: 'err', text: '服務費乘數必須大於 0，例如 1.2 代表加收 20%' })
         setSaving(false)
         return
       }
@@ -83,15 +83,15 @@ export default function UpsForm({ initialAccountNo, source, initialMultiplier }:
         </div>
       </div>
 
-      {/* Discount Multiplier */}
+      {/* Service Fee Multiplier */}
       <div className="space-y-3 border-t pt-5">
         <div>
-          <h3 className="text-sm font-medium text-gray-700">契約折扣係數</h3>
+          <h3 className="text-sm font-medium text-gray-700">服務費乘數</h3>
           <p className="text-xs text-gray-400 mt-0.5">
-            實際帳單金額 ÷ UPS API 報價。例如帳單 NT$11,316 ÷ API 報價 NT$31,329 ≈ <strong>0.361</strong>
+            租戶使用平台代管 UPS 時，對<strong>基本運費</strong>套用的乘數。例如 <strong>1.2</strong> = 加收 20%。
           </p>
           <p className="text-xs text-gray-400 mt-0.5">
-            套用後，查詢結果顯示的「契約估算金額」= API 報價 × 此係數。留空則不套用。
+            燃油附加費、旺季附加費等附加費<strong>不加</strong>（屬公開收費，租戶可自行查核）。留空則以原價顯示。
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -100,14 +100,15 @@ export default function UpsForm({ initialAccountNo, source, initialMultiplier }:
             value={multiplier}
             onChange={e => setMultiplier(e.target.value)}
             min={0.01}
-            max={1}
             step={0.001}
-            placeholder="例：0.361"
+            placeholder="例：1.2"
             className="w-36 border rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          {multiplier && (
+          {multiplier && !isNaN(parseFloat(multiplier)) && parseFloat(multiplier) > 0 && (
             <span className="text-xs text-gray-500">
-              = API 報價打 {(parseFloat(multiplier) * 10).toFixed(2)} 折
+              {parseFloat(multiplier) >= 1
+                ? `= 基本運費加收 ${((parseFloat(multiplier) - 1) * 100).toFixed(1)}%`
+                : `= 基本運費打 ${(parseFloat(multiplier) * 100).toFixed(1)}% 折`}
             </span>
           )}
         </div>

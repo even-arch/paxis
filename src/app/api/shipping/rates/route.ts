@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'UPS 服務尚未開通，請聯繫錫諾系統或至「設定 → UPS」設定自有帳號', upsNotEnabled: true }, { status: 503 })
     }
 
-    const { accountNo, discountMultiplier } = creds
+    const { accountNo, discountMultiplier, source } = creds
 
     const accessToken = await getUpsAccessToken()
     const options = await getUpsRates(
@@ -44,13 +44,23 @@ export async function POST(req: NextRequest) {
       body.declaredValueUsd,
     )
 
-    // 套用折扣係數
-    const result = options.map(opt => ({
-      ...opt,
-      contractEstimate: discountMultiplier != null
-        ? parseFloat((opt.amount * discountMultiplier).toFixed(2))
-        : null,
-    }))
+    // 套用費率：managed 來源只對基本運費加乘，附加費不加；own 來源原樣輸出
+    const result = options.map(opt => {
+      if (source === 'managed' && discountMultiplier != null && opt.chargeBreakdown?.baseCharge != null) {
+        const { baseCharge, surcharges, taxAmount } = opt.chargeBreakdown
+        const surchargesTotal = surcharges.reduce((s, c) => s + c.amount, 0)
+        const markedUpAmount = parseFloat(
+          (baseCharge * discountMultiplier + surchargesTotal + (taxAmount ?? 0)).toFixed(2)
+        )
+        return { ...opt, amount: markedUpAmount, contractEstimate: null }
+      }
+      return {
+        ...opt,
+        contractEstimate: discountMultiplier != null
+          ? parseFloat((opt.amount * discountMultiplier).toFixed(2))
+          : null,
+      }
+    })
 
     return NextResponse.json({
       options: result,

@@ -340,6 +340,9 @@ export default function ShippingPage() {
   const [paxisCommercialInvNo, setPaxisCommercialInvNo] = useState('')
   const [paxisCiExchangeRate, setPaxisCiExchangeRate] = useState('')
 
+  // 出貨模式：package = 一般貨物；document = 純文件（不計材積重，不需裝箱明細）
+  const [shipmentMode, setShipmentMode] = useState<'package' | 'document'>('package')
+
   // 建提單（確認後才執行）
   const [creatingShipment, setCreatingShipment] = useState(false)
   const [shipmentResult, setShipmentResult] = useState<{
@@ -834,11 +837,11 @@ export default function ShippingPage() {
           destination: { ...destination, taxId: destination.taxId || undefined },
           packages: pkgList.map(p => ({
             weightKg: parseFloat(p.grossWeightKg),
-            lengthCm: p.lengthCm ? parseFloat(p.lengthCm) : undefined,
-            widthCm: p.widthCm ? parseFloat(p.widthCm) : undefined,
-            heightCm: p.heightCm ? parseFloat(p.heightCm) : undefined,
+            dimensions: (p.lengthCm && p.widthCm && p.heightCm)
+              ? { lengthCm: parseFloat(p.lengthCm), widthCm: parseFloat(p.widthCm), heightCm: parseFloat(p.heightCm) }
+              : undefined,
             quantity: parseInt(p.quantity) || 1,
-            packageType: p.packageType,
+            packageType: shipmentMode === 'document' ? 'document' : p.packageType,
             items: p.items,
           })),
           declaredValue: declaredValue ? parseFloat(declaredValue) : undefined,
@@ -1106,11 +1109,11 @@ export default function ShippingPage() {
           destination: { ...destination, taxId: destination.taxId || undefined },
           packages: pkgList.map(p => ({
             weightKg: parseFloat(p.grossWeightKg),
-            lengthCm: p.lengthCm ? parseFloat(p.lengthCm) : undefined,
-            widthCm:  p.widthCm  ? parseFloat(p.widthCm)  : undefined,
-            heightCm: p.heightCm ? parseFloat(p.heightCm) : undefined,
+            dimensions: (p.lengthCm && p.widthCm && p.heightCm)
+              ? { lengthCm: parseFloat(p.lengthCm), widthCm: parseFloat(p.widthCm), heightCm: parseFloat(p.heightCm) }
+              : undefined,
             quantity: parseInt(p.quantity) || 1,
-            packageType: p.packageType,
+            packageType: shipmentMode === 'document' ? 'document' : p.packageType,
           })),
           declaredValueUsd: declaredValue ? parseFloat(declaredValue) : undefined,
         }),
@@ -1199,7 +1202,29 @@ export default function ShippingPage() {
     <div className="space-y-5 py-6 px-4 max-w-[1400px]">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-800">UPS 出貨</h1>
+        <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5">
+          <button type="button"
+            onClick={() => setShipmentMode('package')}
+            className={`text-xs px-3 py-1.5 rounded-md transition-colors ${
+              shipmentMode === 'package' ? 'bg-white text-gray-800 shadow-sm font-medium' : 'text-gray-500 hover:text-gray-700'
+            }`}>
+            📦 貨物
+          </button>
+          <button type="button"
+            onClick={() => setShipmentMode('document')}
+            className={`text-xs px-3 py-1.5 rounded-md transition-colors ${
+              shipmentMode === 'document' ? 'bg-white text-gray-800 shadow-sm font-medium' : 'text-gray-500 hover:text-gray-700'
+            }`}>
+            📄 文件
+          </button>
+        </div>
       </div>
+
+      {shipmentMode === 'document' && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5 text-xs text-blue-700">
+          📄 <strong>文件模式</strong>：UPS 將此包裹分類為文件，不計材積重量，無需填寫裝箱明細。
+        </div>
+      )}
 
       {/* 從 SLS 帶入時的提示 banner */}
       {linkedSlsShipmentId && (
@@ -1401,8 +1426,8 @@ export default function ShippingPage() {
                                 </td>
                               </tr>
 
-                              {/* ── Level 3: Items ── */}
-                              <tr>
+                              {/* ── Level 3: Items（文件模式下隱藏）── */}
+                              {shipmentMode !== 'document' && <tr>
                                 <td colSpan={11} className="p-0 pb-1">
                                   <table className="w-full text-xs">
                                     <thead>
@@ -1494,7 +1519,7 @@ export default function ShippingPage() {
                                     </tbody>
                                   </table>
                                 </td>
-                              </tr>
+                              </tr>}
                             </React.Fragment>
                           )
                         })}
