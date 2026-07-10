@@ -60,6 +60,49 @@ export default async function ShipmentDetailPage({ params }: Props) {
 
   if (!shipment) notFound()
 
+  // 建立 piList（依 SLS_PI_Link.sortOrder 排列），供 PIOrderPanel 與裝箱明細共用
+  type PiEntry = import('./PIOrderPanel').PiEntry
+  let piList: PiEntry[] = shipment.pis.map(sp => ({
+    piId: sp.piId,
+    piNo: sp.pi.piNo,
+    orderId: sp.pi.order?.id,
+    orderNo: sp.pi.order?.orderNo,
+    etd: sp.pi.etd,
+    poOrders: sp.pi.poOrders,
+  }))
+  if (piList.length === 0) {
+    // fallback：從 items 推導（舊資料 / UPS 流程漏建 SLS_PI_Link）
+    const seen = new Set<number>()
+    for (const item of shipment.items) {
+      if (item.pi && !seen.has(item.pi.id)) {
+        seen.add(item.pi.id)
+        piList.push({ piId: item.pi.id, piNo: item.pi.piNo, orderId: item.pi.orderId, poOrders: [] })
+      }
+    }
+  }
+  if (piList.length > 0) {
+    // 模糊補查：poNo 以 piNo 為前綴，補上 slsPiId FK 沒抓到的拆單 PO
+    const fuzzyPOs = await prisma.pO.findMany({
+      where: {
+        OR: piList.map(p => ({ poNo: { startsWith: p.piNo } })),
+        slsPiId: null,
+      },
+      select: { id: true, poNo: true, slsPiId: true, supplier: { select: { shortName: true, name: true } } },
+    })
+    for (const pi of piList) {
+      const matched = fuzzyPOs.filter(po =>
+        po.poNo === pi.piNo ||
+        po.poNo.startsWith(pi.piNo + '-') ||
+        /^[A-Z]$/.test(po.poNo.slice(pi.piNo.length))
+      )
+      for (const po of matched) {
+        if (!pi.poOrders.find(p => p.id === po.id)) {
+          pi.poOrders.push({ id: po.id, poNo: po.poNo, supplier: po.supplier })
+        }
+      }
+    }
+  }
+
   const SOURCE_LABELS: Record<string, string> = {
     PATISCO: 'Patisco', MANUAL: '手動', AI_IMPORT: 'AI 匯入', UPS: 'UPS',
   }
@@ -127,53 +170,13 @@ export default async function ShipmentDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {await (async () => {
-        // 優先用 SLS_PI_Link junction table（已按 sortOrder 排序）；
-        // 若空（舊資料或 UPS 流程漏建），從 items.pi 推導唯一 PI 清單作為 fallback
-        let piList: import('./PIOrderPanel').PiEntry[] = shipment.pis.map(sp => ({
-          piId: sp.piId,
-          piNo: sp.pi.piNo,
-          orderId: sp.pi.order?.id,
-          orderNo: sp.pi.order?.orderNo,
-          etd: sp.pi.etd,
-          poOrders: sp.pi.poOrders,
-        }))
-        if (piList.length === 0) {
-          const seen = new Set<number>()
-          for (const item of shipment.items) {
-            if (item.pi && !seen.has(item.pi.id)) {
-              seen.add(item.pi.id)
-              piList.push({ piId: item.pi.id, piNo: item.pi.piNo, orderId: item.pi.orderId, poOrders: [] })
-            }
-          }
-        }
-        if (piList.length === 0) return null
-
-        // 模糊補查：poNo 以 piNo 為前綴（含精確相等），補上 slsPiId FK 沒有抓到的拆單 PO
-        const fuzzyPOs = await prisma.pO.findMany({
-          where: {
-            OR: piList.map(p => ({ poNo: { startsWith: p.piNo } })),
-            slsPiId: null,
-          },
-          select: { id: true, poNo: true, slsPiId: true, supplier: { select: { shortName: true, name: true } } },
-        })
-        for (const pi of piList) {
-          const matched = fuzzyPOs.filter(po => po.poNo === pi.piNo || po.poNo.startsWith(pi.piNo + '-') || /^[A-Z]$/.test(po.poNo.slice(pi.piNo.length)))
-          for (const po of matched) {
-            if (!pi.poOrders.find(p => p.id === po.id)) {
-              pi.poOrders.push({ id: po.id, poNo: po.poNo, supplier: po.supplier })
-            }
-          }
-        }
-
-        return (
-          <PIOrderPanel
-            piList={piList}
-            shipmentId={shipment.id}
-            orgSlug={params.orgSlug}
-          />
-        )
-      })()}
+      {piList.length > 0 && (
+        <PIOrderPanel
+          piList={piList}
+          shipmentId={shipment.id}
+          orgSlug={params.orgSlug}
+        />
+      )}
 
       <div className="bg-white rounded-lg shadow p-5 mb-6">
         <div className="flex items-center justify-between mb-3">
@@ -222,7 +225,6 @@ export default async function ShipmentDetailPage({ params }: Props) {
 
       {shipment.items.length > 0 && (() => {
         // 序列化 Decimal → string，以 PI 分組，傳給 Client Component
-        type Item = typeof shipment.items[number]
         const groupMap = new Map<string, ShipmentGroupData>()
         for (const item of shipment.items) {
           const key = item.piId != null ? String(item.piId) : '__none__'
@@ -255,7 +257,16 @@ export default async function ShipmentDetailPage({ params }: Props) {
             hasLinkedOrder: !!(item.slsItem || item.piId),
           })
         }
-        const groups = Array.from(groupMap.values())
+        // 依 piList 的 sortOrder 排列群組；未關聯 PI 的品項放最後
+        const groups: ShipmentGroupData[] = [
+          ...piList.map(p => groupMap.get(String(p.piId))).filter((g): g is ShipmentGroupData => g != null),
+          ...(groupMap.has('__none__') ? [groupMap.get('__none__')!] : []),
+        ]
+        // fallback：若 piList 沒有涵蓋所有 piId（理論上不應發生），補上剩餘群組
+        const covered = new Set(piList.map(p => String(p.piId)))
+        groupMap.forEach((g, key) => {
+          if (!covered.has(key) && key !== '__none__') groups.push(g)
+        })
 
         return (
           <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
