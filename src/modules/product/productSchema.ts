@@ -1,5 +1,7 @@
 export type ProductFormData = {
   name: string
+  // 產品類型：'0'=成品/一般商品 '1'=半成品 '2'=原物料/零件
+  productType: string
   sku: string
   modelNo: string
   description: string
@@ -22,6 +24,7 @@ export type ProductFormData = {
 
 export const emptyProductForm: ProductFormData = {
   name: '',
+  productType: '0',
   sku: '',
   modelNo: '',
   description: '',

@@ -83,6 +83,13 @@ export default function ProductForm({ initialData, productId }: Props) {
           <Field label="型號 Model No.">
             <input type="text" value={form.modelNo} onChange={e => set('modelNo', e.target.value)} className={input} />
           </Field>
+          <Field label="產品類型">
+            <select value={form.productType} onChange={e => set('productType', e.target.value)} className={input}>
+              <option value="0">成品 / 一般商品</option>
+              <option value="1">半成品（加工中間狀態）</option>
+              <option value="2">原物料 / 零件</option>
+            </select>
+          </Field>
           <Field label="單位">
             <select value={form.unit} onChange={e => set('unit', e.target.value)} className={input}>
               <option value="">請選擇</option>

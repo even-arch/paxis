@@ -16,6 +16,7 @@ export default async function EditProductPage({
 
   const initialData: Partial<ProductFormData> = {
     name: product.name,
+    productType: String(product.productType ?? 0),
     sku: product.sku ?? '',
     modelNo: product.modelNo ?? '',
     description: product.description ?? '',

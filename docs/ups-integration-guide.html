@@ -1,0 +1,1515 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UPS 整合工程文件 — Patisco 實作指南</title>
+<style>
+/* ── Token System ───────────────────────────────── */
+:root {
+  --bg:         #F5F5F0;
+  --surface:    #FFFFFF;
+  --surface2:   #F0F0EB;
+  --border:     #DDD9D0;
+  --border2:    #EDEBE6;
+  --text:       #1A1A14;
+  --text2:      #5A5850;
+  --text3:      #8A8678;
+  --accent:     #3D6FFF;
+  --accent-dim: #D6E0FF;
+  --accent-dark:#2251CC;
+  --success:    #1A7A40;
+  --success-bg: #E8F5EE;
+  --warn:       #C47A00;
+  --warn-bg:    #FFF5E0;
+  --danger:     #C22222;
+  --danger-bg:  #FDEAEA;
+  --code-bg:    #0D1624;
+  --code-text:  #C8D6F0;
+  --code-str:   #7EC8A0;
+  --code-kw:    #8DB4FF;
+  --code-cmt:   #556888;
+  --code-num:   #F0A060;
+  --code-type:  #E0C080;
+  --sidebar-w:  248px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:         #0C0F1A;
+    --surface:    #141826;
+    --surface2:   #1A1F30;
+    --border:     #262D42;
+    --border2:    #1E2438;
+    --text:       #E4E8F4;
+    --text2:      #8A95B0;
+    --text3:      #5A6480;
+    --accent:     #5A88FF;
+    --accent-dim: #1A2A50;
+    --accent-dark:#7AA4FF;
+    --success:    #3AAA64;
+    --success-bg: #0D2A1A;
+    --warn:       #E09020;
+    --warn-bg:    #251D06;
+    --danger:     #E04444;
+    --danger-bg:  #2A0D0D;
+    --code-bg:    #080C14;
+    --code-text:  #C8D6F0;
+  }
+}
+:root[data-theme="light"] {
+  --bg:         #F5F5F0;
+  --surface:    #FFFFFF;
+  --surface2:   #F0F0EB;
+  --border:     #DDD9D0;
+  --border2:    #EDEBE6;
+  --text:       #1A1A14;
+  --text2:      #5A5850;
+  --text3:      #8A8678;
+  --accent:     #3D6FFF;
+  --accent-dim: #D6E0FF;
+  --accent-dark:#2251CC;
+  --success:    #1A7A40;
+  --success-bg: #E8F5EE;
+  --warn:       #C47A00;
+  --warn-bg:    #FFF5E0;
+  --danger:     #C22222;
+  --danger-bg:  #FDEAEA;
+  --code-bg:    #0D1624;
+  --code-text:  #C8D6F0;
+}
+:root[data-theme="dark"] {
+  --bg:         #0C0F1A;
+  --surface:    #141826;
+  --surface2:   #1A1F30;
+  --border:     #262D42;
+  --border2:    #1E2438;
+  --text:       #E4E8F4;
+  --text2:      #8A95B0;
+  --text3:      #5A6480;
+  --accent:     #5A88FF;
+  --accent-dim: #1A2A50;
+  --accent-dark:#7AA4FF;
+  --success:    #3AAA64;
+  --success-bg: #0D2A1A;
+  --warn:       #E09020;
+  --warn-bg:    #251D06;
+  --danger:     #E04444;
+  --danger-bg:  #2A0D0D;
+  --code-bg:    #080C14;
+  --code-text:  #C8D6F0;
+}
+
+/* ── Reset + Base ───────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text);
+  background: var(--bg);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Layout ─────────────────────────────────────── */
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Sidebar ─────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.sidebar-header {
+  padding: 20px 18px 14px;
+  border-bottom: 1px solid var(--border2);
+}
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.sidebar-logo-icon {
+  width: 28px; height: 28px;
+  background: var(--accent);
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px;
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  flex-shrink: 0;
+}
+.sidebar-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.2px;
+  line-height: 1.3;
+}
+.sidebar-subtitle {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 2px;
+}
+.sidebar-version {
+  display: inline-block;
+  font-size: 10px;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  background: var(--accent-dim);
+  color: var(--accent-dark);
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-top: 6px;
+}
+.nav {
+  padding: 10px 0 20px;
+  flex: 1;
+}
+.nav-group-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text3);
+  padding: 12px 18px 4px;
+}
+.nav a {
+  display: block;
+  font-size: 12.5px;
+  color: var(--text2);
+  text-decoration: none;
+  padding: 4px 18px;
+  border-left: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  line-height: 1.5;
+}
+.nav a:hover { color: var(--accent); background: var(--accent-dim); }
+.nav a.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-dim); }
+.nav a.sub { padding-left: 30px; font-size: 12px; }
+
+/* ── Main Content ────────────────────────────────── */
+.main {
+  flex: 1;
+  min-width: 0;
+  padding: 48px 56px 80px;
+  max-width: 900px;
+}
+
+/* ── Page Header ─────────────────────────────────── */
+.page-header {
+  margin-bottom: 48px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--border);
+}
+.page-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+.page-title {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.8px;
+  color: var(--text);
+  line-height: 1.15;
+  text-wrap: balance;
+  margin-bottom: 12px;
+}
+.page-desc {
+  font-size: 15px;
+  color: var(--text2);
+  max-width: 600px;
+  line-height: 1.65;
+}
+.meta-row {
+  display: flex;
+  gap: 20px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+.meta-item {
+  font-size: 12px;
+  color: var(--text3);
+}
+.meta-item strong { color: var(--text2); }
+
+/* ── Section ─────────────────────────────────────── */
+.section {
+  margin-bottom: 52px;
+}
+.section-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  color: var(--text);
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--accent);
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.section-num {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  color: var(--text3);
+  letter-spacing: 0.05em;
+}
+.subsection {
+  margin-bottom: 28px;
+}
+.subsection-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 10px;
+  padding-left: 10px;
+  border-left: 3px solid var(--accent);
+  line-height: 1.4;
+}
+p {
+  color: var(--text2);
+  margin-bottom: 12px;
+  line-height: 1.7;
+}
+p:last-child { margin-bottom: 0; }
+
+/* ── Code ─────────────────────────────────────────── */
+pre {
+  background: var(--code-bg);
+  border-radius: 8px;
+  padding: 18px 20px;
+  overflow-x: auto;
+  margin: 14px 0;
+  border: 1px solid rgba(255,255,255,0.05);
+  line-height: 1.6;
+}
+code {
+  font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace;
+  font-size: 12.5px;
+  color: var(--code-text);
+}
+p code, li code, td code {
+  background: var(--surface2);
+  color: var(--accent-dark);
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+:root[data-theme="dark"] p code,
+:root[data-theme="dark"] li code,
+:root[data-theme="dark"] td code,
+@media (prefers-color-scheme: dark) {
+  p code, li code, td code {
+    background: var(--surface2);
+    color: var(--accent-dark);
+  }
+}
+.kw  { color: var(--code-kw); }
+.str { color: var(--code-str); }
+.cmt { color: var(--code-cmt); font-style: italic; }
+.num { color: var(--code-num); }
+.typ { color: var(--code-type); }
+.pun { color: #8AABB8; }
+.fn  { color: #B8D8FF; }
+
+/* ── Tables ──────────────────────────────────────── */
+.table-wrap {
+  overflow-x: auto;
+  margin: 14px 0;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+th {
+  background: var(--surface2);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text3);
+  padding: 9px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border2);
+  color: var(--text2);
+  vertical-align: top;
+  line-height: 1.55;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--surface2); }
+
+/* ── Callouts ────────────────────────────────────── */
+.callout {
+  padding: 14px 16px;
+  border-radius: 6px;
+  border-left: 3px solid;
+  margin: 16px 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.callout p { color: inherit; margin: 0; }
+.callout.info  { background: var(--accent-dim); border-color: var(--accent); color: var(--accent-dark); }
+.callout.warn  { background: var(--warn-bg);    border-color: var(--warn);   color: var(--warn); }
+.callout.ok    { background: var(--success-bg); border-color: var(--success);color: var(--success); }
+.callout.note  { background: var(--surface2);   border-color: var(--border); color: var(--text2); }
+.callout-title { font-weight: 700; margin-bottom: 4px; font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+
+/* ── Flow Diagram ────────────────────────────────── */
+.flow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0;
+  margin: 16px 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  overflow-x: auto;
+}
+.flow-node {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.flow-node.accent {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent-dark);
+}
+.flow-node.ok {
+  background: var(--success-bg);
+  border-color: var(--success);
+  color: var(--success);
+}
+.flow-arrow {
+  color: var(--text3);
+  font-size: 16px;
+  padding: 0 8px;
+  flex-shrink: 0;
+}
+.flow-label {
+  font-size: 10px;
+  color: var(--text3);
+  text-align: center;
+  display: block;
+  margin-top: 2px;
+  font-style: italic;
+}
+
+/* ── Decision Tree ───────────────────────────────── */
+.decision {
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px 24px;
+  color: var(--text2);
+  line-height: 1.9;
+  overflow-x: auto;
+  margin: 14px 0;
+}
+.decision .d-if   { color: var(--accent-dark); font-weight: 700; }
+.decision .d-then { color: var(--success); }
+.decision .d-else { color: var(--warn); }
+.decision .d-null { color: var(--danger); }
+
+/* ── Formula Box ─────────────────────────────────── */
+.formula {
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 18px 20px;
+  margin: 14px 0;
+  text-align: center;
+  font-size: 15px;
+  color: var(--text);
+  font-weight: 500;
+  letter-spacing: -0.2px;
+}
+.formula .eq-label {
+  font-size: 11px;
+  color: var(--text3);
+  display: block;
+  margin-top: 6px;
+}
+
+/* ── List ────────────────────────────────────────── */
+ul, ol {
+  padding-left: 20px;
+  margin: 10px 0;
+  color: var(--text2);
+  line-height: 1.7;
+}
+li { margin-bottom: 4px; }
+
+/* ── Badge ────────────────────────────────────────── */
+.badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 3px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.badge.get    { background: #E8F5EE; color: #1A7A40; }
+.badge.post   { background: #FFF0E0; color: #B86000; }
+.badge.patch  { background: #F0E8FF; color: #6633CC; }
+.badge.req    { background: var(--danger-bg); color: var(--danger); }
+.badge.opt    { background: var(--surface2); color: var(--text3); }
+
+/* ── HR / Divider ────────────────────────────────── */
+hr { border: none; border-top: 1px solid var(--border2); margin: 40px 0; }
+
+/* ── Endpoint Row ────────────────────────────────── */
+.endpoint {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 11px 14px;
+  margin: 8px 0;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.endpoint-path { flex: 1; }
+.endpoint-desc { font-family: -apple-system, system-ui, sans-serif; font-size: 12px; color: var(--text3); }
+
+@media (max-width: 800px) {
+  .layout { flex-direction: column; }
+  .sidebar { width: 100%; height: auto; position: static; border-right: none; border-bottom: 1px solid var(--border); }
+  .main { padding: 24px 20px 60px; }
+  .nav { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- ── Sidebar ── -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">UPS</div>
+      <div>
+        <div class="sidebar-title">UPS 整合工程文件</div>
+        <div class="sidebar-subtitle">Patisco 實作指南</div>
+      </div>
+    </div>
+    <span class="sidebar-version">PAXIS-REF · 2026-07</span>
+  </div>
+  <nav class="nav">
+    <div class="nav-group-label">架構與設定</div>
+    <a href="#overview">1. 架構概覽</a>
+    <a href="#env">2. 環境變數</a>
+    <a href="#schema">3. 資料庫 Schema</a>
+    <a href="#config-keys">4. 設定 Key 一覽</a>
+
+    <div class="nav-group-label">核心機制</div>
+    <a href="#auth">5. UPS OAuth 認證</a>
+    <a href="#resolve-creds">6. 憑證解析邏輯</a>
+    <a href="#modes">7. 三種運作模式</a>
+    <a href="#markup">8. 加成機制</a>
+
+    <div class="nav-group-label">API 功能</div>
+    <a href="#rates">9. 費率查詢</a>
+    <a href="#shipment">10. 建立提單</a>
+    <a href="#pickup">11. 預約提貨</a>
+
+    <div class="nav-group-label">管理介面</div>
+    <a href="#admin-ui">12. 平台後台設定</a>
+    <a href="#tenant-ui">13. 租戶 UPS 設定</a>
+
+    <div class="nav-group-label">移植指南</div>
+    <a href="#patisco-impl">14. Patisco 實作步驟</a>
+    <a href="#endpoints">15. API 端點清單</a>
+  </nav>
+</aside>
+
+<!-- ── Main ── -->
+<main class="main">
+
+<!-- ── Page Header ── -->
+<div class="page-header">
+  <div class="page-eyebrow">工程規格文件</div>
+  <h1 class="page-title">UPS 整合完整工程文件</h1>
+  <p class="page-desc">本文件完整描述 PAXIS 系統中 UPS 出貨整合的設計與實作細節，包含認證流程、多租戶憑證解析、費率查詢、建立提單、預約提貨，以及平台加成機制。供 Patisco 前後端工程師 follow 並移植到正式環境。</p>
+  <div class="meta-row">
+    <span class="meta-item"><strong>參考系統：</strong> PAXIS（paxis.tw）</span>
+    <span class="meta-item"><strong>技術棧：</strong> Next.js 14 · TypeScript · Prisma · PostgreSQL</span>
+    <span class="meta-item"><strong>UPS API 版本：</strong> Rating v2403 · Shipments v2403 · Pickup v2201</span>
+    <span class="meta-item"><strong>文件日期：</strong> 2026-07-13</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<section class="section" id="overview">
+  <h2 class="section-title"><span class="section-num">01</span> 架構概覽</h2>
+
+  <p>PAXIS 的 UPS 整合採用<strong>平台帳號代管 + 租戶自有帳號並存</strong>的雙軌設計。所有 UPS API 呼叫使用<strong>同一組 OAuth 2.0 client credentials</strong>（環境變數 `UPS_CLIENT_ID` / `UPS_CLIENT_SECRET`），但帳單帳號（Account Number）因租戶設定而異。</p>
+
+  <div class="subsection">
+    <div class="subsection-title">整體請求流程</div>
+    <div class="flow">
+      <div class="flow-node accent">用戶操作<br><span style="font-size:10px;font-weight:400">選擇服務/確認出貨</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">Next.js API Route<br><span style="font-size:10px;font-weight:400">POST /api/shipping/…</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">resolveUpsCreds()<br><span style="font-size:10px;font-weight:400">取帳號 + 乘數</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">getUpsAccessToken()<br><span style="font-size:10px;font-weight:400">OAuth token</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node ok">UPS API<br><span style="font-size:10px;font-weight:400">onlinetools.ups.com</span></div>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">系統角色分層</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>角色</th><th>設定位置</th><th>管理方</th><th>說明</th></tr></thead>
+        <tbody>
+          <tr><td><strong>平台帳號</strong></td><td><code>ADMIN_Setting（主 DB）</code></td><td>錫諾系統</td><td>所有代管租戶共用的 UPS 帳號，由平台設定</td></tr>
+          <tr><td><strong>加成乘數</strong></td><td><code>ADMIN_Setting.ups_discount_multiplier</code></td><td>錫諾系統</td><td>代管租戶的基本運費加成比例（例：1.2 = 加收 20%）</td></tr>
+          <tr><td><strong>租戶帳號</strong></td><td><code>SYS_KeyValue（租戶 DB）</code></td><td>租戶自行設定</td><td>填入後覆蓋代管，直接使用租戶自有帳號出帳</td></tr>
+          <tr><td><strong>OAuth 憑證</strong></td><td><code>env: UPS_CLIENT_ID/SECRET</code></td><td>平台</td><td>所有租戶共用同一組 API 應用程式憑證</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════ -->
+<section class="section" id="env">
+  <h2 class="section-title"><span class="section-num">02</span> 環境變數</h2>
+
+  <p>以下環境變數需設定於部署環境（Vercel / 伺服器），不進版本控制：</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>變數名稱</th><th>必填</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>UPS_CLIENT_ID</code></td>
+          <td><span class="badge req">必填</span></td>
+          <td>UPS Developer Account 的 OAuth Client ID。在 UPS Developer Portal 建立應用時取得。</td>
+        </tr>
+        <tr>
+          <td><code>UPS_CLIENT_SECRET</code></td>
+          <td><span class="badge req">必填</span></td>
+          <td>對應的 Client Secret。</td>
+        </tr>
+        <tr>
+          <td><code>XINOSYS_UPS_ACCOUNT_NO</code></td>
+          <td><span class="badge opt">選填</span></td>
+          <td>平台（錫諾系統）自有 UPS 帳號的 fallback 環境變數。通常從 DB 讀取（<code>ADMIN_Setting.ups_xinosys_account_no</code>），若 DB 為空才讀此環境變數。</td>
+        </tr>
+        <tr>
+          <td><code>UPS_DISCOUNT_MULTIPLIER</code></td>
+          <td><span class="badge opt">選填</span></td>
+          <td>加成乘數的 env fallback，通常從 DB 讀取。</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout info">
+    <div class="callout-title">UPS Developer Portal</div>
+    <p>前往 developer.ups.com → 建立應用 → 選擇「I need API access to UPS technology」→ 取得 Client ID 和 Client Secret。OAuth 2.0 client_credentials grant 不需要用戶授權，適合伺服器端使用。</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════ -->
+<section class="section" id="schema">
+  <h2 class="section-title"><span class="section-num">03</span> 資料庫 Schema</h2>
+
+  <div class="subsection">
+    <div class="subsection-title">UPS_ShipmentLog（出貨紀錄）</div>
+    <p>每次成功建立 UPS 提單後，寫入一筆 log。目前用 raw SQL 建立（PAXIS 是用 <code>prisma.$queryRaw</code>），Patisco 可改為 Prisma model 或直接建 migration。</p>
+    <pre><code><span class="kw">CREATE TABLE</span> <span class="typ">"UPS_ShipmentLog"</span> (
+  id                   SERIAL         <span class="kw">PRIMARY KEY</span>,
+  <span class="str">"trackingNumber"</span>     TEXT           <span class="kw">NOT NULL</span>,
+  <span class="str">"upsShipmentId"</span>      TEXT,                     <span class="cmt">-- UPS shipment identification number</span>
+  <span class="str">"serviceCode"</span>        TEXT           <span class="kw">NOT NULL</span>, <span class="cmt">-- e.g. '07', '65', '08'</span>
+  <span class="str">"serviceName"</span>        TEXT,                     <span class="cmt">-- 'UPS Worldwide Express' 等</span>
+  <span class="str">"piId"</span>               INTEGER,                  <span class="cmt">-- 關聯的 PI id（選填）</span>
+  <span class="str">"piNo"</span>               TEXT,                     <span class="cmt">-- PI 號（冗余儲存，查詢快）</span>
+  <span class="str">"originSnapshot"</span>     JSONB,                    <span class="cmt">-- 發貨地快照（ShippingAddress）</span>
+  <span class="str">"destinationSnapshot"</span> JSONB,                   <span class="cmt">-- 收貨地快照</span>
+  <span class="str">"packagesSnapshot"</span>   JSONB,                    <span class="cmt">-- 包裹規格快照</span>
+  <span class="str">"declaredValue"</span>      NUMERIC(<span class="num">12</span>,<span class="num">2</span>),
+  <span class="str">"declaredCurrency"</span>   TEXT,
+  <span class="str">"chargedAmount"</span>      NUMERIC(<span class="num">12</span>,<span class="num">2</span>),            <span class="cmt">-- UPS 實際收費</span>
+  <span class="str">"chargedCurrency"</span>    TEXT,
+  <span class="str">"labelBase64"</span>        TEXT,                     <span class="cmt">-- GIF/PNG label（base64）</span>
+  <span class="str">"labelFormat"</span>        TEXT,                     <span class="cmt">-- 'GIF' | 'PNG' | 'PDF'</span>
+  <span class="str">"pickupConfirmationNo"</span> TEXT,                  <span class="cmt">-- 預約提貨確認號（nullable）</span>
+  <span class="str">"pickupReadyTime"</span>    TIMESTAMPTZ,              <span class="cmt">-- 可供提貨時間</span>
+  <span class="str">"pickupScheduledDate"</span> TIMESTAMPTZ,             <span class="cmt">-- 預約提貨日</span>
+  <span class="str">"createdByUserId"</span>    INTEGER,                  <span class="cmt">-- 操作者 user id</span>
+  <span class="str">"createdAt"</span>          TIMESTAMPTZ    <span class="kw">NOT NULL</span>  <span class="kw">DEFAULT</span> <span class="fn">now</span>()
+);</code></pre>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">SYS_KeyValue（租戶設定 KV）</div>
+    <p>每個租戶的 DB 都有一張 <code>SYS_KeyValue</code>。與 UPS 相關的 key：</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Key</th><th>說明</th><th>優先順序</th></tr></thead>
+        <tbody>
+          <tr><td><code>ups_own_account_no</code></td><td>租戶自有 UPS 帳號（新版 key）</td><td>最高</td></tr>
+          <tr><td><code>ups_xinosys_account_no</code></td><td>舊版 key，向後相容，效果等同 own_account_no</td><td>次高（backward compat）</td></tr>
+          <tr><td><code>ups_mode</code></td><td><code>'disabled'</code> / <code>'managed'</code> — 代管模式開關</td><td>—</td></tr>
+          <tr><td><code>ups_own_discount_multiplier</code></td><td>租戶自有帳號的折扣乘數（選填）</td><td>—</td></tr>
+          <tr><td><code>ups_discount_multiplier</code></td><td>舊版乘數 key，向後相容</td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">ADMIN_Setting（平台主 DB 設定）</div>
+    <p>錫諾系統管理的主 DB，存放平台帳號與全局乘數：</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Key</th><th>說明</th></tr></thead>
+        <tbody>
+          <tr><td><code>ups_xinosys_account_no</code></td><td>平台代管帳號（錫諾自有 UPS 帳號）</td></tr>
+          <tr><td><code>ups_discount_multiplier</code></td><td>對使用代管服務的租戶收取的基本運費乘數</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════ -->
+<section class="section" id="config-keys">
+  <h2 class="section-title"><span class="section-num">04</span> 設定 Key 完整對照表</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Key 名稱</th><th>所在 DB</th><th>Table</th><th>設定方</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td><code>ups_own_account_no</code></td><td>租戶 DB</td><td>SYS_KeyValue</td><td>租戶自行</td><td>啟用租戶自有帳號，優先級最高</td></tr>
+        <tr><td><code>ups_mode</code></td><td>租戶 DB</td><td>SYS_KeyValue</td><td>平台後台</td><td>設為 <code>managed</code> 才啟用代管</td></tr>
+        <tr><td><code>ups_own_discount_multiplier</code></td><td>租戶 DB</td><td>SYS_KeyValue</td><td>租戶/平台</td><td>自有帳號的議價係數</td></tr>
+        <tr><td><code>ups_xinosys_account_no</code></td><td>主 DB</td><td>ADMIN_Setting</td><td>平台</td><td>代管用帳號</td></tr>
+        <tr><td><code>ups_discount_multiplier</code></td><td>主 DB</td><td>ADMIN_Setting</td><td>平台</td><td>代管租戶的加成乘數</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════ -->
+<section class="section" id="auth">
+  <h2 class="section-title"><span class="section-num">05</span> UPS OAuth 認證</h2>
+
+  <p>UPS API 使用 OAuth 2.0 <strong>client_credentials grant</strong>。每次呼叫 UPS API 前需先取得 Bearer token，有效期 4 小時。</p>
+
+  <div class="subsection">
+    <div class="subsection-title">Token 端點</div>
+    <div class="endpoint">
+      <span class="badge post">POST</span>
+      <span class="endpoint-path">https://onlinetools.ups.com/security/v1/oauth/token</span>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Request</div>
+    <pre><code><span class="cmt">// Headers</span>
+Authorization: <span class="str">Basic BASE64(CLIENT_ID:CLIENT_SECRET)</span>
+Content-Type:  application/x-www-form-urlencoded
+
+<span class="cmt">// Body</span>
+grant_type=client_credentials</code></pre>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Response</div>
+    <pre><code>{
+  <span class="str">"access_token"</span>: <span class="str">"eyJhbGci..."</span>,
+  <span class="str">"expires_in"</span>:   <span class="str">"14399"</span>   <span class="cmt">// 秒數（字串）≈ 4 小時</span>
+}</code></pre>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Token 快取策略（PAXIS 實作）</div>
+    <p>在 module level 快取 token，同一 serverless instance 共用。設定 5 分鐘提前更新緩衝，避免在快到期時被使用到剛失效的 token：</p>
+    <pre><code><span class="cmt">// src/lib/shipping/ups-auth.ts</span>
+
+<span class="kw">let</span> _cache: { accessToken: <span class="typ">string</span>; expiresAt: <span class="typ">number</span> } | <span class="kw">null</span> = <span class="kw">null</span>
+
+<span class="kw">export async function</span> <span class="fn">getUpsAccessToken</span>(): <span class="typ">Promise</span>&lt;<span class="typ">string</span>&gt; {
+  <span class="cmt">// 距過期超過 5 分鐘才算有效</span>
+  <span class="kw">if</span> (_cache && _cache.expiresAt - Date.<span class="fn">now</span>() > <span class="num">5</span> * <span class="num">60</span> * <span class="num">1000</span>) {
+    <span class="kw">return</span> _cache.accessToken
+  }
+
+  <span class="kw">const</span> credentials = Buffer.<span class="fn">from</span>(<span class="str">`<span class="pun">${</span>clientId<span class="pun">}</span>:<span class="pun">${</span>clientSecret<span class="pun">}</span>`</span>).<span class="fn">toString</span>(<span class="str">'base64'</span>)
+  <span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">fetch</span>(UPS_TOKEN_URL, {
+    method: <span class="str">'POST'</span>,
+    headers: {
+      Authorization: <span class="str">`Basic <span class="pun">${</span>credentials<span class="pun">}</span>`</span>,
+      <span class="str">'Content-Type'</span>: <span class="str">'application/x-www-form-urlencoded'</span>,
+    },
+    body: <span class="str">'grant_type=client_credentials'</span>,
+  })
+
+  <span class="kw">const</span> data = <span class="kw">await</span> res.<span class="fn">json</span>()
+  _cache = {
+    accessToken: data.access_token,
+    expiresAt: Date.<span class="fn">now</span>() + <span class="fn">parseInt</span>(data.expires_in, <span class="num">10</span>) * <span class="num">1000</span>,
+  }
+  <span class="kw">return</span> _cache.accessToken
+}</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-title">Serverless 注意事項</div>
+    <p>Vercel serverless function 每次冷啟動都會重置 module-level 變數，<code>_cache</code> 會清空。這是預期行為：冷啟動後會重新取 token，warm instance 之間才能共用快取。不需要額外處理。</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════ -->
+<section class="section" id="resolve-creds">
+  <h2 class="section-title"><span class="section-num">06</span> 憑證解析邏輯</h2>
+
+  <p><code>resolveUpsCreds(tenantPrisma)</code> 是所有 UPS 功能的入口，決定這次請求要用哪個帳號出帳、是否有加成乘數。</p>
+
+  <div class="subsection">
+    <div class="subsection-title">解析優先順序（Waterfall）</div>
+    <div class="decision">
+<span class="d-if">if</span> (租戶 DB 有 <code>ups_own_account_no</code> 或 <code>ups_xinosys_account_no</code>)
+  → <span class="d-then">return { accountNo: 租戶帳號, source: 'own', discountMultiplier: 租戶乘數 }</span>
+
+<span class="d-if">else if</span> (租戶 DB <code>ups_mode === 'managed'</code>)
+  → <span class="d-then">從主 DB（ADMIN_Setting）讀取平台帳號和全局乘數</span>
+  → <span class="d-then">return { accountNo: 平台帳號, source: 'managed', discountMultiplier: 全局乘數 }</span>
+
+<span class="d-if">else</span>
+  → <span class="d-null">return null  // UPS 服務未開通</span>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">完整實作（src/lib/ups.ts）</div>
+    <pre><code><span class="kw">export interface</span> <span class="typ">UpsCreds</span> {
+  accountNo:          <span class="typ">string</span>
+  discountMultiplier: <span class="typ">number</span> | <span class="kw">null</span>
+  source:             <span class="str">'own'</span> | <span class="str">'managed'</span>
+}
+
+<span class="kw">export async function</span> <span class="fn">resolveUpsCreds</span>(tenantPrisma: <span class="typ">PrismaClient</span>): <span class="typ">Promise</span>&lt;<span class="typ">UpsCreds</span> | <span class="kw">null</span>&gt; {
+  <span class="cmt">// 1. 查租戶自有帳號（含舊版 key 向後相容）</span>
+  <span class="kw">const</span> [ownAccountRow, legacyAccountRow] = <span class="kw">await</span> Promise.<span class="fn">all</span>([
+    tenantPrisma.sYS_KeyValue.<span class="fn">findUnique</span>({ where: { key: <span class="str">'ups_own_account_no'</span> } }),
+    tenantPrisma.sYS_KeyValue.<span class="fn">findUnique</span>({ where: { key: <span class="str">'ups_xinosys_account_no'</span> } }),
+  ])
+  <span class="kw">const</span> ownAccount = ownAccountRow?.value?.trim() || legacyAccountRow?.value?.trim()
+
+  <span class="kw">if</span> (ownAccount) {
+    <span class="cmt">// 有自有帳號：讀取此租戶的議價乘數（非強制）</span>
+    <span class="kw">const</span> multiplierRow = <span class="kw">await</span> tenantPrisma.sYS_KeyValue
+      .<span class="fn">findUnique</span>({ where: { key: <span class="str">'ups_own_discount_multiplier'</span> } })
+    <span class="kw">const</span> multiplier = multiplierRow?.value ? <span class="fn">parseFloat</span>(multiplierRow.value) : <span class="kw">null</span>
+    <span class="kw">return</span> { accountNo: ownAccount, discountMultiplier: multiplier, source: <span class="str">'own'</span> }
+  }
+
+  <span class="cmt">// 2. 查是否為代管模式</span>
+  <span class="kw">const</span> modeRow = <span class="kw">await</span> tenantPrisma.sYS_KeyValue
+    .<span class="fn">findUnique</span>({ where: { key: <span class="str">'ups_mode'</span> } })
+  <span class="kw">if</span> (modeRow?.value === <span class="str">'managed'</span>) {
+    <span class="cmt">// 從主 DB（ADMIN_Setting）讀取平台帳號</span>
+    <span class="kw">const</span> platformAccount = <span class="kw">await</span> <span class="fn">getSystemSetting</span>(<span class="str">'ups_xinosys_account_no'</span>)
+    <span class="kw">const</span> accountNo = platformAccount?.trim() || process.env.XINOSYS_UPS_ACCOUNT_NO
+    <span class="kw">if</span> (!accountNo) <span class="kw">return null</span>
+    <span class="kw">const</span> multiplierStr = <span class="kw">await</span> <span class="fn">getSystemSetting</span>(<span class="str">'ups_discount_multiplier'</span>)
+    <span class="kw">return</span> {
+      accountNo,
+      discountMultiplier: multiplierStr ? <span class="fn">parseFloat</span>(multiplierStr) : <span class="kw">null</span>,
+      source: <span class="str">'managed'</span>,
+    }
+  }
+
+  <span class="kw">return null</span>  <span class="cmt">// 未開通</span>
+}</code></pre>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════ -->
+<section class="section" id="modes">
+  <h2 class="section-title"><span class="section-num">07</span> 三種運作模式</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>模式</th><th>條件</th><th>帳單帳號</th><th>費率顯示</th><th>誰出帳</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>disabled</strong></td>
+          <td>no <code>ups_mode</code>，no <code>ups_own_account_no</code></td>
+          <td>無</td>
+          <td>功能鎖定，顯示「請聯繫開通」</td>
+          <td>無</td>
+        </tr>
+        <tr>
+          <td><strong>managed</strong></td>
+          <td><code>ups_mode = 'managed'</code></td>
+          <td>平台帳號（<code>ADMIN_Setting</code>）</td>
+          <td>UPS 報價 × 乘數（基本運費部分）</td>
+          <td>錫諾系統向租戶收費</td>
+        </tr>
+        <tr>
+          <td><strong>own</strong></td>
+          <td>有 <code>ups_own_account_no</code></td>
+          <td>租戶自有帳號（覆蓋代管）</td>
+          <td>直接顯示 UPS 議價費率</td>
+          <td>UPS 直接向租戶收費</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout note">
+    <p><strong>優先順序：own &gt; managed &gt; disabled。</strong>同一租戶若同時設定了 <code>ups_own_account_no</code> 和 <code>ups_mode = 'managed'</code>，自有帳號優先。清空 <code>ups_own_account_no</code> 後，才會 fallback 到代管。</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════ -->
+<section class="section" id="markup">
+  <h2 class="section-title"><span class="section-num">08</span> 加成機制（Markup）</h2>
+
+  <div class="subsection">
+    <div class="subsection-title">加成公式</div>
+    <p>代管模式下，平台對<strong>基本運費（Base Charge）</strong>套用乘數，附加費（燃油費、偏遠費等）<strong>不加成</strong>，因為這些費用屬公開揭露收費，租戶可自行查核。</p>
+
+    <div class="formula">
+      收費金額 = (Base Charge × 乘數) + Σ 附加費 + 稅費
+      <span class="eq-label">例：Base = $100，乘數 = 1.2，燃油費 = $15 → 收費 = (100 × 1.2) + 15 = $135</span>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">API 端的加成計算（src/app/api/shipping/rates/route.ts）</div>
+    <pre><code><span class="kw">const</span> result = options.<span class="fn">map</span>(opt => {
+  <span class="kw">if</span> (source === <span class="str">'managed'</span> && discountMultiplier != <span class="kw">null</span>
+      && opt.chargeBreakdown?.baseCharge != <span class="kw">null</span>) {
+    <span class="kw">const</span> { baseCharge, surcharges, taxAmount } = opt.chargeBreakdown
+    <span class="kw">const</span> surchargesTotal = surcharges.<span class="fn">reduce</span>((s, c) => s + c.amount, <span class="num">0</span>)
+    <span class="kw">const</span> markedUpAmount = <span class="fn">parseFloat</span>(
+      (baseCharge * discountMultiplier + surchargesTotal + (taxAmount ?? <span class="num">0</span>)).<span class="fn">toFixed</span>(<span class="num">2</span>)
+    )
+    <span class="kw">return</span> { ...opt, amount: markedUpAmount, contractEstimate: <span class="kw">null</span> }
+  }
+  <span class="cmt">// 自有帳號：原樣輸出，contractEstimate 供參考</span>
+  <span class="kw">return</span> {
+    ...opt,
+    contractEstimate: discountMultiplier != <span class="kw">null</span>
+      ? <span class="fn">parseFloat</span>((opt.amount * discountMultiplier).<span class="fn">toFixed</span>(<span class="num">2</span>))
+      : <span class="kw">null</span>,
+  }
+})</code></pre>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">費用明細結構（ShippingChargeBreakdown）</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>欄位</th><th>類型</th><th>說明</th></tr></thead>
+        <tbody>
+          <tr><td><code>baseCharge</code></td><td>number | null</td><td>基本運費（議價後的 BaseServiceCharge）</td></tr>
+          <tr><td><code>surcharges</code></td><td>Array</td><td>各附加費項目：<code>{ code, label, amount }</code></td></tr>
+          <tr><td><code>taxAmount</code></td><td>number | null</td><td>稅費合計</td></tr>
+          <tr><td><code>totalWithTax</code></td><td>number | null</td><td>含稅總計</td></tr>
+          <tr><td><code>currency</code></td><td>string</td><td>貨幣代碼（通常 USD）</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">已知附加費代碼</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>代碼</th><th>中文說明</th></tr></thead>
+        <tbody>
+          <tr><td><code>375</code></td><td>燃油附加費</td></tr>
+          <tr><td><code>100</code></td><td>偏遠地區附加費</td></tr>
+          <tr><td><code>190</code></td><td>特殊搬運費</td></tr>
+          <tr><td><code>270</code></td><td>住宅配送費</td></tr>
+          <tr><td><code>370</code></td><td>旺季附加費</td></tr>
+          <tr><td><code>380</code></td><td>旺季附加費（小件）</td></tr>
+          <tr><td><code>430</code></td><td>超大包裹費</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════ -->
+<section class="section" id="rates">
+  <h2 class="section-title"><span class="section-num">09</span> 費率查詢</h2>
+
+  <div class="subsection">
+    <div class="subsection-title">PAXIS API 端點</div>
+    <div class="endpoint">
+      <span class="badge post">POST</span>
+      <span class="endpoint-path">/api/shipping/rates</span>
+      <span class="endpoint-desc">查詢 UPS 所有可用服務的報價</span>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Request Body（GetRatesInput）</div>
+    <pre><code>{
+  <span class="str">"origin"</span>: {
+    <span class="str">"name"</span>:            <span class="str">"XINOSYS SYSTEMS"</span>,
+    <span class="str">"addressLine"</span>:     <span class="str">"10F, No.100, Sec.3, Minsheng E. Rd."</span>,
+    <span class="str">"city"</span>:            <span class="str">"Taipei"</span>,
+    <span class="str">"postalCode"</span>:      <span class="str">"10549"</span>,
+    <span class="str">"countryCode"</span>:     <span class="str">"TW"</span>,
+    <span class="str">"taxId"</span>:           <span class="str">"12345678"</span>  <span class="cmt">// 選填，統一編號，影響議價折扣</span>
+  },
+  <span class="str">"destination"</span>: {
+    <span class="str">"name"</span>:            <span class="str">"ABC COMPANY"</span>,
+    <span class="str">"addressLine"</span>:     <span class="str">"123 Main St"</span>,
+    <span class="str">"city"</span>:            <span class="str">"Los Angeles"</span>,
+    <span class="str">"stateProvinceCode"</span>:<span class="str">"CA"</span>,
+    <span class="str">"postalCode"</span>:      <span class="str">"90001"</span>,
+    <span class="str">"countryCode"</span>:     <span class="str">"US"</span>
+  },
+  <span class="str">"packages"</span>: [
+    {
+      <span class="str">"weightKg"</span>:   <span class="num">5.5</span>,
+      <span class="str">"dimensions"</span>: {
+        <span class="str">"lengthCm"</span>: <span class="num">40</span>,
+        <span class="str">"widthCm"</span>:  <span class="num">30</span>,
+        <span class="str">"heightCm"</span>: <span class="num">20</span>
+      },
+      <span class="str">"packageType"</span>: <span class="str">"package"</span>,  <span class="cmt">// 'package' | 'document'</span>
+      <span class="str">"quantity"</span>:    <span class="num">2</span>
+    }
+  ],
+  <span class="str">"declaredValueUsd"</span>: <span class="num">500</span>  <span class="cmt">// 選填，申報價值（USD）</span>
+}</code></pre>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Response（200 OK）</div>
+    <pre><code>{
+  <span class="str">"options"</span>: [
+    {
+      <span class="str">"carrierCode"</span>:      <span class="str">"ups"</span>,
+      <span class="str">"serviceCode"</span>:      <span class="str">"65"</span>,
+      <span class="str">"serviceName"</span>:      <span class="str">"UPS Worldwide Saver"</span>,
+      <span class="str">"deliveryTier"</span>:     <span class="str">"standard"</span>,
+      <span class="str">"estimatedDaysMin"</span>: <span class="num">3</span>,
+      <span class="str">"estimatedDaysMax"</span>: <span class="num">5</span>,
+      <span class="str">"amount"</span>:           <span class="num">142.30</span>,  <span class="cmt">// 加成後金額</span>
+      <span class="str">"listAmount"</span>:       <span class="num">155.00</span>,  <span class="cmt">// UPS 官方定價</span>
+      <span class="str">"isNegotiated"</span>:     <span class="kw">true</span>,
+      <span class="str">"currency"</span>:         <span class="str">"USD"</span>,
+      <span class="str">"guaranteedDelivery"</span>:<span class="kw">false</span>,
+      <span class="str">"chargeBreakdown"</span>: {
+        <span class="str">"baseCharge"</span>: <span class="num">118.60</span>,
+        <span class="str">"surcharges"</span>: [
+          { <span class="str">"code"</span>: <span class="str">"375"</span>, <span class="str">"label"</span>: <span class="str">"燃油附加費"</span>, <span class="str">"amount"</span>: <span class="num">23.70</span> }
+        ],
+        <span class="str">"taxAmount"</span>: <span class="kw">null</span>,
+        <span class="str">"totalWithTax"</span>: <span class="kw">null</span>,
+        <span class="str">"currency"</span>: <span class="str">"USD"</span>
+      },
+      <span class="str">"contractEstimate"</span>: <span class="kw">null</span>
+    }
+    <span class="cmt">// ... 其他服務</span>
+  ],
+  <span class="str">"discountMultiplier"</span>: <span class="num">1.2</span>
+}</code></pre>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">服務代碼對照表</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Code</th><th>服務名稱</th><th>Tier</th><th>預估天數</th></tr></thead>
+        <tbody>
+          <tr><td><code>07</code></td><td>UPS Worldwide Express</td><td>express</td><td>1–3 天</td></tr>
+          <tr><td><code>54</code></td><td>UPS Worldwide Express Plus</td><td>premium</td><td>1–2 天</td></tr>
+          <tr><td><code>65</code></td><td>UPS Worldwide Saver</td><td>standard</td><td>3–5 天</td></tr>
+          <tr><td><code>08</code></td><td>UPS Worldwide Expedited</td><td>economy</td><td>5–8 天</td></tr>
+          <tr><td><code>11</code></td><td>UPS Standard</td><td>economy</td><td>5–10 天</td></tr>
+          <tr><td><code>96</code></td><td>UPS Worldwide Express Freight</td><td>freight</td><td>3–5 天</td></tr>
+          <tr><td><code>03</code></td><td>UPS Ground（美國境內）</td><td>economy</td><td>3–7 天</td></tr>
+          <tr><td><code>02</code></td><td>UPS 2nd Day Air</td><td>express</td><td>2 天</td></tr>
+          <tr><td><code>01</code></td><td>UPS Next Day Air</td><td>premium</td><td>1 天</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">包裹數量處理邏輯</div>
+    <p>UPS Rating API 每次最多 50 個包裹。PAXIS 的處理方式：</p>
+    <ul>
+      <li><code>quantity</code> 大於 1 的包裹，先展開成多個單件</li>
+      <li>展開後總數超過 50 件，改為合併成一件（取平均重量），避免 API 錯誤</li>
+      <li><code>packageType === 'document'</code> 時不帶 <code>Dimensions</code>（UPS 文件袋無需尺寸）</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════ -->
+<section class="section" id="shipment">
+  <h2 class="section-title"><span class="section-num">10</span> 建立提單</h2>
+
+  <div class="subsection">
+    <div class="subsection-title">PAXIS API 端點</div>
+    <div class="endpoint">
+      <span class="badge post">POST</span>
+      <span class="endpoint-path">/api/shipping/create-shipment</span>
+      <span class="endpoint-desc">建立 UPS 提單，取得 tracking number 和 label</span>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Request Body</div>
+    <pre><code>{
+  <span class="str">"serviceCode"</span>:    <span class="str">"07"</span>,              <span class="cmt">// 從費率查詢結果選擇</span>
+  <span class="str">"serviceName"</span>:    <span class="str">"UPS Worldwide Express"</span>,  <span class="cmt">// 選填，用於 log</span>
+  <span class="str">"origin"</span>:         { <span class="cmt">/* ShippingAddress */</span> },
+  <span class="str">"destination"</span>:    { <span class="cmt">/* ShippingAddress */</span> },
+  <span class="str">"packages"</span>:       [ <span class="cmt">/* ShippingPackage[] */</span> ],
+  <span class="str">"declaredValue"</span>:  <span class="num">500</span>,
+  <span class="str">"declaredCurrency"</span>: <span class="str">"USD"</span>,
+  <span class="str">"piId"</span>:           <span class="num">123</span>,               <span class="cmt">// 選填，關聯 PI id</span>
+  <span class="str">"piNo"</span>:           <span class="str">"PI-20260714-001"</span>,  <span class="cmt">// 選填，用作 referenceNo</span>
+  <span class="str">"slsShipmentId"</span>:  <span class="num">456</span>,               <span class="cmt">// 選填，自動寫回 SLS.trackingNo</span>
+  <span class="str">"labelFormat"</span>:    <span class="str">"GIF"</span>              <span class="cmt">// 'GIF' | 'PNG' | 'PDF'，預設 GIF</span>
+}</code></pre>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Response（200 OK）</div>
+    <pre><code>{
+  <span class="str">"ok"</span>:              <span class="kw">true</span>,
+  <span class="str">"trackingNumber"</span>:  <span class="str">"1Z999AA10123456784"</span>,
+  <span class="str">"shipmentId"</span>:      <span class="str">"1ZISUSA..."</span>,          <span class="cmt">// UPS Shipment Identification Number</span>
+  <span class="str">"labelBase64"</span>:     <span class="str">"R0lGOD..."</span>,           <span class="cmt">// 第一張 label（base64 GIF）</span>
+  <span class="str">"labelFormat"</span>:     <span class="str">"GIF"</span>,
+  <span class="str">"chargedAmount"</span>:   <span class="num">142.30</span>,
+  <span class="str">"chargedCurrency"</span>: <span class="str">"USD"</span>,
+  <span class="str">"allLabels"</span>: [
+    { <span class="str">"trackingNumber"</span>: <span class="str">"1Z..."</span>, <span class="str">"labelBase64"</span>: <span class="str">"..."</span> }
+  ],
+  <span class="str">"logId"</span>:           <span class="num">89</span>               <span class="cmt">// UPS_ShipmentLog.id，用於後續預約提貨</span>
+}</code></pre>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">建立提單後的副作用</div>
+    <ul>
+      <li>自動寫入一筆 <code>UPS_ShipmentLog</code>，快照 origin/destination/packages</li>
+      <li>若帶入 <code>slsShipmentId</code>，自動更新 <code>SLS.trackingNo</code></li>
+      <li>Label 以 base64 直接存入 DB，不另存檔案系統</li>
+    </ul>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Label 顯示（前端）</div>
+    <pre><code><span class="cmt">// base64 GIF → img src</span>
+&lt;img src={`data:image/gif;base64,${labelBase64}`} /&gt;
+
+<span class="cmt">// 提供列印下載</span>
+<span class="kw">const</span> blob = <span class="kw">new</span> <span class="fn">Blob</span>([<span class="fn">atob</span>(labelBase64)], { type: <span class="str">'image/gif'</span> })
+<span class="kw">const</span> url = URL.<span class="fn">createObjectURL</span>(blob)
+<span class="cmt">// 開新視窗列印，或 &lt;a download&gt;</span></code></pre>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════ -->
+<section class="section" id="pickup">
+  <h2 class="section-title"><span class="section-num">11</span> 預約提貨</h2>
+
+  <div class="subsection">
+    <div class="subsection-title">PAXIS API 端點</div>
+    <div class="endpoint">
+      <span class="badge post">POST</span>
+      <span class="endpoint-path">/api/shipping/schedule-pickup</span>
+      <span class="endpoint-desc">向 UPS 預約到府提貨，寫回 UPS_ShipmentLog</span>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Request Body</div>
+    <pre><code>{
+  <span class="str">"logId"</span>:          <span class="num">89</span>,           <span class="cmt">// create-shipment 回傳的 UPS_ShipmentLog.id</span>
+  <span class="str">"pickupDate"</span>:     <span class="str">"20260714"</span>,  <span class="cmt">// YYYYMMDD</span>
+  <span class="str">"readyTime"</span>:      <span class="str">"1400"</span>,      <span class="cmt">// HHmm，24 小時制，可供取貨時間</span>
+  <span class="str">"closeTime"</span>:      <span class="str">"1800"</span>,      <span class="cmt">// HHmm，最晚關門時間</span>
+  <span class="str">"contactPhone"</span>:   <span class="str">"0912345678"</span>,
+  <span class="str">"contactName"</span>:    <span class="str">"王小明"</span>,
+  <span class="str">"totalWeightKg"</span>:  <span class="num">11.0</span>,
+  <span class="str">"quantity"</span>:       <span class="num">2</span>,           <span class="cmt">// 總箱數</span>
+  <span class="str">"serviceCode"</span>:    <span class="str">"07"</span>,        <span class="cmt">// 同提單服務代碼</span>
+  <span class="str">"companyName"</span>:    <span class="str">"XINOSYS SYSTEMS"</span>,
+  <span class="str">"addressLine"</span>:    <span class="str">"10F, No.100, Sec.3, Minsheng E. Rd."</span>,
+  <span class="str">"city"</span>:           <span class="str">"Taipei"</span>,
+  <span class="str">"postalCode"</span>:     <span class="str">"10549"</span>,
+  <span class="str">"countryCode"</span>:    <span class="str">"TW"</span>
+}</code></pre>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Response（200 OK）</div>
+    <pre><code>{
+  <span class="str">"ok"</span>:                  <span class="kw">true</span>,
+  <span class="str">"confirmationNumber"</span>:  <span class="str">"WBX20260714ABC"</span>,
+  <span class="str">"dueDate"</span>:             <span class="str">"20260714"</span>
+}</code></pre>
+  </div>
+
+  <div class="callout info">
+    <div class="callout-title">預約提貨流程說明</div>
+    <p>預約提貨需在<strong>建立提單之後</strong>進行，因為需要 <code>logId</code>（從 <code>UPS_ShipmentLog</code> 取到提貨地址的 piNo）。系統預設目的地國家為 US；若需支援其他目的地，可將 <code>DestinationCountryCode</code> 改為從 log 的 <code>destinationSnapshot.countryCode</code> 讀取。</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════ -->
+<section class="section" id="admin-ui">
+  <h2 class="section-title"><span class="section-num">12</span> 平台後台設定（Admin UI）</h2>
+
+  <p>由錫諾系統人員操作，用於設定代管帳號和全局加成乘數。</p>
+
+  <div class="subsection">
+    <div class="subsection-title">路由</div>
+    <div class="endpoint">
+      <span class="badge get">GET</span>
+      <span class="endpoint-path">/api/admin/settings/ups</span>
+      <span class="endpoint-desc">讀取平台 UPS 帳號和乘數</span>
+    </div>
+    <div class="endpoint">
+      <span class="badge post">POST</span>
+      <span class="endpoint-path">/api/admin/settings/ups</span>
+      <span class="endpoint-desc">更新平台 UPS 帳號和乘數</span>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">POST Request Body</div>
+    <pre><code>{
+  <span class="str">"accountNo"</span>:        <span class="str">"872Y1F"</span>,   <span class="cmt">// 6 位 UPS 帳號；清空則清除 DB 值</span>
+  <span class="str">"discountMultiplier"</span>: <span class="num">1.2</span>       <span class="cmt">// null 表示不加成（原價顯示）</span>
+}</code></pre>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">帳號來源顯示邏輯</div>
+    <p>GET 回傳的 <code>source</code> 欄位有三種值：</p>
+    <ul>
+      <li><code>'db'</code> — 帳號來自 DB（正常情況）</li>
+      <li><code>'env'</code> — DB 無值，fallback 到環境變數 <code>XINOSYS_UPS_ACCOUNT_NO</code></li>
+      <li><code>'none'</code> — 尚未設定</li>
+    </ul>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-title">乘數驗證規則</div>
+    <p>乘數必須大於 0。後端已驗證 <code>n &lt;= 0</code> 會回傳 400。前端 UI 顯示計算說明：<code>1.2 = 基本運費加收 20%</code>，<code>0.9 = 基本運費打 90% 折</code>（議價反向）。</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════ -->
+<section class="section" id="tenant-ui">
+  <h2 class="section-title"><span class="section-num">13</span> 租戶 UPS 設定（Tenant UI）</h2>
+
+  <p>租戶自行操作，可填入自有 UPS 帳號覆蓋代管。</p>
+
+  <div class="subsection">
+    <div class="subsection-title">路由</div>
+    <div class="endpoint">
+      <span class="badge get">GET</span>
+      <span class="endpoint-path">/api/settings/ups</span>
+      <span class="endpoint-desc">讀取租戶 UPS 模式和帳號設定</span>
+    </div>
+    <div class="endpoint">
+      <span class="badge post">POST</span>
+      <span class="endpoint-path">/api/settings/ups</span>
+      <span class="endpoint-desc">更新租戶 UPS 帳號設定</span>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">GET Response</div>
+    <pre><code>{
+  <span class="str">"upsMode"</span>:              <span class="str">"managed"</span>,   <span class="cmt">// 'disabled' | 'managed' | 'own'（計算後）</span>
+  <span class="str">"ownAccountNo"</span>:         <span class="str">""</span>,           <span class="cmt">// 租戶填入的帳號，空字串表示未填</span>
+  <span class="str">"ownDiscountMultiplier"</span>: <span class="kw">null</span>         <span class="cmt">// 租戶自己的議價乘數</span>
+}</code></pre>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">設定頁 UX 邏輯</div>
+    <p>前端根據 GET 結果顯示三種狀態卡片：</p>
+    <ul>
+      <li><strong>自有帳號啟用中</strong>（green）— <code>ownAccountNo</code> 有值：「✓ 目前使用自有 UPS 帳號（87****）」</li>
+      <li><strong>代管啟用中</strong>（blue）— <code>upsMode === 'managed'</code>：「✓ 目前使用平台代管 UPS 服務」</li>
+      <li><strong>未開通</strong>（yellow warning）— 兩者都沒有：「⚠ 請聯繫錫諾系統開通或填入自有帳號」</li>
+    </ul>
+    <p>租戶只能設定<strong>自己的帳號</strong>（<code>ownAccountNo</code>），無法更改代管模式。代管模式由平台後台控制（寫入租戶 DB 的 <code>ups_mode</code>）。</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════ -->
+<section class="section" id="patisco-impl">
+  <h2 class="section-title"><span class="section-num">14</span> Patisco 實作步驟</h2>
+
+  <div class="callout note">
+    <p>以下步驟假設 Patisco 是多租戶架構（每個租戶有獨立 DB），與 PAXIS 的多租戶模型相同。請依 Patisco 實際的設定儲存機制調整。</p>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Step 1 — 建立 UPS Developer 應用</div>
+    <ol>
+      <li>至 developer.ups.com 建立帳號並新增 App</li>
+      <li>選擇需要的 API：Rating API、Shipping API、Pickup API</li>
+      <li>取得 <code>Client ID</code> 和 <code>Client Secret</code>，設定為環境變數 <code>UPS_CLIENT_ID</code> / <code>UPS_CLIENT_SECRET</code></li>
+    </ol>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Step 2 — 建立資料庫 Schema</div>
+    <ol>
+      <li>在<strong>每個租戶的 DB</strong> 建立 <code>SYS_KeyValue</code> 表（見 §03）</li>
+      <li>在<strong>主 DB</strong>（ADMIN_Setting）新增 UPS 相關欄位</li>
+      <li>建立 <code>UPS_ShipmentLog</code> 表（見 §03）</li>
+    </ol>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Step 3 — 移植核心 Library</div>
+    <p>以下四支檔案可直接移植，幾乎不需修改：</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>檔案</th><th>功能</th><th>外部依賴</th></tr></thead>
+        <tbody>
+          <tr><td><code>ups-auth.ts</code></td><td>OAuth token 取得 + 快取</td><td>只需 env <code>UPS_CLIENT_ID/SECRET</code></td></tr>
+          <tr><td><code>ups-rating.ts</code></td><td>費率查詢</td><td>依賴 <code>types.ts</code></td></tr>
+          <tr><td><code>ups-shipment.ts</code></td><td>建立提單</td><td>依賴 <code>types.ts</code></td></tr>
+          <tr><td><code>ups-pickup.ts</code></td><td>預約提貨</td><td>無特殊依賴</td></tr>
+          <tr><td><code>types.ts</code></td><td>共用型別定義</td><td>無</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Step 4 — 實作憑證解析</div>
+    <p>根據 §06 的 <code>resolveUpsCreds()</code> 邏輯，依 Patisco 的 DB 架構實作：</p>
+    <pre><code><span class="cmt">// 偽代碼，依 Patisco DB 客製化</span>
+<span class="kw">async function</span> <span class="fn">resolveUpsCreds</span>(tenantId: <span class="typ">string</span>) {
+  <span class="cmt">// 1. 查此租戶的自有帳號</span>
+  <span class="kw">const</span> ownAccount = <span class="kw">await</span> <span class="fn">getTenantSetting</span>(tenantId, <span class="str">'ups_own_account_no'</span>)
+  <span class="kw">if</span> (ownAccount) {
+    <span class="kw">const</span> multiplier = <span class="kw">await</span> <span class="fn">getTenantSetting</span>(tenantId, <span class="str">'ups_own_discount_multiplier'</span>)
+    <span class="kw">return</span> { accountNo: ownAccount, discountMultiplier: multiplier, source: <span class="str">'own'</span> }
+  }
+  <span class="cmt">// 2. 查代管模式</span>
+  <span class="kw">const</span> mode = <span class="kw">await</span> <span class="fn">getTenantSetting</span>(tenantId, <span class="str">'ups_mode'</span>)
+  <span class="kw">if</span> (mode === <span class="str">'managed'</span>) {
+    <span class="kw">const</span> platformAccount = <span class="kw">await</span> <span class="fn">getPlatformSetting</span>(<span class="str">'ups_account_no'</span>)
+    <span class="kw">const</span> multiplier = <span class="kw">await</span> <span class="fn">getPlatformSetting</span>(<span class="str">'ups_multiplier'</span>)
+    <span class="kw">if</span> (!platformAccount) <span class="kw">return null</span>
+    <span class="kw">return</span> { accountNo: platformAccount, discountMultiplier: multiplier, source: <span class="str">'managed'</span> }
+  }
+  <span class="kw">return null</span>
+}</code></pre>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Step 5 — 建立 API Route</div>
+    <p>參考 §09–§11 實作三個 API endpoint：</p>
+    <ul>
+      <li><strong>費率查詢：</strong>呼叫 <code>resolveUpsCreds()</code> → <code>getUpsAccessToken()</code> → <code>getUpsRates()</code> → 套用加成公式</li>
+      <li><strong>建立提單：</strong>呼叫 <code>createUpsShipment()</code> → 寫 <code>UPS_ShipmentLog</code></li>
+      <li><strong>預約提貨：</strong>呼叫 <code>scheduleUpsPickup()</code> → 更新 <code>UPS_ShipmentLog.pickupConfirmationNo</code></li>
+    </ul>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Step 6 — 建立設定 UI</div>
+    <ul>
+      <li><strong>平台後台：</strong>設定代管帳號（<code>ups_account_no</code>）和加成乘數（<code>ups_multiplier</code>）</li>
+      <li><strong>平台後台 → 租戶管理：</strong>開啟/關閉各租戶的代管模式（寫入租戶 DB 的 <code>ups_mode</code>）</li>
+      <li><strong>租戶設定：</strong>允許租戶填入自有帳號（<code>ups_own_account_no</code>）</li>
+    </ul>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Step 7 — 前端出貨流程</div>
+    <p>建議的 UX 流程：</p>
+    <div class="flow">
+      <div class="flow-node">填寫出貨地址<br><span style="font-size:10px;font-weight:400">收件人 / 包裹規格</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node accent">查詢費率<br><span style="font-size:10px;font-weight:400">POST /rates</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">選擇服務<br><span style="font-size:10px;font-weight:400">依 tier / 金額</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node accent">建立提單<br><span style="font-size:10px;font-weight:400">POST /create-shipment</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">顯示 Label<br><span style="font-size:10px;font-weight:400">列印 / 下載</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node ok">預約提貨<br><span style="font-size:10px;font-weight:400">POST /schedule-pickup</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════ -->
+<section class="section" id="endpoints">
+  <h2 class="section-title"><span class="section-num">15</span> API 端點清單</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Method</th><th>路徑</th><th>權限</th><th>功能</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="badge post">POST</span></td>
+          <td><code>/api/shipping/rates</code></td>
+          <td>租戶用戶</td>
+          <td>查詢 UPS 費率（含加成）</td>
+        </tr>
+        <tr>
+          <td><span class="badge post">POST</span></td>
+          <td><code>/api/shipping/create-shipment</code></td>
+          <td>租戶用戶</td>
+          <td>建立 UPS 提單，取得 tracking number 和 label</td>
+        </tr>
+        <tr>
+          <td><span class="badge post">POST</span></td>
+          <td><code>/api/shipping/schedule-pickup</code></td>
+          <td>租戶用戶</td>
+          <td>預約 UPS 到府提貨</td>
+        </tr>
+        <tr>
+          <td><span class="badge get">GET</span></td>
+          <td><code>/api/settings/ups</code></td>
+          <td>租戶用戶</td>
+          <td>讀取租戶 UPS 設定（模式 / 帳號）</td>
+        </tr>
+        <tr>
+          <td><span class="badge post">POST</span></td>
+          <td><code>/api/settings/ups</code></td>
+          <td>租戶用戶</td>
+          <td>更新租戶自有帳號</td>
+        </tr>
+        <tr>
+          <td><span class="badge get">GET</span></td>
+          <td><code>/api/admin/settings/ups</code></td>
+          <td>平台 Admin</td>
+          <td>讀取平台 UPS 代管帳號和加成乘數</td>
+        </tr>
+        <tr>
+          <td><span class="badge post">POST</span></td>
+          <td><code>/api/admin/settings/ups</code></td>
+          <td>平台 Admin</td>
+          <td>更新平台 UPS 代管帳號和加成乘數</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr>
+
+  <div class="subsection">
+    <div class="subsection-title">錯誤回應格式</div>
+    <pre><code><span class="cmt">// 統一格式</span>
+{ <span class="str">"error"</span>: <span class="str">"錯誤描述"</span> }
+
+<span class="cmt">// UPS 服務未開通時，額外帶 upsNotEnabled flag</span>
+{ <span class="str">"error"</span>: <span class="str">"UPS 服務尚未開通..."</span>, <span class="str">"upsNotEnabled"</span>: <span class="kw">true</span> }</code></pre>
+    <p>前端收到 <code>upsNotEnabled: true</code> 可特別處理，顯示「請聯繫平台開通」的引導訊息，而非通用錯誤。</p>
+  </div>
+
+  <div class="callout ok">
+    <div class="callout-title">實作驗證清單</div>
+    <ul style="margin-top:4px">
+      <li>[ ] UPS Developer 應用建立，OAuth credentials 取得並設為環境變數</li>
+      <li>[ ] <code>UPS_ShipmentLog</code> 和 <code>SYS_KeyValue</code> 表建立完成</li>
+      <li>[ ] <code>ups-auth.ts</code>、<code>ups-rating.ts</code>、<code>ups-shipment.ts</code>、<code>ups-pickup.ts</code> 移植並測試</li>
+      <li>[ ] <code>resolveUpsCreds()</code> 依 Patisco DB 架構實作</li>
+      <li>[ ] 三個 API endpoint 建立：rates / create-shipment / schedule-pickup</li>
+      <li>[ ] 平台後台設定 UI（代管帳號 + 乘數）</li>
+      <li>[ ] 租戶設定 UI（自有帳號）</li>
+      <li>[ ] 前端出貨流程：查費率 → 選服務 → 建提單 → 顯示 label → 預約提貨</li>
+      <li>[ ] 加成公式正確：只對 base charge 加成，附加費原價</li>
+      <li>[ ] 模式優先順序正確：own > managed > disabled</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+</div>
+
+<script>
+// Active nav highlight on scroll
+const sections = document.querySelectorAll('section[id]')
+const navLinks = document.querySelectorAll('.nav a[href^="#"]')
+
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      navLinks.forEach(l => l.classList.remove('active'))
+      const active = document.querySelector(`.nav a[href="#${entry.target.id}"]`)
+      if (active) active.classList.add('active')
+    }
+  })
+}, { rootMargin: '-20% 0px -70% 0px' })
+
+sections.forEach(s => observer.observe(s))
+
+// Reduce motion
+if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  document.documentElement.style.scrollBehavior = 'auto'
+}
+</script>
+</body>
+</html>

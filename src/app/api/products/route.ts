@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
   const product = await prisma.pRD_Product.create({
     data: {
       name: body.name,
+      productType: [0, 1, 2].includes(Number(body.productType)) ? Number(body.productType) : 0,
       sku: body.sku || null,
       modelNo: body.modelNo || null,
       description: body.description || null,

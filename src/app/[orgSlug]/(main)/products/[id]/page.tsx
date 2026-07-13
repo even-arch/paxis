@@ -29,6 +29,14 @@ export default async function ProductDetailPage({
 
   const stock = product.inventoryItems[0]
 
+  // 現行 BOM 的零件數（供 BOM 卡片摘要）
+  const activeBom = await prisma.bOM_Header.findFirst({
+    where: { productId: product.id, isActive: true },
+    orderBy: { version: 'desc' },
+    select: { _count: { select: { items: true } } },
+  })
+  const bomItemCount = activeBom?._count.items ?? 0
+
   // 從 PO_CustomerCopy_Item 取得買過這個產品的客戶（含訂單資訊）
   const salesItems = await prisma.pO_CustomerCopy_Item.findMany({
     where: { productId: product.id },
@@ -93,6 +101,7 @@ export default async function ProductDetailPage({
         {/* 基本資料 */}
         <Card title="基本資料">
           <Row label="商品名稱" value={product.name} />
+          <Row label="產品類型" value={PRODUCT_TYPE_LABEL[product.productType] ?? '成品 / 一般商品'} />
           <Row label="SKU / 料號" value={product.sku} />
           <Row label="型號" value={product.modelNo} />
           <Row label="單位" value={product.unit} />
@@ -134,6 +143,27 @@ export default async function ProductDetailPage({
           <Row label="預留量" value={stock ? `${stock.reservedQty} ${product.unit ?? ''}` : '0'} />
           <Row label="可用庫存" value={stock ? `${stock.quantity - stock.reservedQty} ${product.unit ?? ''}` : '0'} />
         </Card>
+
+        {/* BOM 物料清單（原物料/零件通常不需要） */}
+        {product.productType !== 2 && (
+          <Card title="BOM 物料清單">
+            {bomItemCount > 0 ? (
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-600">已設定 {bomItemCount} 項零件</p>
+                <Link href={orgPath(params.orgSlug, `/products/${params.id}/bom`)} className="text-sm text-blue-600 hover:underline">
+                  查看 / 編輯 BOM →
+                </Link>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-400">尚未設定物料清單</p>
+                <Link href={orgPath(params.orgSlug, `/products/${params.id}/bom`)} className="text-sm text-blue-600 hover:underline">
+                  建立 BOM →
+                </Link>
+              </div>
+            )}
+          </Card>
+        )}
 
         {/* 供應商 */}
         {product.supplierProducts.length > 0 && (
@@ -309,6 +339,12 @@ export default async function ProductDetailPage({
       </div>
     </div>
   )
+}
+
+const PRODUCT_TYPE_LABEL: Record<number, string> = {
+  0: '成品 / 一般商品',
+  1: '半成品（加工中間狀態）',
+  2: '原物料 / 零件',
 }
 
 const SOURCE_LABEL: Record<string, { text: string; cls: string }> = {

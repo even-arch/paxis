@@ -291,6 +291,10 @@ model PRD_Product {
   isMadeToOrder Boolean  @default(false)
   safetyStock   Int      @default(0)
 
+  // 產品類型：0=成品/一般商品 1=半成品（有 BOM、也會被上層 BOM 引用） 2=原物料/零件
+  // 半成品判定標準：會停在倉庫或委外廠被盤點的中間狀態，就值得一個 SKU
+  productType   Int      @default(0)
+
   patiscoProductId String?
 
   sellingPrice      Decimal?
@@ -317,6 +321,8 @@ model PRD_Product {
   invAdjustments    INV_Adjustment[]
   deliveryNoteItems SLS_DeliveryNoteItem[]
   shippingNoticeItems PO_ShippingNoticeItem[]
+  bomHeaders        BOM_Header[]  @relation("BomProduct")
+  usedInBomItems    BOM_Item[]    @relation("BomComponent")
 
   @@index([sku])
   @@index([modelNo])
@@ -379,6 +385,57 @@ model PRD_CategoryMapping {
 // 供應商管理 (SUP_)
 // =============================================================================
 
+// ══════════════════════════════════════════════════════════════
+// BOM（物料清單）— Phase 1：純資料定義，不動庫存
+//
+// 多階 BOM 靠遞迴：半成品是 PRD_Product（productType=1），
+// 自己掛自己的 BOM_Header，展開時逐層往下查。
+// 循環防呆（A 用 B、B 又用 A）由應用層在存檔時檢查，DB 不擋。
+// ══════════════════════════════════════════════════════════════
+
+model BOM_Header {
+  id        Int         @id @default(autoincrement())
+  productId Int         // 產出物：成品或半成品
+  product   PRD_Product @relation("BomProduct", fields: [productId], references: [id])
+
+  version   Int         @default(1)  // 同一產品可有多版 BOM，isActive 標記現行版
+  isActive  Boolean     @default(true)
+  note      String?
+
+  createdBy Int?        // SYS_User id；手動建立時必填
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  items     BOM_Item[]
+
+  @@unique([productId, version])
+  @@index([productId])
+  @@map("BOM_Header")
+}
+
+model BOM_Item {
+  id          Int         @id @default(autoincrement())
+  bomId       Int
+  bom         BOM_Header  @relation(fields: [bomId], references: [id], onDelete: Cascade)
+  componentId Int         // 零件/原料/半成品，都是 PRD_Product
+  component   PRD_Product @relation("BomComponent", fields: [componentId], references: [id])
+
+  qtyPer      Decimal     // 每 1 單位產出物的用量
+  unit        String?     // 顯示用；實際單位以 component.unit 為準
+  scrapRate   Decimal?    // 標準損耗率（%），選填；Phase 2 發料時作為建議投料量參考
+
+  // 指定供應商（選填）；不填則由 SUP_SupplierProduct 的 isPreferred 決定
+  preferredSupplierId Int?
+  preferredSupplier   SUP_Supplier? @relation(fields: [preferredSupplierId], references: [id])
+
+  sortOrder   Int         @default(0)
+  note        String?
+
+  @@unique([bomId, componentId])
+  @@index([componentId])
+  @@map("BOM_Item")
+}
+
 model SUP_Supplier {
   id            Int    @id @default(autoincrement())
   name          String
@@ -421,6 +478,7 @@ model SUP_Supplier {
   fobAllocations  SLS_FobCostAllocation[]
   paymentVouchers FIN_PaymentVoucher[]
   shippingNotices PO_ShippingNotice[]
+  bomItems       BOM_Item[]
 
   @@index([name])
   @@map("SUP_Supplier")
