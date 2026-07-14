@@ -18,7 +18,12 @@ export default withAuth(
         const { pathname } = req.nextUrl
         // /[orgSlug]/login 不需要 token
         if (pathname.match(/^\/[^/]+\/login/)) return true
-        return !!token
+        if (!token) return false
+        // token 必須帶 orgSlug，且要跟 URL 的 orgSlug 一致
+        // （舊 JWT 沒有 orgSlug → 強制重新登入；跨 org 瀏覽 → 擋下）
+        const urlOrg = pathname.split('/')[1]
+        const tokenOrg = (token as { orgSlug?: string }).orgSlug
+        return !!tokenOrg && tokenOrg === urlOrg
       },
     },
   }

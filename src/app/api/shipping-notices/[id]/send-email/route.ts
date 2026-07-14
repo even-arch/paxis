@@ -4,7 +4,6 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { sendShippingNoticeEmail } from '@/lib/mailer'
 import { filterMarksForDocNos } from '@/lib/shipping-marks'
-import { prisma as globalPrisma } from '@/lib/db'
 
 type Params = { params: { id: string } }
 
@@ -15,8 +14,10 @@ export async function POST(_req: NextRequest, { params }: Params) {
   const id = Number(params.id)
   if (isNaN(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
 
+  const prisma = await getRequestPrisma()
+
   try {
-    const notice = await globalPrisma.pO_ShippingNotice.findUnique({
+    const notice = await prisma.pO_ShippingNotice.findUnique({
       where: { id },
       include: {
         supplier: { select: { id: true, name: true, email: true, contactPerson: true } },
@@ -36,7 +37,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
     }
 
     // 取得公司資訊
-    const company = await globalPrisma.sYS_Company.findFirst()
+    const company = await prisma.sYS_Company.findFirst()
 
     // 準備郵件資料
     const emailData = {
@@ -69,7 +70,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
     await sendShippingNoticeEmail(notice.supplier.email, emailData)
 
     // 更新狀態為 SENT
-    const updated = await globalPrisma.pO_ShippingNotice.update({
+    const updated = await prisma.pO_ShippingNotice.update({
       where: { id },
       data: { status: 'SENT' },
     })
