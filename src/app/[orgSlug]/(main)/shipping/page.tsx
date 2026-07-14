@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { taipeiDateISO, taipeiDateCompact } from '@/lib/utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -335,7 +336,7 @@ export default function ShippingPage() {
   const [paxisSaving, setPaxisSaving] = useState(false)
   const [paxisSaved, setPaxisSaved] = useState<{ shipmentNo: string; shipmentId: number } | null>(null)
   const [paxisError, setPaxisError] = useState('')
-  const [paxisActualShipDate, setPaxisActualShipDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [paxisActualShipDate, setPaxisActualShipDate] = useState(() => taipeiDateISO())
   const [paxisPackingListNo, setPaxisPackingListNo] = useState('')
   const [paxisCommercialInvNo, setPaxisCommercialInvNo] = useState('')
   const [paxisCiExchangeRate, setPaxisCiExchangeRate] = useState('')
@@ -814,7 +815,7 @@ export default function ShippingPage() {
     setShipmentResult(null)
     setShipmentError('')
     // 預設提貨日為今天
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    const today = taipeiDateCompact()
     setPickupDate(today)
   }
 

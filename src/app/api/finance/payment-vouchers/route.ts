@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { taipeiDateCompact } from '@/lib/utils'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getRequestPrisma } from '@/lib/request-db'
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
 
   // 生成流水號 PV-YYYYMMDD-XXXX
   const today = new Date()
-  const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '')
+  const dateStr = taipeiDateCompact(today)
   const countToday = await prisma.fIN_PaymentVoucher.count({
     where: { voucherNo: { startsWith: `PV-${dateStr}` } },
   })

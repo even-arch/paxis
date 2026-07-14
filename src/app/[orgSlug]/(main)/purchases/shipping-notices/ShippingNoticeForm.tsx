@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { taipeiDateISO } from '@/lib/utils'
 
 type Supplier = { id: number; name: string; shortName: string | null; email: string | null }
 type POOption = {
@@ -39,7 +40,7 @@ export default function ShippingNoticeForm({
   const [error, setError] = useState('')
 
   const [supplierId, setSupplierId] = useState('')
-  const [issueDate, setIssueDate] = useState(new Date().toISOString().slice(0, 10))
+  const [issueDate, setIssueDate] = useState(taipeiDateISO())
   const [note, setNote] = useState('')
   const [items, setItems] = useState<LineItem[]>([])
 

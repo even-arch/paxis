@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { taipeiDateISO } from '@/lib/utils'
 import { getRequestPrisma } from '@/lib/request-db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -44,7 +45,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
       noticeNo: notice.noticeNo,
       supplierName: notice.supplier.name,
       supplierContact: notice.supplier.contactPerson,
-      issueDate: notice.issueDate.toISOString().slice(0, 10),
+      issueDate: taipeiDateISO(notice.issueDate),
       deliverToName: notice.deliverToName,
       deliverToAddress: notice.deliverToAddress,
       deliverToContact: notice.deliverToContact,

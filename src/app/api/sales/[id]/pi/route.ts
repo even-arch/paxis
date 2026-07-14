@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { taipeiDateCompact } from '@/lib/utils'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getRequestPrisma } from '@/lib/request-db'
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest, {
   // PI 號：優先用傳入值（AI 匯入時帶入文件原始號碼），否則自動產生
   let piNo = body.piNo?.trim() || null
   if (!piNo) {
-    const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    const datePart = taipeiDateCompact()
     const count = await prisma.pI.count()
     piNo = `PI-${datePart}-${String(count + 1).padStart(4, '0')}`
   }

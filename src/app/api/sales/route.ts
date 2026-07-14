@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { taipeiDateCompact } from '@/lib/utils'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getRequestPrisma } from '@/lib/request-db'
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest) {
   let orderNo = body.orderNo?.trim() || ''
   if (!orderNo) {
     const today = new Date()
-    const datePart = today.toISOString().slice(0, 10).replace(/-/g, '')
+    const datePart = taipeiDateCompact(today)
     const count = await prisma.pO_CustomerCopy.count()
     orderNo = `SLS-${datePart}-${String(count + 1).padStart(4, '0')}`
   }

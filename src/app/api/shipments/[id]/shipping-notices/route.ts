@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { taipeiDateISO, taipeiDateCompact } from '@/lib/utils'
 import { getRequestPrisma } from '@/lib/request-db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -150,7 +151,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
   const created: Array<{ id: number; noticeNo: string; supplierName: string }> = []
   const skipped: Array<{ supplierName: string; reason: string }> = []
 
-  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+  const today = taipeiDateCompact()
   let countToday = await prisma.pO_ShippingNotice.count({
     where: { noticeNo: { startsWith: `SN-${today}` } },
   })
@@ -185,11 +186,11 @@ export async function POST(_req: NextRequest, { params }: Params) {
     // 交貨地點與期限：優先帶 SO 資料（貨櫃場 + 進倉期限）
     const noteLines = [`由出貨單 ${shipment.shipmentNo} 產生`]
     if (shipment.warehouseInUntil) {
-      const d = shipment.warehouseInUntil.toISOString().slice(0, 10)
+      const d = taipeiDateISO(shipment.warehouseInUntil)
       noteLines.push(`最晚進倉期限：${d}`)
     }
     if (shipment.customsClosingDate) {
-      const d = shipment.customsClosingDate.toISOString().slice(0, 10)
+      const d = taipeiDateISO(shipment.customsClosingDate)
       noteLines.push(`結關日：${d}`)
     }
 

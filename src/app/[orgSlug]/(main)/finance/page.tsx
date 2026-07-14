@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useOrgPath } from '@/lib/use-org-path'
+import { taipeiDateISO } from '@/lib/utils'
 
 type Payable = {
   id: number
@@ -654,7 +655,7 @@ export default function FinancePage() {
                                 : (Number(r.amountForeign) * Number(r.rateAtInvoice)).toFixed(2))
                               setRecRate(hasCollected && r.rateAtCollection ? String(Number(r.rateAtCollection)) : '')
                               setRecDateInput(hasCollected && r.collectedAt
-                                ? new Date(r.collectedAt).toISOString().slice(0, 10)
+                                ? taipeiDateISO(r.collectedAt)
                                 : '')
                               setRecNote(r.note ?? '')
                             }}

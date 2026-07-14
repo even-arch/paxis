@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useOrgPath } from '@/lib/use-org-path'
+import { taipeiDateISO } from '@/lib/utils'
 
 type BreakdownItem = { productName: string; sku: string | null; qty: number; unitPrice: number; value: number }
 type SupplierBreakdown = {
@@ -69,7 +70,7 @@ export default function SalesShipmentPanel({ orderId, orderStatus, items, active
   const router = useRouter()
   const toOrgPath = useOrgPath()
   const [showForm, setShowForm] = useState(false)
-  const [actualShipDate, setActualShipDate] = useState(new Date().toISOString().slice(0, 10))
+  const [actualShipDate, setActualShipDate] = useState(taipeiDateISO())
   const [selectedPiId, setSelectedPiId] = useState<string>(activePIs[0]?.id ? String(activePIs[0].id) : '')
   const [shippingMethod, setShippingMethod] = useState('')
   const [portOfLoading, setPortOfLoading] = useState('')

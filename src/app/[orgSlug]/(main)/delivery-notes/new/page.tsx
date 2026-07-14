@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { getPagePrisma } from '@/lib/page-db'
 import DeliveryNoteForm from './DeliveryNoteForm'
+import { taipeiDateCompact } from '@/lib/utils'
 
 export default async function NewDeliveryNotePage({ params }: { params: { orgSlug: string } }) {
   const prisma = await getPagePrisma(params.orgSlug)
@@ -18,7 +19,7 @@ export default async function NewDeliveryNotePage({ params }: { params: { orgSlu
   ])
 
   const today = new Date()
-  const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '')
+  const dateStr = taipeiDateCompact(today)
   const todayCount = await prisma.sLS_DeliveryNote.count({
     where: { docNo: { startsWith: `DN-${dateStr}-` } },
   })

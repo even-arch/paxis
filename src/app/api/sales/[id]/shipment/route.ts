@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { taipeiDateCompact } from '@/lib/utils'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getRequestPrisma } from '@/lib/request-db'
@@ -182,7 +183,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const sourceLabel = body.source ?? 'MANUAL'
 
     // 產生出貨單號：SHP-YYYYMMDD-XXXX（系統內部識別號，不對外）
-    const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    const datePart = taipeiDateCompact()
     const count = await prisma.sLS.count()
     const shipmentNo = `SHP-${datePart}-${String(count + 1).padStart(4, '0')}`
 

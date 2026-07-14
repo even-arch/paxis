@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { taipeiDateISO } from '@/lib/utils'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getRequestPrisma } from '@/lib/request-db'
@@ -32,7 +33,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
         grouped[key] = {
           noticeId: item.notice.id,
           noticeNo: item.notice.noticeNo,
-          issueDate: item.notice.issueDate.toISOString().slice(0, 10),
+          issueDate: taipeiDateISO(item.notice.issueDate),
           status: item.notice.status,
           items: [],
         }

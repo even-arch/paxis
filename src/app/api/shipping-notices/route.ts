@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { taipeiDateCompact } from '@/lib/utils'
 import { getRequestPrisma } from '@/lib/request-db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
 
   try {
     // 生成流水號 SN-YYYYMMDD-XXXX
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    const today = taipeiDateCompact()
     const countToday = await prisma.pO_ShippingNotice.count({
       where: { noticeNo: { startsWith: `SN-${today}` } },
     })

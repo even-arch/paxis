@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { taipeiDateISO } from '@/lib/utils'
 
 type Customer = { id: number; name: string; shortName: string | null; contactPerson: string | null; phoneNo: string | null; address: string | null; city: string | null; shippingMarkTemplate: string | null }
 type Product  = { id: number; sku: string | null; name: string; unit: string | null }
@@ -31,7 +32,7 @@ export default function DeliveryNoteForm({
   const [customerId, setCustomerId] = useState('')
   const [slsPiId, setSlsPiId] = useState('')
   const [slsOrderId, setSlsOrderId] = useState('')
-  const [issueDate, setIssueDate] = useState(new Date().toISOString().slice(0, 10))
+  const [issueDate, setIssueDate] = useState(taipeiDateISO())
   const [deliveryDate, setDeliveryDate] = useState('')
   const [contactName, setContactName] = useState('')
   const [contactPhone, setContactPhone] = useState('')
