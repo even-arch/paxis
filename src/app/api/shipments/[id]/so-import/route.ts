@@ -64,6 +64,45 @@ function parseDate(s?: string | null): Date | null {
   return isNaN(d.getTime()) ? null : d
 }
 
+/**
+ * DELETE /api/shipments/[id]/so-import
+ * 清空此出貨單的船務資訊（SO），供重新匯入。
+ * 注意：portOfLoading / portOfDischarge 屬「出貨資訊」，可能來自 Patisco
+ * 或手動輸入，SO 匯入只是覆蓋它們，清空時不動。
+ */
+export async function DELETE(_req: NextRequest, { params }: Params) {
+  const prisma = await getRequestPrisma()
+  const session = await getServerSession(authOptions)
+  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const shipmentId = Number(params.id)
+  if (isNaN(shipmentId)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
+
+  const shipment = await prisma.sLS.findUnique({ where: { id: shipmentId }, select: { id: true } })
+  if (!shipment) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  await prisma.sLS.update({
+    where: { id: shipmentId },
+    data: {
+      soNo: null,
+      vesselVoyage: null,
+      shippingLine: null,
+      containerYard: null,
+      placeOfReceipt: null,
+      forwarderName: null,
+      forwarderContact: null,
+      soNote: null,
+      customsClosingDate: null,
+      soEtd: null,
+      soEta: null,
+      warehouseInFrom: null,
+      warehouseInUntil: null,
+    },
+  })
+
+  return NextResponse.json({ ok: true })
+}
+
 export async function POST(req: NextRequest, { params }: Params) {
   const prisma = await getRequestPrisma()
   const session = await getServerSession(authOptions)

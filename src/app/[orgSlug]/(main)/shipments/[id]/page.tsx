@@ -181,7 +181,10 @@ export default async function ShipmentDetailPage({ params }: Props) {
       <div className="bg-white rounded-lg shadow p-5 mb-6">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">船務資訊（SO）</h2>
-          <SOImportButton shipmentId={shipment.id} />
+          <SOImportButton
+            shipmentId={shipment.id}
+            hasSoData={!!(shipment.soNo || shipment.vesselVoyage || shipment.containerYard || shipment.forwarderName)}
+          />
         </div>
         {shipment.soNo || shipment.vesselVoyage || shipment.containerYard ? (
           <div className="grid grid-cols-2 gap-x-8">
