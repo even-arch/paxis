@@ -1,6 +1,6 @@
 import { Resend } from 'resend'
 import nodemailer from 'nodemailer'
-import { prisma } from '@/lib/db'
+import type { PrismaClient } from '@prisma/client'
 import { decrypt } from '@/lib/crypto'
 
 interface MailOptions {
@@ -9,7 +9,9 @@ interface MailOptions {
   html: string
 }
 
-async function getResendConfig() {
+// 寄件設定存在各租戶自己的 SYS_EmailConfig，呼叫端必須傳入該租戶的
+// prisma（getRequestPrisma / getPrismaByOrgSlug），不得用全域預設 DB
+async function getResendConfig(prisma: PrismaClient) {
     const config = await prisma.sYS_EmailConfig.findFirst({ where: { isActive: true } })
   if (!config?.encryptedApiKey) return null
   return {
@@ -46,9 +48,9 @@ async function sendViaSMTP(opts: MailOptions) {
   await transporter.sendMail({ from, ...opts })
 }
 
-// 主要寄信函式：優先 Resend（用戶設定），fallback SMTP（系統環境變數）
-export async function sendMail(opts: MailOptions) {
-  const resend = await getResendConfig()
+// 主要寄信函式：優先 Resend（租戶設定），fallback SMTP（系統環境變數）
+export async function sendMail(prisma: PrismaClient, opts: MailOptions) {
+  const resend = await getResendConfig(prisma)
   if (resend) {
     await sendViaResend(resend.apiKey, resend.from, opts)
     return
@@ -56,8 +58,8 @@ export async function sendMail(opts: MailOptions) {
   await sendViaSMTP(opts)
 }
 
-export async function sendPasswordResetEmail(to: string, resetUrl: string, companyName: string) {
-  await sendMail({
+export async function sendPasswordResetEmail(prisma: PrismaClient, to: string, resetUrl: string, companyName: string) {
+  await sendMail(prisma, {
     to,
     subject: `${companyName} — 重設您的密碼`,
     html: `
@@ -98,7 +100,7 @@ export interface ShippingNoticeEmailData {
   noticeUrl?: string
 }
 
-export async function sendShippingNoticeEmail(to: string, data: ShippingNoticeEmailData) {
+export async function sendShippingNoticeEmail(prisma: PrismaClient, to: string, data: ShippingNoticeEmailData) {
   const {
     noticeNo, supplierName, supplierContact, issueDate,
     deliverToName, deliverToAddress, deliverToContact,
@@ -171,7 +173,7 @@ export async function sendShippingNoticeEmail(to: string, data: ShippingNoticeEm
     </div>
   `
 
-  await sendMail({
+  await sendMail(prisma, {
     to,
     subject: `${companyName} — 出貨通知單 ${noticeNo}`,
     html,

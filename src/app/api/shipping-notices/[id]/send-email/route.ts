@@ -64,11 +64,12 @@ export async function POST(_req: NextRequest, { params }: Params) {
       })),
       companyName: company?.nameZh || company?.nameEn || 'PAXIS',
       companyEmail: company?.email,
-      noticeUrl: `${process.env.NEXTAUTH_URL}/purchases/shipping-notices/${id}`,
+      // 通知單頁面連結需含 orgSlug（middleware 依此路由租戶）
+      noticeUrl: `${process.env.NEXTAUTH_URL}/${session.user.orgSlug}/purchases/shipping-notices/${id}`,
     }
 
     // 發送郵件
-    await sendShippingNoticeEmail(notice.supplier.email, emailData)
+    await sendShippingNoticeEmail(prisma, notice.supplier.email, emailData)
 
     // 更新狀態為 SENT
     const updated = await prisma.pO_ShippingNotice.update({

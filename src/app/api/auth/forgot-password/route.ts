@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     const companyName = company?.nameEn || company?.nameZh || 'PAXIS'
 
     try {
-      await sendPasswordResetEmail(email, resetUrl, companyName)
+      await sendPasswordResetEmail(prisma, email, resetUrl, companyName)
     } catch (err) {
       console.error('[forgot-password] email send failed:', err)
       if (process.env.NODE_ENV !== 'production') {

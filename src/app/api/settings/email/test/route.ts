@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await sendMail({
+    await sendMail(prisma, {
       to,
       subject: 'PAXIS — Email 設定測試',
       html: `
