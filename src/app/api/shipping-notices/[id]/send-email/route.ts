@@ -4,6 +4,7 @@ import { getRequestPrisma } from '@/lib/request-db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { sendShippingNoticeEmail } from '@/lib/mailer'
+import { renderShippingNoticePdf } from '@/lib/sn-pdf'
 import { filterMarksForDocNos } from '@/lib/shipping-marks'
 
 type Params = { params: { id: string } }
@@ -64,12 +65,17 @@ export async function POST(_req: NextRequest, { params }: Params) {
       })),
       companyName: company?.nameZh || company?.nameEn || 'PAXIS',
       companyEmail: company?.email,
-      // 通知單頁面連結需含 orgSlug（middleware 依此路由租戶）
-      noticeUrl: `${process.env.NEXTAUTH_URL}/${session.user.orgSlug}/purchases/shipping-notices/${id}`,
+      note: notice.note,
+      // 供應商沒有 PAXIS 帳號，不放登入連結，改附 A4 PDF
     }
 
-    // 發送郵件
-    await sendShippingNoticeEmail(prisma, notice.supplier.email, emailData)
+    // 產出 A4 PDF 附件
+    const pdfBuffer = await renderShippingNoticePdf(emailData)
+
+    // 發送郵件（附 PDF）
+    await sendShippingNoticeEmail(prisma, notice.supplier.email, emailData, [
+      { filename: `${notice.noticeNo}.pdf`, content: pdfBuffer },
+    ])
 
     // 更新狀態為 SENT
     const updated = await prisma.pO_ShippingNotice.update({

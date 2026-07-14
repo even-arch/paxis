@@ -7,6 +7,7 @@ interface MailOptions {
   to: string
   subject: string
   html: string
+  attachments?: Array<{ filename: string; content: Buffer }>
 }
 
 // 寄件設定存在各租戶自己的 SYS_EmailConfig，呼叫端必須傳入該租戶的
@@ -29,6 +30,7 @@ async function sendViaResend(apiKey: string, from: string, opts: MailOptions) {
     to: opts.to,
     subject: opts.subject,
     html: opts.html,
+    ...(opts.attachments?.length ? { attachments: opts.attachments } : {}),
   })
   if (error) throw new Error(error.message)
 }
@@ -97,10 +99,16 @@ export interface ShippingNoticeEmailData {
   }>
   companyName: string
   companyEmail?: string
+  note?: string | null
   noticeUrl?: string
 }
 
-export async function sendShippingNoticeEmail(prisma: PrismaClient, to: string, data: ShippingNoticeEmailData) {
+export async function sendShippingNoticeEmail(
+  prisma: PrismaClient,
+  to: string,
+  data: ShippingNoticeEmailData,
+  attachments?: Array<{ filename: string; content: Buffer }>,
+) {
   const {
     noticeNo, supplierName, supplierContact, issueDate,
     deliverToName, deliverToAddress, deliverToContact,
@@ -161,7 +169,9 @@ export async function sendShippingNoticeEmail(prisma: PrismaClient, to: string, 
 
       <p style="color:#374151;margin:24px 0">請在準備好貨物後盡快回覆確認。如有任何問題，歡迎與我們聯繫。</p>
 
-      ${noticeUrl ? `
+      ${attachments?.length ? `
+        <p style="color:#374151;margin:0 0 24px 0">📎 完整的出貨通知單（A4 PDF）已附於本信件，可直接下載列印。</p>
+      ` : noticeUrl ? `
         <a href="${noticeUrl}" style="display:inline-block;margin:24px 0;padding:12px 24px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;font-weight:500">
           查看完整通知單
         </a>
@@ -177,5 +187,6 @@ export async function sendShippingNoticeEmail(prisma: PrismaClient, to: string, 
     to,
     subject: `${companyName} — 出貨通知單 ${noticeNo}`,
     html,
+    attachments,
   })
 }
