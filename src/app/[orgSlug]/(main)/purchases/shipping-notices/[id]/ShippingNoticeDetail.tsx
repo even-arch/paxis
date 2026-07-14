@@ -40,6 +40,8 @@ interface ShippingNoticeDetailProps {
     containerYard: string | null
     suppliers: Array<{ id: number; label: string; name: string; address: string; contact: string }>
   }
+  /** 已依此供應商單號篩選過的麥頭；null = 來源出貨單無麥頭 */
+  shippingMarks?: string | null
 }
 
 interface PONotificationHistory {
@@ -53,7 +55,7 @@ interface PONotificationHistory {
   }>
 }
 
-export default function ShippingNoticeDetail({ notice, deliverPresets }: ShippingNoticeDetailProps) {
+export default function ShippingNoticeDetail({ notice, deliverPresets, shippingMarks }: ShippingNoticeDetailProps) {
   const orgPath = useOrgPath()
   const [sendingEmail, setSendingEmail] = useState(false)
   const [emailError, setEmailError] = useState('')
@@ -399,6 +401,19 @@ export default function ShippingNoticeDetail({ notice, deliverPresets }: Shippin
         </table>
       </div>
 
+      {/* 麥頭（與 A4 列印、Email 相同內容，供出貨前核對） */}
+      {shippingMarks && (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100">
+            <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">麥頭（Shipping Marks）</h2>
+            <p className="text-xs text-gray-400 mt-1">已依此供應商的單號篩選；列印與 Email 會帶相同內容，請供應商出貨前核對</p>
+          </div>
+          <div className="px-5 py-4">
+            <pre className="text-xs text-gray-700 font-mono whitespace-pre-wrap bg-gray-50 border border-gray-200 rounded p-4 columns-2 gap-8">{shippingMarks}</pre>
+          </div>
+        </div>
+      )}
+
       {/* 通知歷史 */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100">
@@ -424,8 +439,12 @@ export default function ShippingNoticeDetail({ notice, deliverPresets }: Shippin
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-mono text-blue-600">{notif.noticeNo}</span>
                           <span className="text-xs text-gray-500">{notif.issueDate}</span>
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${notif.status === 'SENT' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-                            {notif.status === 'SENT' ? '已寄送' : '已確認'}
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            notif.status === 'DRAFT' ? 'bg-gray-100 text-gray-600'
+                            : notif.status === 'SENT' ? 'bg-blue-100 text-blue-700'
+                            : 'bg-green-100 text-green-700'
+                          }`}>
+                            {notif.status === 'DRAFT' ? '草稿' : notif.status === 'SENT' ? '已寄送' : '已確認'}
                           </span>
                         </div>
                         <div className="text-xs space-y-1">

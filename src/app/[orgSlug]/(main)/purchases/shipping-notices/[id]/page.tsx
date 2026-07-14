@@ -6,6 +6,7 @@ import { getPagePrisma } from '@/lib/page-db'
 import { formatDate } from '@/lib/utils'
 import { orgPath } from '@/lib/org-path'
 import ShippingNoticeDetail from './ShippingNoticeDetail'
+import { filterMarksForDocNos } from '@/lib/shipping-marks'
 
 export default async function ShippingNoticeDetailPage({
   params,
@@ -22,16 +23,25 @@ export default async function ShippingNoticeDetailPage({
       supplier: { select: { id: true, name: true, email: true, contactPerson: true, phoneNo: true, address: true, city: true, countryCode: true } },
       items: {
         include: {
-          po: { select: { id: true, poNo: true } },
+          po: { select: { id: true, poNo: true, slsPi: { select: { piNo: true } } } },
           product: { select: { id: true, sku: true, name: true, unit: true } },
         },
       },
       performer: { select: { id: true, name: true } },
-      sourceShipment: { select: { id: true, shipmentNo: true, containerYard: true } },
+      sourceShipment: { select: { id: true, shipmentNo: true, containerYard: true, shippingMarks: true } },
     },
   })
 
   if (!notice) notFound()
+
+  // 麥頭：依此供應商相關單號（PO 號 + 連結 PI 號）篩出對應的 Remark 區塊
+  // （與 A4 列印、Email 相同邏輯，讓畫面上也看得到）
+  const shippingMarks = notice.sourceShipment?.shippingMarks
+    ? filterMarksForDocNos(
+        notice.sourceShipment.shippingMarks,
+        notice.items.flatMap(it => [it.po.poNo, it.po.slsPi?.piNo].filter((s): s is string => !!s)),
+      )
+    : null
 
   // Decimal → string，避免 Server → Client 序列化錯誤
   const serialized = {
@@ -87,7 +97,7 @@ export default async function ShippingNoticeDetailPage({
         </span>
       </div>
 
-      <ShippingNoticeDetail notice={serialized} deliverPresets={deliverPresets} />
+      <ShippingNoticeDetail notice={serialized} deliverPresets={deliverPresets} shippingMarks={shippingMarks} />
     </div>
   )
 }
