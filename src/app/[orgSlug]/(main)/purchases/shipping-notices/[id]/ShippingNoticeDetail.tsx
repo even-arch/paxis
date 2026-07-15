@@ -140,6 +140,11 @@ export default function ShippingNoticeDetail({ notice, deliverPresets, shippingM
       return
     }
 
+    // 重寄防誤按：已寄送過的單要再確認一次
+    if (notice.status !== 'DRAFT' && !confirm(
+      `此通知單已寄送過，確定要重新寄送到 ${notice.supplier.email} 嗎？\n（若供應商 Email 有誤，請先至供應商主檔修改再回來重寄）`
+    )) return
+
     setSendingEmail(true)
     setEmailError('')
     setEmailSuccess(false)
@@ -239,13 +244,15 @@ export default function ShippingNoticeDetail({ notice, deliverPresets, shippingM
             >
               🖨 A4 列印
             </a>
-            {notice.status === 'DRAFT' && notice.supplier.email && (
+            {notice.supplier.email && (
               <button
                 onClick={handleSendEmail}
                 disabled={sendingEmail}
-                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg whitespace-nowrap"
+                className={`disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg whitespace-nowrap ${
+                  notice.status === 'DRAFT' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-500 hover:bg-gray-600'
+                }`}
               >
-                {sendingEmail ? '寄送中...' : '📧 Email 寄送'}
+                {sendingEmail ? '寄送中...' : notice.status === 'DRAFT' ? '📧 Email 寄送' : '📧 重新寄送'}
               </button>
             )}
             <button
