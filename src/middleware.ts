@@ -50,6 +50,7 @@ export default withAuth(
 export const config = {
   matcher: [
     // 保護所有 orgSlug 下的路徑（排除 login、invite、admin、api、靜態資源）
-    '/:orgSlug((?!admin|invite|api|_next|favicon)[^/]+)/:path*',
+    // fonts = public/fonts（PDF 附件的中文字型由本站 URL 載入，不得要求登入）
+    '/:orgSlug((?!admin|invite|api|_next|favicon|fonts)[^/]+)/:path*',
   ],
 }
