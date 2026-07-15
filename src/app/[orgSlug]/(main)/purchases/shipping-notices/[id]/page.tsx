@@ -6,7 +6,7 @@ import { getPagePrisma } from '@/lib/page-db'
 import { formatDate } from '@/lib/utils'
 import { orgPath } from '@/lib/org-path'
 import ShippingNoticeDetail from './ShippingNoticeDetail'
-import { filterMarksForDocNos } from '@/lib/shipping-marks'
+import { filterMarksForDocNos, findUnmatchedDocNos } from '@/lib/shipping-marks'
 
 export default async function ShippingNoticeDetailPage({
   params,
@@ -36,12 +36,26 @@ export default async function ShippingNoticeDetailPage({
 
   // 麥頭：依此供應商相關單號（PO 號 + 連結 PI 號）篩出對應的 Remark 區塊
   // （與 A4 列印、Email 相同邏輯，讓畫面上也看得到）
-  const shippingMarks = notice.sourceShipment?.shippingMarks
+  const rawMarks = notice.sourceShipment?.shippingMarks ?? null
+  const shippingMarks = rawMarks
     ? filterMarksForDocNos(
-        notice.sourceShipment.shippingMarks,
+        rawMarks,
         notice.items.flatMap(it => [it.po.poNo, it.po.slsPi?.piNo].filter((s): s is string => !!s)),
       )
     : null
+
+  // 差異警告：哪些 PO 在麥頭裡找不到對應區塊（常見原因：麥頭原文單號打錯字）
+  // 一張 PO 的 PO 號或其連結 PI 號有任一對到就算有
+  const marksUnmatchedPoNos = rawMarks
+    ? Array.from(new Set(
+        notice.items
+          .filter(it => {
+            const candidates = [it.po.poNo, it.po.slsPi?.piNo].filter((s): s is string => !!s)
+            return findUnmatchedDocNos(rawMarks, candidates).length === candidates.length
+          })
+          .map(it => it.po.poNo),
+      ))
+    : []
 
   // Decimal → string，避免 Server → Client 序列化錯誤
   const serialized = {
@@ -97,7 +111,12 @@ export default async function ShippingNoticeDetailPage({
         </span>
       </div>
 
-      <ShippingNoticeDetail notice={serialized} deliverPresets={deliverPresets} shippingMarks={shippingMarks} />
+      <ShippingNoticeDetail
+        notice={serialized}
+        deliverPresets={deliverPresets}
+        shippingMarks={shippingMarks}
+        marksUnmatchedPoNos={marksUnmatchedPoNos}
+      />
     </div>
   )
 }

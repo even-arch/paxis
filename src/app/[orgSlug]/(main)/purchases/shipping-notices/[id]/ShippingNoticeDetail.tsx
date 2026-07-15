@@ -42,6 +42,8 @@ interface ShippingNoticeDetailProps {
   }
   /** 已依此供應商單號篩選過的麥頭；null = 來源出貨單無麥頭 */
   shippingMarks?: string | null
+  /** 在麥頭中找不到對應區塊的 PO 號（常見原因：麥頭原文單號打錯字） */
+  marksUnmatchedPoNos?: string[]
 }
 
 interface PONotificationHistory {
@@ -55,7 +57,7 @@ interface PONotificationHistory {
   }>
 }
 
-export default function ShippingNoticeDetail({ notice, deliverPresets, shippingMarks }: ShippingNoticeDetailProps) {
+export default function ShippingNoticeDetail({ notice, deliverPresets, shippingMarks, marksUnmatchedPoNos }: ShippingNoticeDetailProps) {
   const orgPath = useOrgPath()
   const [sendingEmail, setSendingEmail] = useState(false)
   const [emailError, setEmailError] = useState('')
@@ -416,6 +418,15 @@ export default function ShippingNoticeDetail({ notice, deliverPresets, shippingM
             <p className="text-xs text-gray-400 mt-1">已依此供應商的單號篩選；列印與 Email 會帶相同內容，請供應商出貨前核對</p>
           </div>
           <div className="px-5 py-4">
+            {marksUnmatchedPoNos && marksUnmatchedPoNos.length > 0 && (
+              <div className="mb-3 bg-amber-50 border border-amber-300 rounded px-4 py-3 text-sm text-amber-800">
+                <p className="font-semibold">⚠ 以下 PO 在麥頭中找不到對應區塊：{marksUnmatchedPoNos.join('、')}</p>
+                <p className="text-xs text-amber-700 mt-1">
+                  常見原因是麥頭原文的單號打錯字（例如多打或少打一位數）。請核對 Patisco DO「其它資訊」的麥頭單號，
+                  修正後重新同步該出貨單，這些區塊才會帶進通知單。
+                </p>
+              </div>
+            )}
             <pre className="text-xs text-gray-700 font-mono whitespace-pre-wrap bg-gray-50 border border-gray-200 rounded p-4 columns-2 gap-8">{shippingMarks}</pre>
           </div>
         </div>
