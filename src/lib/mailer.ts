@@ -8,6 +8,8 @@ interface MailOptions {
   subject: string
   html: string
   attachments?: Array<{ filename: string; content: Buffer }>
+  /** 密件副本（備份用，例如寄件操作者自己的信箱） */
+  bcc?: string
 }
 
 // 寄件設定存在各租戶自己的 SYS_EmailConfig，呼叫端必須傳入該租戶的
@@ -30,6 +32,7 @@ async function sendViaResend(apiKey: string, from: string, opts: MailOptions) {
     to: opts.to,
     subject: opts.subject,
     html: opts.html,
+    ...(opts.bcc ? { bcc: opts.bcc } : {}),
     ...(opts.attachments?.length ? { attachments: opts.attachments } : {}),
   })
   if (error) throw new Error(error.message)
@@ -108,6 +111,7 @@ export async function sendShippingNoticeEmail(
   to: string,
   data: ShippingNoticeEmailData,
   attachments?: Array<{ filename: string; content: Buffer }>,
+  bcc?: string,
 ) {
   const {
     noticeNo, supplierName, supplierContact, issueDate,
@@ -188,5 +192,6 @@ export async function sendShippingNoticeEmail(
     subject: `${companyName} — 出貨通知單 ${noticeNo}`,
     html,
     attachments,
+    bcc,
   })
 }

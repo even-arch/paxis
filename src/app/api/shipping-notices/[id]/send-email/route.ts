@@ -72,10 +72,14 @@ export async function POST(_req: NextRequest, { params }: Params) {
     // 產出 A4 PDF 附件
     const pdfBuffer = await renderShippingNoticePdf(emailData)
 
-    // 發送郵件（附 PDF）
-    await sendShippingNoticeEmail(prisma, notice.supplier.email, emailData, [
-      { filename: `${notice.noticeNo}.pdf`, content: pdfBuffer },
-    ])
+    // 發送郵件（附 PDF），BCC 給寄件操作者本人留備份
+    await sendShippingNoticeEmail(
+      prisma,
+      notice.supplier.email,
+      emailData,
+      [{ filename: `${notice.noticeNo}.pdf`, content: pdfBuffer }],
+      session.user.email ?? undefined,
+    )
 
     // 更新狀態為 SENT
     const updated = await prisma.pO_ShippingNotice.update({
