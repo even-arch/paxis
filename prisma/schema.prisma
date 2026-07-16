@@ -927,6 +927,10 @@ model PO_ShippingNotice {
   deliverToAddress String?
   deliverToContact String?   // 聯絡人 / 電話
 
+  // 期望到貨日：供應商最晚何時要把貨送達交貨地點
+  // 由出貨單產生時自動帶 SO 的最晚進倉期限（warehouseInUntil），可手動調整
+  expectedDeliveryDate DateTime?
+
   // 由哪張出貨單（SLS）驅動產生；手動建立時為 null
   sourceShipmentId Int?
   sourceShipment   SLS? @relation(fields: [sourceShipmentId], references: [id])

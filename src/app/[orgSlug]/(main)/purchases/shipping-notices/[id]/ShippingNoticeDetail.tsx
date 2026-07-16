@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { formatDate } from '@/lib/utils'
+import { formatDate, taipeiDateISO } from '@/lib/utils'
 import { useOrgPath } from '@/lib/use-org-path'
 
 interface ShippingNoticeDetailProps {
@@ -14,6 +14,7 @@ interface ShippingNoticeDetailProps {
     deliverToName: string | null
     deliverToAddress: string | null
     deliverToContact: string | null
+    expectedDeliveryDate: Date | string | null
     sourceShipment: { id: number; shipmentNo: string } | null
     supplier: {
       id: number
@@ -70,6 +71,9 @@ export default function ShippingNoticeDetail({ notice, deliverPresets, shippingM
   const [deliverToName, setDeliverToName] = useState(notice.deliverToName ?? '')
   const [deliverToAddress, setDeliverToAddress] = useState(notice.deliverToAddress ?? '')
   const [deliverToContact, setDeliverToContact] = useState(notice.deliverToContact ?? '')
+  const [expectedDeliveryDate, setExpectedDeliveryDate] = useState(
+    notice.expectedDeliveryDate ? taipeiDateISO(notice.expectedDeliveryDate) : ''
+  )
   const [savingDeliver, setSavingDeliver] = useState(false)
   const [deliverSaved, setDeliverSaved] = useState(false)
   const [deliverMode, setDeliverMode] = useState<'office' | 'supplier' | 'yard' | 'other' | null>(null)
@@ -105,7 +109,7 @@ export default function ShippingNoticeDetail({ notice, deliverPresets, shippingM
       const res = await fetch(`/api/shipping-notices/${notice.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deliverToName, deliverToAddress, deliverToContact }),
+        body: JSON.stringify({ deliverToName, deliverToAddress, deliverToContact, expectedDeliveryDate: expectedDeliveryDate || null }),
       })
       if (res.ok) {
         setDeliverSaved(true)
@@ -156,7 +160,7 @@ export default function ShippingNoticeDetail({ notice, deliverPresets, shippingM
       await fetch(`/api/shipping-notices/${notice.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deliverToName, deliverToAddress, deliverToContact }),
+        body: JSON.stringify({ deliverToName, deliverToAddress, deliverToContact, expectedDeliveryDate: expectedDeliveryDate || null }),
       })
       const res = await fetch(`/api/shipping-notices/${notice.id}/send-email`, {
         method: 'POST',
@@ -348,6 +352,14 @@ export default function ShippingNoticeDetail({ notice, deliverPresets, shippingM
                 placeholder="例：王先生 0912-345-678"
                 className="w-full px-3 py-2 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-400" />
             </label>
+            <label className="text-sm">
+              <span className="text-gray-400 text-xs block mb-1">期望到貨日（供應商最晚何時要把貨送達；由 SO 最晚進倉期限自動帶入，可調整）</span>
+              <input type="date" value={expectedDeliveryDate} onChange={e => setExpectedDeliveryDate(e.target.value)}
+                className="w-48 px-3 py-2 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            </label>
+            {!expectedDeliveryDate && (
+              <p className="text-xs text-amber-600">⚠ 尚未填寫期望到貨日，建議填寫，供應商才知道最晚何時要到貨</p>
+            )}
             {!deliverToName && !deliverToAddress && (
               <p className="text-xs text-amber-600">⚠ 尚未填寫交貨地點，寄出前建議先填寫，供應商才知道貨要出到哪裡</p>
             )}
@@ -365,6 +377,10 @@ export default function ShippingNoticeDetail({ notice, deliverPresets, shippingM
             <div className="flex gap-4">
               <span className="text-gray-400 w-24">聯絡人</span>
               <span className="text-gray-800">{notice.deliverToContact || '—'}</span>
+            </div>
+            <div className="flex gap-4">
+              <span className="text-gray-400 w-24">期望到貨日</span>
+              <span className="text-gray-800">{notice.expectedDeliveryDate ? formatDate(notice.expectedDeliveryDate) : '—'}</span>
             </div>
           </div>
         )}

@@ -172,11 +172,17 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const updated = await prisma.sLS.update({ where: { id: shipmentId }, data })
 
-    // 同步更新此出貨單既有通知單（草稿）的交貨地點
+    // 同步更新此出貨單既有通知單（草稿）的交貨地點與期望到貨日
     if (parsed.containerYard) {
       await prisma.pO_ShippingNotice.updateMany({
         where: { sourceShipmentId: shipmentId, status: 'DRAFT', deliverToName: null },
         data: { deliverToName: parsed.containerYard },
+      })
+    }
+    if (whUntil) {
+      await prisma.pO_ShippingNotice.updateMany({
+        where: { sourceShipmentId: shipmentId, status: 'DRAFT', expectedDeliveryDate: null },
+        data: { expectedDeliveryDate: whUntil },
       })
     }
 

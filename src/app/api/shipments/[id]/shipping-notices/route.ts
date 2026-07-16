@@ -183,15 +183,16 @@ export async function POST(_req: NextRequest, { params }: Params) {
     countToday++
     const noticeNo = `SN-${today}-${String(countToday).padStart(4, '0')}`
 
-    // 交貨地點與期限：優先帶 SO 資料（貨櫃場 + 進倉期限）
+    // 交貨地點與期限：優先帶 SO 資料
+    // 貨櫃場 → 交貨地點；最晚進倉期限 → 期望到貨日；S/O 號、船名、結關日 → 備註（進倉報關常用）
     const noteLines = [`由出貨單 ${shipment.shipmentNo} 產生`]
-    if (shipment.warehouseInUntil) {
-      const d = taipeiDateISO(shipment.warehouseInUntil)
-      noteLines.push(`最晚進倉期限：${d}`)
-    }
+    if (shipment.soNo) noteLines.push(`S/O 號碼：${shipment.soNo}`)
+    if (shipment.vesselVoyage) noteLines.push(`船名/航次：${shipment.vesselVoyage}`)
     if (shipment.customsClosingDate) {
-      const d = taipeiDateISO(shipment.customsClosingDate)
-      noteLines.push(`結關日：${d}`)
+      noteLines.push(`結關日：${taipeiDateISO(shipment.customsClosingDate)}`)
+    }
+    if (shipment.warehouseInUntil) {
+      noteLines.push(`最晚進倉期限：${taipeiDateISO(shipment.warehouseInUntil)}`)
     }
 
     const notice = await prisma.pO_ShippingNotice.create({
@@ -202,6 +203,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
         status: 'DRAFT',
         sourceShipmentId: shipmentId,
         deliverToName: shipment.containerYard ?? null,
+        expectedDeliveryDate: shipment.warehouseInUntil ?? null,
         note: noteLines.join('\n'),
         performedBy: userId,
         items: { create: items },

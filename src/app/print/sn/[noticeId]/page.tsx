@@ -38,6 +38,7 @@ type SNData = {
     deliverToName: string | null
     deliverToAddress: string | null
     deliverToContact: string | null
+    expectedDeliveryDate: string | null
     inCharge: string | null
     items: NoticeItem[]
   }
@@ -345,6 +346,9 @@ function SNDocument({ data }: { data: SNData }) {
               <div><b>Delivery Place:</b> {notice.deliverToName ?? shipment?.containerYard ?? '＿＿＿＿＿＿'}</div>
               {notice.deliverToAddress && <div style={{ paddingLeft: '12pt' }}>{notice.deliverToAddress}</div>}
               {notice.deliverToContact && <div style={{ paddingLeft: '12pt' }}>聯絡：{notice.deliverToContact}</div>}
+              {notice.expectedDeliveryDate && (
+                <div><b>Delivery By（期望到貨日）:</b> {notice.expectedDeliveryDate.slice(0, 10)}（請務必於此日期前送達）</div>
+              )}
               {shipment?.vesselVoyage && <div><b>Vessel:</b> {shipment.vesselVoyage}{shipment.shippingLine ? `（${shipment.shippingLine}）` : ''}</div>}
               {shipment?.placeOfReceipt && <div><b>Place of Receipt:</b> {shipment.placeOfReceipt}</div>}
               {shipment?.portOfLoading && <div><b>Port of Loading:</b> {shipment.portOfLoading}</div>}

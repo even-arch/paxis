@@ -121,6 +121,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       deliverToName: notice.deliverToName,
       deliverToAddress: notice.deliverToAddress,
       deliverToContact: notice.deliverToContact,
+      expectedDeliveryDate: notice.expectedDeliveryDate,
       inCharge: notice.performer?.name ?? null,
       items: notice.items.map(it => ({
         poNo: it.po.poNo,

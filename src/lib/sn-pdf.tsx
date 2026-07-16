@@ -56,12 +56,18 @@ function SnDocument({ data }: { data: ShippingNoticeEmailData }) {
         <View style={styles.infoRow}><Text style={styles.infoLabel}>通知日期</Text><Text style={styles.infoValue}>{data.issueDate}</Text></View>
         <View style={styles.infoRow}><Text style={styles.infoLabel}>供應商</Text><Text style={styles.infoValue}>{data.supplierName}{data.supplierContact ? `（${data.supplierContact}）` : ''}</Text></View>
 
-        {(data.deliverToName || data.deliverToAddress) ? (
+        {(data.deliverToName || data.deliverToAddress || data.expectedDeliveryDate) ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>交貨地點（請將貨物出至以下地點）</Text>
+            <Text style={styles.sectionTitle}>交貨地點與期限（請將貨物出至以下地點）</Text>
             {data.deliverToName ? <View style={styles.infoRow}><Text style={styles.infoLabel}>收貨方</Text><Text style={styles.infoValue}>{data.deliverToName}</Text></View> : null}
             {data.deliverToAddress ? <View style={styles.infoRow}><Text style={styles.infoLabel}>地址</Text><Text style={styles.infoValue}>{data.deliverToAddress}</Text></View> : null}
             {data.deliverToContact ? <View style={styles.infoRow}><Text style={styles.infoLabel}>聯絡人</Text><Text style={styles.infoValue}>{data.deliverToContact}</Text></View> : null}
+            {data.expectedDeliveryDate ? (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>期望到貨日</Text>
+                <Text style={[styles.infoValue, { fontWeight: 'bold' }]}>{data.expectedDeliveryDate}（請務必於此日期前送達）</Text>
+              </View>
+            ) : null}
           </View>
         ) : null}
 

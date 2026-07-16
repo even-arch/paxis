@@ -92,6 +92,8 @@ export interface ShippingNoticeEmailData {
   deliverToName?: string | null
   deliverToAddress?: string | null
   deliverToContact?: string | null
+  /** 期望到貨日（YYYY-MM-DD，已格式化） */
+  expectedDeliveryDate?: string | null
   shippingMarks?: string | null
   items: Array<{
     poNo: string
@@ -115,7 +117,7 @@ export async function sendShippingNoticeEmail(
 ) {
   const {
     noticeNo, supplierName, supplierContact, issueDate,
-    deliverToName, deliverToAddress, deliverToContact,
+    deliverToName, deliverToAddress, deliverToContact, expectedDeliveryDate,
     shippingMarks, items, companyName, companyEmail, noticeUrl,
   } = data
 
@@ -140,12 +142,13 @@ export async function sendShippingNoticeEmail(
         <p style="color:#374151;margin:0"><strong>通知日期：</strong>${issueDate}</p>
       </div>
 
-      ${(deliverToName || deliverToAddress) ? `
+      ${(deliverToName || deliverToAddress || expectedDeliveryDate) ? `
         <div style="background:#fefce8;border:1px solid #fde047;padding:16px;border-radius:8px;margin:24px 0">
-          <h3 style="color:#a16207;margin:0 0 12px 0;font-size:15px">📦 交貨地點</h3>
+          <h3 style="color:#a16207;margin:0 0 12px 0;font-size:15px">📦 交貨地點與期限</h3>
           ${deliverToName ? `<p style="color:#374151;margin:0 0 8px 0"><strong>收貨方：</strong>${deliverToName}</p>` : ''}
           ${deliverToAddress ? `<p style="color:#374151;margin:0 0 8px 0"><strong>地址：</strong>${deliverToAddress}</p>` : ''}
-          ${deliverToContact ? `<p style="color:#374151;margin:0"><strong>聯絡人：</strong>${deliverToContact}</p>` : ''}
+          ${deliverToContact ? `<p style="color:#374151;margin:0 0 8px 0"><strong>聯絡人：</strong>${deliverToContact}</p>` : ''}
+          ${expectedDeliveryDate ? `<p style="color:#b91c1c;margin:0"><strong>期望到貨日：</strong>${expectedDeliveryDate}（請務必於此日期前送達）</p>` : ''}
         </div>
       ` : ''}
 

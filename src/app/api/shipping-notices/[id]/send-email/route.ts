@@ -50,6 +50,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
       deliverToName: notice.deliverToName,
       deliverToAddress: notice.deliverToAddress,
       deliverToContact: notice.deliverToContact,
+      expectedDeliveryDate: notice.expectedDeliveryDate ? taipeiDateISO(notice.expectedDeliveryDate) : null,
       shippingMarks: notice.sourceShipment?.shippingMarks
         ? filterMarksForDocNos(
             notice.sourceShipment.shippingMarks,

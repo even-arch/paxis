@@ -40,7 +40,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (isNaN(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
 
   const body = await req.json()
-  const { status, note, deliverToName, deliverToAddress, deliverToContact } = body
+  const { status, note, deliverToName, deliverToAddress, deliverToContact, expectedDeliveryDate } = body
 
   const existing = await prisma.pO_ShippingNotice.findUnique({
     where: { id },
@@ -54,6 +54,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (deliverToName !== undefined) updateData.deliverToName = deliverToName || null
   if (deliverToAddress !== undefined) updateData.deliverToAddress = deliverToAddress || null
   if (deliverToContact !== undefined) updateData.deliverToContact = deliverToContact || null
+  if (expectedDeliveryDate !== undefined) {
+    updateData.expectedDeliveryDate = expectedDeliveryDate ? new Date(expectedDeliveryDate) : null
+  }
 
   const notice = await prisma.pO_ShippingNotice.update({
     where: { id },
