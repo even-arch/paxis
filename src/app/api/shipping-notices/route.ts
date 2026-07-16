@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   const userId = rawId != null ? Number(rawId) : null
 
   const body = await req.json()
-  const { supplierId, issueDate, note, items = [] } = body
+  const { supplierId, issueDate, expectedDeliveryDate, note, items = [] } = body
 
   if (!supplierId) return NextResponse.json({ error: '請選擇供應商' }, { status: 400 })
   if (!items.length) return NextResponse.json({ error: '請至少新增一個品項' }, { status: 400 })
@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
         noticeNo,
         supplierId: Number(supplierId),
         issueDate: new Date(issueDate),
+        expectedDeliveryDate: expectedDeliveryDate ? new Date(expectedDeliveryDate) : null,
         note: note || null,
         performedBy: userId,
         status: 'DRAFT',

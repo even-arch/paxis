@@ -41,6 +41,7 @@ export default function ShippingNoticeForm({
 
   const [supplierId, setSupplierId] = useState('')
   const [issueDate, setIssueDate] = useState(taipeiDateISO())
+  const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('')
   const [note, setNote] = useState('')
   const [items, setItems] = useState<LineItem[]>([])
 
@@ -130,6 +131,7 @@ export default function ShippingNoticeForm({
         body: JSON.stringify({
           supplierId: supplierId ? Number(supplierId) : null,
           issueDate,
+          expectedDeliveryDate: expectedDeliveryDate || null,
           note: note || null,
           items: items.filter(it => it.notifiedQuantity > 0).map(it => ({
             poId: it.poId,
@@ -164,6 +166,9 @@ export default function ShippingNoticeForm({
         <div className="grid grid-cols-2 gap-4">
           <F label="通知日期">
             <input type="date" className={ic} value={issueDate} onChange={e => setIssueDate(e.target.value)} required />
+          </F>
+          <F label="期望到貨日（供應商最晚何時要把貨送達）">
+            <input type="date" className={ic} value={expectedDeliveryDate} onChange={e => setExpectedDeliveryDate(e.target.value)} />
           </F>
           <F label="供應商">
             <select className={ic} value={supplierId} onChange={e => setSupplierId(e.target.value)} required>

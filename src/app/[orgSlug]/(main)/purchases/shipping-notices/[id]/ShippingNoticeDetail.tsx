@@ -151,6 +151,11 @@ export default function ShippingNoticeDetail({ notice, deliverPresets, shippingM
       `此通知單已寄送過，確定要重新寄送到 ${notice.supplier.email} 嗎？\n（若供應商 Email 有誤，請先至供應商主檔修改再回來重寄）`
     )) return
 
+    // 期望到貨日是對供應商的基本告知，未填要再確認一次
+    if (!expectedDeliveryDate && !confirm(
+      '尚未填寫「期望到貨日」，供應商將不知道最晚何時要到貨。\n確定仍要寄出嗎？'
+    )) return
+
     setSendingEmail(true)
     setEmailError('')
     setEmailSuccess(false)
