@@ -626,7 +626,10 @@ model CUS_Contact {
 // 0=草稿, 1=已送出, 2=部分到貨, 3=完成, 4=取消
 model PO {
   id            Int    @id @default(autoincrement())
-  poNo          String    @unique
+  // 單號不做全域唯一：Patisco 拆單給多個供應商時沿用同一單號（如 E2620053），
+  // 唯一性以 (poNo, supplierId) 定義 — 同號同供應商 = 同一張單（修訂），
+  // 同號不同供應商 = 拆單，各自成單
+  poNo          String
   supplierId    Int
   supplier      SUP_Supplier @relation(fields: [supplierId], references: [id])
 
@@ -686,6 +689,7 @@ model PO {
   payables      FIN_Payable[]  @relation("PO_Payables")
   shippingNoticeItems PO_ShippingNoticeItem[]
 
+  @@unique([poNo, supplierId])
   @@index([supplierId, status])
   @@index([poNo])
   @@index([slsPiId])

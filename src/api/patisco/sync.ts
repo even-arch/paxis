@@ -707,23 +707,29 @@ export async function step5_poOrders(prisma: PrismaClient, jobId: number): Promi
   const r: SyncStepResult = { created: 0, updated: 0, skipped: 0, errors: [] }
   const allRecords = await getRawRecords(prisma, 'PO')
 
-  // Patisco 可能有同號多 doc（誤建空殼、修訂重開）。每個 poNo 只取一筆：
-  // 優先取有 products 的；同樣有 products 時取 docId 較大（較晚建立）的
-  const byNo = new Map<string, RawSyncRecord>()
+  // Patisco 可能有同號多 doc，兩種情況要分開處理：
+  // 1. 同號同供應商 = 誤建空殼、修訂重開 → 去重，優先取有 products 的，
+  //    同樣有 products 時取 docId 較大（較晚建立）的
+  // 2. 同號不同供應商 = 拆單（一張客戶單拆給多個供應商，沿用同一單號，
+  //    如 E2620053 = 雅邦 + 禾詰）→ 各自保留，各自成單
+  // 因此去重 key 是 poNo + sellerName，不是只有 poNo
+  const byNoSeller = new Map<string, RawSyncRecord>()
   for (const rec of allRecords) {
     const no = rec.patiscoDocNo.trim() || rec.patiscoDocId
+    const seller = ((rec.result as { header?: { seller?: { name?: string } } })?.header?.seller?.name ?? '').trim()
+    const key = `${no}||${seller}`
     const productCount = ((rec.result as { products?: unknown[] })?.products ?? []).length
-    const prev = byNo.get(no)
-    if (!prev) { byNo.set(no, rec); continue }
+    const prev = byNoSeller.get(key)
+    if (!prev) { byNoSeller.set(key, rec); continue }
     const prevCount = ((prev.result as { products?: unknown[] })?.products ?? []).length
     const better =
       (productCount > 0 && prevCount === 0) ||
       (productCount > 0 && prevCount > 0 && rec.patiscoDocId > prev.patiscoDocId)
-    if (better) byNo.set(no, rec)
+    if (better) byNoSeller.set(key, rec)
   }
-  const records = Array.from(byNo.values())
+  const records = Array.from(byNoSeller.values())
   if (records.length < allRecords.length) {
-    console.log(`[step5] 同號去重：${allRecords.length} → ${records.length} 筆（略過空殼/舊版 doc）`)
+    console.log(`[step5] 同號同供應商去重：${allRecords.length} → ${records.length} 筆（略過空殼/舊版 doc）`)
   }
 
   for (const rec of records) {
@@ -754,10 +760,17 @@ export async function step5_poOrders(prisma: PrismaClient, jobId: number): Promi
         continue
       }
 
-      const existing = await prisma.pO.findUnique({
-        where: { poNo },
-        select: { id: true, _count: { select: { items: true } } },
-      })
+      // 既有單查找：優先用 patiscoOrderId（文件真身分），
+      // 找不到再用 (poNo, supplierId) — 同號不同供應商是拆單，不能只看 poNo
+      const existing =
+        (await prisma.pO.findFirst({
+          where: { patiscoOrderId: rec.patiscoDocId },
+          select: { id: true, _count: { select: { items: true } } },
+        })) ??
+        (await prisma.pO.findFirst({
+          where: { poNo, supplierId: supplier.id },
+          select: { id: true, _count: { select: { items: true } } },
+        }))
 
       // 嘗試連結 PO_CustomerCopy（同訂單號碼）
       const salesOrder = await prisma.pO_CustomerCopy.findFirst({
