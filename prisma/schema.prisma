@@ -671,7 +671,9 @@ model PO {
   sourceType      Int      @default(0)
 
   patiscoOrderNo    String?
-  patiscoOrderId    String?
+  // Patisco 文件 UID = 同步身分的唯一鍵（單號只是人看的標籤，可同號拆單）
+  // nullable unique：手動/AI 建立的 PO 為 null，不受約束
+  patiscoOrderId    String?   @unique
   patiscoStatus     String?   // Patisco 文件狀態：'0'=Editing, '1'=Confirmed
   patiscoCreatedAt  DateTime? // Patisco 原始建立時間（PO 文件上的 createdDate）
 
