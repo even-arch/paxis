@@ -44,11 +44,15 @@ export async function POST(req: NextRequest) {
 
   try {
     // 生成流水號 SN-YYYYMMDD-XXXX
+    // 取今天最大號 +1（不能用筆數 +1：退回刪單後筆數變少，會與現存單撞號）
     const today = taipeiDateCompact()
-    const countToday = await prisma.pO_ShippingNotice.count({
-      where: { noticeNo: { startsWith: `SN-${today}` } },
+    const lastToday = await prisma.pO_ShippingNotice.findFirst({
+      where: { noticeNo: { startsWith: `SN-${today}-` } },
+      orderBy: { noticeNo: 'desc' },
+      select: { noticeNo: true },
     })
-    const noticeNo = `SN-${today}-${String(countToday + 1).padStart(4, '0')}`
+    const seq = (lastToday ? parseInt(lastToday.noticeNo.slice(-4), 10) : 0) + 1
+    const noticeNo = `SN-${today}-${String(seq).padStart(4, '0')}`
 
     const notice = await prisma.pO_ShippingNotice.create({
       data: {

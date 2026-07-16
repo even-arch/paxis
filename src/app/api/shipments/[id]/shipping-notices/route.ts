@@ -151,11 +151,16 @@ export async function POST(_req: NextRequest, { params }: Params) {
   const created: Array<{ id: number; noticeNo: string; supplierName: string }> = []
   const skipped: Array<{ supplierName: string; reason: string }> = []
 
+  // 流水號 = 今天最大號 +1（不能用筆數 +1：退回刪單後筆數變少，會與現存單撞號）
   const today = taipeiDateCompact()
-  let countToday = await prisma.pO_ShippingNotice.count({
-    where: { noticeNo: { startsWith: `SN-${today}` } },
+  const lastToday = await prisma.pO_ShippingNotice.findFirst({
+    where: { noticeNo: { startsWith: `SN-${today}-` } },
+    orderBy: { noticeNo: 'desc' },
+    select: { noticeNo: true },
   })
+  let countToday = lastToday ? parseInt(lastToday.noticeNo.slice(-4), 10) : 0
 
+  try {
   for (const [supplierId, group] of Array.from(bySupplier.entries())) {
     if (existingSupplierIds.has(supplierId)) {
       skipped.push({ supplierName: group.supplierName, reason: '已有通知單' })
@@ -212,6 +217,15 @@ export async function POST(_req: NextRequest, { params }: Params) {
     })
 
     created.push({ id: notice.id, noticeNo: notice.noticeNo, supplierName: group.supplierName })
+  }
+  } catch (err) {
+    // 一律回 JSON（未捕捉例外會回空 body，前端 res.json() 會炸）
+    console.error('[shipping-notices generate]', err)
+    const msg = err instanceof Error ? err.message : String(err)
+    return NextResponse.json(
+      { error: `產生通知單失敗：${msg}`, created, skipped },
+      { status: 500 },
+    )
   }
 
   return NextResponse.json({ created, skipped, existing })
