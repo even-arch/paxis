@@ -152,31 +152,47 @@ export async function POST(req: NextRequest, {
     },
   })
 
-  // 自動建立應付帳款
-  const receiptAmountTWD = receiveItems.reduce((sum, item) => {
-    const poItem = order.items.find(i => i.id === item.poItemId)
-    if (!poItem) return sum
-    const cost = item.unitCost != null ? new Decimal(item.unitCost) : poItem.unitPrice
-    return sum.add(new Decimal(item.quantity).mul(cost))
-  }, new Decimal(0))
-
-  const supplier = await prisma.sUP_Supplier.findUnique({
-    where: { id: order.supplierId },
-    select: { paymentCycleDays: true },
-  })
-  const dueDate = supplier?.paymentCycleDays
-    ? new Date(Date.now() + supplier.paymentCycleDays * 86400000)
-    : null
-
-  await prisma.fIN_Payable.create({
-    data: {
-      supplierId: order.supplierId,
-      receiptId: receipt.id,
-      amountTWD: receiptAmountTWD,
-      dueDate,
-      status: 0,
+  // 自動建立應付帳款 —— 前提：這張 PO 還沒有應付帳款。
+  // 貿易商模式下應付由「出貨確認」建立（掛 shipmentId + poId）；
+  // 若已存在（不論出貨或先前入庫建的），入庫不得再建，否則同一張 PO 重複計帳。
+  const existingPayable = await prisma.fIN_Payable.findFirst({
+    where: {
+      OR: [
+        { poId: orderId },
+        { receipt: { orderId } },
+      ],
     },
+    select: { id: true },
   })
+
+  if (!existingPayable) {
+    const receiptAmountTWD = receiveItems.reduce((sum, item) => {
+      const poItem = order.items.find(i => i.id === item.poItemId)
+      if (!poItem) return sum
+      const cost = item.unitCost != null ? new Decimal(item.unitCost) : poItem.unitPrice
+      return sum.add(new Decimal(item.quantity).mul(cost))
+    }, new Decimal(0))
+
+    const supplier = await prisma.sUP_Supplier.findUnique({
+      where: { id: order.supplierId },
+      select: { paymentCycleDays: true },
+    })
+    const dueDate = supplier?.paymentCycleDays
+      ? new Date(Date.now() + supplier.paymentCycleDays * 86400000)
+      : null
+
+    await prisma.fIN_Payable.create({
+      data: {
+        supplierId: order.supplierId,
+        receiptId: receipt.id,
+        amountTWD: receiptAmountTWD,
+        dueDate,
+        status: 0,
+      },
+    })
+  } else {
+    console.log(`[receive] PO ${orderId} 已有應付帳款（id=${existingPayable.id}），入庫不重複建立`)
+  }
 
   Promise.all(patiscoNotifications).catch(() => {})
 
