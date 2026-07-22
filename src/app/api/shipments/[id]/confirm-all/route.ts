@@ -1,13 +1,11 @@
 /**
- * POST /api/shipments/[id]/customs-docs/confirm-all
- * 一鍵批次確認：出貨已用報關文件核對過，把還沒收尾的項目一次標記完成。
- *
- * 適用情境：供應商實際上已用其他管道（電話、LINE…）確認出貨，
- * 只是沒有另外走系統的 Email 寄送流程；報關文件（尤其出口報單）
- * 是貨物已離境的權威證據，人工核對無誤後可一次收尾，不必逐筆進去點。
+ * POST /api/shipments/[id]/confirm-all
+ * 一鍵批次確認：由「確認出貨」按鈕觸發，把還沒收尾的供應商通知單
+ * 一併標記完成（供應商實務上常透過 LINE/電話等其他管道確認出貨，
+ * 不一定會走系統的 Email 寄送流程），並可一併驅動庫存確認。
  *
  * - noticeIds：要標記為 CONFIRMED 的出貨通知單（保留原 note，附加確認記錄）
- * - confirmShipment：是否連同觸發「確認出貨」（庫存扣減 + 應收帳款）
+ * - confirmShipment：是否連同觸發「確認出貨」（庫存扣減 + 應收帳款；冪等）
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -34,7 +32,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     return uid != null ? parseInt(String(uid), 10) : null
   })()
   const performerName = session.user?.name ?? session.user?.email ?? '使用者'
-  const auditLine = `\n[人工批次確認 ${taipeiDateISO()}，操作人：${performerName}] 已透過報關文件核對，確認此通知單對應之出貨已完成（非經系統 Email 寄送流程）`
+  const auditLine = `\n[確認出貨時一併確認 ${taipeiDateISO()}，操作人：${performerName}] 供應商已於其他管道（如 LINE/電話）確認出貨，非經系統 Email 流程`
 
   let noticesConfirmed = 0
   if (noticeIds.length > 0) {
