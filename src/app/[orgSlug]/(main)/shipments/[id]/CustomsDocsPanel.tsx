@@ -33,6 +33,13 @@ type Suggestions = {
   bondedWarnings: string[]
 }
 
+type Outstanding = {
+  notices: Array<{ id: number; noticeNo: string; status: string; supplierName: string }>
+  shipmentConfirmed: boolean
+}
+
+const NOTICE_STATUS_LABEL: Record<string, string> = { DRAFT: '草稿', SENT: '已寄送' }
+
 const DOC_TYPE_LABEL: Record<string, string> = {
   FORWARDER_INVOICE: '貨代費用發票',
   BILL_OF_LADING: '提單（B/L）',
@@ -57,6 +64,10 @@ export default function CustomsDocsPanel({ shipmentId }: { shipmentId: number })
   const [docs, setDocs] = useState<DocListItem[]>([])
   const [reconciliation, setReconciliation] = useState<Reconciliation | null>(null)
   const [suggestions, setSuggestions] = useState<Suggestions | null>(null)
+  const [outstanding, setOutstanding] = useState<Outstanding | null>(null)
+  const [checkedNotices, setCheckedNotices] = useState<Set<number>>(new Set())
+  const [checkedConfirmShipment, setCheckedConfirmShipment] = useState(true)
+  const [confirmingAll, setConfirmingAll] = useState(false)
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
@@ -72,6 +83,11 @@ export default function CustomsDocsPanel({ shipmentId }: { shipmentId: number })
         setDocs(data.docs ?? [])
         setReconciliation(data.reconciliation ?? null)
         setSuggestions(data.suggestions ?? null)
+        const outs: Outstanding | null = data.outstanding ?? null
+        setOutstanding(outs)
+        // 預設全選：草稿/已寄送的通知單 + 尚未確認出貨，都勾起來供一鍵確認
+        setCheckedNotices(new Set((outs?.notices ?? []).map(n => n.id)))
+        setCheckedConfirmShipment(outs ? !outs.shipmentConfirmed : false)
       }
     } finally {
       setLoading(false)
@@ -142,9 +158,47 @@ export default function CustomsDocsPanel({ shipmentId }: { shipmentId: number })
     }
   }
 
+  function toggleNotice(id: number) {
+    setCheckedNotices(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  async function handleConfirmAll() {
+    const noticeIds = Array.from(checkedNotices)
+    if (noticeIds.length === 0 && !checkedConfirmShipment) return
+    const parts: string[] = []
+    if (noticeIds.length > 0) parts.push(`${noticeIds.length} 張通知單標記為已確認`)
+    if (checkedConfirmShipment) parts.push('確認出貨（庫存扣減 + 建立應收帳款）')
+    if (!confirm(`確定要一次執行：${parts.join('、')}？\n（假設這批貨已透過報關文件核對無誤，供應商可能透過其他管道已確認）`)) return
+
+    setConfirmingAll(true)
+    setError('')
+    setMessage('')
+    try {
+      const res = await fetch(`/api/shipments/${shipmentId}/customs-docs/confirm-all`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ noticeIds, confirmShipment: checkedConfirmShipment }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? '批次確認失敗')
+      setMessage(`已完成：${data.noticesConfirmed} 張通知單確認${data.shipmentResult ? '，出貨已確認' : ''}`)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '批次確認失敗')
+    } finally {
+      setConfirmingAll(false)
+    }
+  }
+
   const hasReconciliationData = reconciliation && (
     reconciliation.piTotal || reconciliation.commercialInvoiceTotal || reconciliation.customsDeclaredTotal
   )
+  const hasOutstanding = outstanding && (outstanding.notices.length > 0 || !outstanding.shipmentConfirmed)
+  const nothingChecked = checkedNotices.size === 0 && !checkedConfirmShipment
 
   return (
     <div className="bg-white rounded-lg shadow p-5 mb-6">
@@ -222,6 +276,51 @@ export default function CustomsDocsPanel({ shipmentId }: { shipmentId: number })
               ) : (
                 <p className="text-xs text-green-600">✓ 三方金額一致，無明顯落差</p>
               )}
+            </div>
+          )}
+
+          {/* ── 尚未完成的項目：一鍵批次確認 ── */}
+          {hasOutstanding && (
+            <div className="border border-teal-200 bg-teal-50/50 rounded-lg p-4">
+              <h3 className="text-xs font-semibold text-teal-700 uppercase tracking-wide mb-1">
+                尚未收尾的項目
+              </h3>
+              <p className="text-xs text-gray-500 mb-3">
+                若這批貨已用報關文件核對無誤（供應商可能已透過電話、LINE 等其他管道確認出貨），
+                可勾選以下項目一次標記完成，不必逐筆進去點。
+              </p>
+              <div className="space-y-1.5 mb-3">
+                {outstanding!.notices.map(n => (
+                  <label key={n.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={checkedNotices.has(n.id)}
+                      onChange={() => toggleNotice(n.id)}
+                      className="rounded"
+                    />
+                    <span className="font-mono text-xs text-blue-700">{n.noticeNo}</span>
+                    <span className="text-gray-600">{n.supplierName}</span>
+                    <span className="text-xs text-gray-400">（目前：{NOTICE_STATUS_LABEL[n.status] ?? n.status}）</span>
+                  </label>
+                ))}
+                {!outstanding!.shipmentConfirmed && (
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={checkedConfirmShipment}
+                      onChange={() => setCheckedConfirmShipment(v => !v)}
+                      className="rounded"
+                    />
+                    <span className="text-gray-700 font-medium">確認出貨（庫存扣減 + 建立應收帳款，此動作不可逆）</span>
+                  </label>
+                )}
+              </div>
+              <button
+                onClick={handleConfirmAll}
+                disabled={confirmingAll || nothingChecked}
+                className="text-xs px-3 py-1.5 rounded bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-40">
+                {confirmingAll ? '處理中...' : '✓ 一鍵確認已勾選項目'}
+              </button>
             </div>
           )}
 

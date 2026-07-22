@@ -121,6 +121,21 @@ export async function GET(_req: NextRequest, { params }: Params) {
     parsedDocs.map(d => d.bondedFactoryWarning).filter((s): s is string => !!s)
   ))
 
+  // ── 尚未完成的項目：草稿/已寄送但未確認的通知單、出貨是否已扣庫存 ──────
+  const pendingNotices = await prisma.pO_ShippingNotice.findMany({
+    where: { sourceShipmentId: shipmentId, status: { not: 'CONFIRMED' } },
+    select: {
+      id: true, noticeNo: true, status: true,
+      supplier: { select: { name: true, shortName: true } },
+    },
+    orderBy: { noticeNo: 'asc' },
+  })
+  const invMovements = await prisma.iNV_Movement.findMany({
+    where: { slsShipmentId: shipmentId, type: 4 },
+    select: { id: true },
+    take: 1,
+  })
+
   return NextResponse.json({
     docs,
     reconciliation: {
@@ -136,6 +151,13 @@ export async function GET(_req: NextRequest, { params }: Params) {
       htsBackfill,
       freightItems: freightItemSuggestions,
       bondedWarnings,
+    },
+    outstanding: {
+      notices: pendingNotices.map(n => ({
+        id: n.id, noticeNo: n.noticeNo, status: n.status,
+        supplierName: n.supplier.shortName ?? n.supplier.name,
+      })),
+      shipmentConfirmed: invMovements.length > 0,
     },
   })
 }

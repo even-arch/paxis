@@ -2,15 +2,12 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getRequestPrisma } from '@/lib/request-db'
-import { Prisma } from '@prisma/client'
+import { confirmShipment } from '@/lib/confirm-shipment'
 
 /**
  * POST /api/shipments/[id]/confirm
- * 確認出貨並記錄相關的財務資訊：
- * 1. INV_Movement type=4（quantity--, reservedQty--）
- * 2. PO_CustomerCopy_Item.shippedQty 更新
- * 3. FIN_Receivable 建立（AR：應收帳款）
- * 4. PI.status = 2（已出貨）
+ * 確認出貨並記錄相關的財務資訊，邏輯見 src/lib/confirm-shipment.ts
+ * （與批次確認 customs-docs/confirm-all 共用同一套邏輯）。
  *
  * 注意：應付帳款不自動創建，由用戶在對帳頁面手工確認。
  * 冪等保護：已有 type=4 Movement 則拒絕重複。
@@ -28,201 +25,11 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     return uid != null ? parseInt(String(uid), 10) : null
   })()
 
-  // ── 讀取出貨單完整資料 ──────────────────────────────────────────────────
-  const shipment = await prisma.sLS.findUnique({
-    where: { id: shipmentId },
-    include: {
-      customer: { select: { id: true } },
-      items: {
-        include: {
-          slsItem: { select: { id: true, product: { select: { id: true } } } },
-          pi: { select: { id: true } },
-        },
-      },
-      pis: {
-        include: {
-          pi: {
-            select: {
-              id: true, piNo: true, orderId: true, totalAmount: true,
-              currencyCode: true, extraCharges: true,
-              order: {
-                select: {
-                  id: true, orderNo: true, exchangeRate: true,
-                  totalAmount: true, currencyCode: true,
-                  items: { select: { id: true, shippedQty: true, quantity: true } },
-                },
-              },
-            },
-          },
-        },
-      },
-      stockMovements: { where: { type: 4 }, select: { id: true } },
-    },
-  })
-
-  if (!shipment) return NextResponse.json({ error: '找不到出貨單' }, { status: 404 })
-
-  // 若 INV 已扣過，跳過 INV 步驟但仍繼續建 AR/AP（補建財務記錄）
-  const invAlreadyDone = shipment.stockMovements.length > 0
-
-  // ── 補查 rawSku → productId ──────────────────────────────────────────
-  const rawSkuItems = shipment.items.filter(i => !i.slsItem && i.rawSku && i.piId)
-  const piItemLookup = new Map<string, number>()
-
-  if (rawSkuItems.length > 0) {
-    const piIds = Array.from(new Set(rawSkuItems.map(i => i.piId!)))
-    const piItems = await prisma.pI_Item.findMany({
-      where: { piId: { in: piIds } },
-      select: {
-        piId: true,
-        slsItem: { select: { id: true, product: { select: { id: true, sku: true } } } },
-        product: { select: { id: true, sku: true } },
-      },
-    })
-    for (const pi of piItems) {
-      const prod = pi.slsItem?.product ?? pi.product
-      if (prod?.sku) piItemLookup.set(`${pi.piId}:${prod.sku}`, prod.id)
-    }
-  }
-
-  const result = { invConfirmed: 0, invSkipped: 0, arCreated: false }
-
   try {
-    // ── 1. INV_Movement type=4 + PO_CustomerCopy_Item.shippedQty ─────────────────────
-    if (invAlreadyDone) {
-      result.invSkipped = shipment.items.length
-    }
-    for (const item of invAlreadyDone ? [] : shipment.items) {
-      const productId = item.slsItem?.product?.id
-        ?? (item.piId && item.rawSku ? piItemLookup.get(`${item.piId}:${item.rawSku}`) : undefined)
-
-      if (!productId) { result.invSkipped++; continue }
-
-      const stock = await prisma.iNV_Stock.findUnique({ where: { productId } })
-      const currentQty = stock?.quantity ?? 0
-      const currentReserved = stock?.reservedQty ?? 0
-      const reservedDecrement = Math.min(item.quantity, Math.max(0, currentReserved))
-
-      await prisma.iNV_Stock.upsert({
-        where: { productId },
-        create: { productId, quantity: -item.quantity, reservedQty: 0, safetyStock: 0 },
-        update: {
-          quantity: { decrement: item.quantity },
-          ...(reservedDecrement > 0 ? { reservedQty: { decrement: reservedDecrement } } : {}),
-        },
-      })
-
-      const updatedStock = await prisma.iNV_Stock.findUnique({ where: { productId } })
-      await prisma.iNV_Movement.create({
-        data: {
-          productId, type: 4,
-          qtyDelta: -item.quantity,
-          reservedDelta: -reservedDecrement,
-          quantityAfter: updatedStock?.quantity ?? currentQty - item.quantity,
-          reservedAfter: updatedStock?.reservedQty ?? currentReserved - reservedDecrement,
-          slsShipmentId: shipmentId,
-          source: 'MANUAL', performedBy,
-          patiscoDocId: shipment.patiscoDocId ?? undefined,
-          patiscoDocNo: shipment.patiscoDocNo ?? undefined,
-        },
-      })
-
-      // PO_CustomerCopy_Item.shippedQty 更新
-      if (item.slsItem?.id) {
-        await prisma.pO_CustomerCopy_Item.update({
-          where: { id: item.slsItem.id },
-          data: { shippedQty: { increment: item.quantity } },
-        })
-      }
-      result.invConfirmed++
-    }
-
-    // ── 2. FIN_Receivable（AR）────────────────────────────────────────────
-    const existingAR = await prisma.fIN_Receivable.findUnique({ where: { shipmentId } })
-    if (!existingAR) {
-      const ciRate = Number(shipment.ciExchangeRate ?? 0)
-
-      const calcExtraCharges = (ec: unknown): number => {
-        if (!ec || !Array.isArray(ec)) return 1
-        let pct = 0
-        for (const c of ec as { type?: string; amount?: string }[]) {
-          if (c.amount && c.type !== '1') pct += Number(c.amount)
-        }
-        return 1 + pct / 100
-      }
-
-      // AR = 裝箱明細加總（quantity × unitPrice），反映本次實際出貨金額
-      // PI.totalAmount 是整張 PI 的總額，分批出貨時不能直接用，必須用明細。
-      // unitPrice 從 Patisco 拉入，幣別與出貨單 currencyCode 一致（通常 EUR）。
-      let amountForeignFromItems = 0
-      let itemsWithPrice = 0
-      for (const item of shipment.items) {
-        const up = (item as unknown as { unitPrice?: { toString(): string } | null }).unitPrice
-        if (up != null) {
-          amountForeignFromItems += item.quantity * Number(up)
-          itemsWithPrice++
-        }
-      }
-
-      let amountTWD = 0
-      let amountForeign = 0
-
-      if (itemsWithPrice > 0 && ciRate > 0) {
-        // 主路徑：明細加總（外幣）→ 換算 TWD
-        amountForeign = amountForeignFromItems
-        amountTWD = amountForeign / ciRate
-      } else if (itemsWithPrice > 0) {
-        // ciRate 未知：外幣金額先存，TWD 以外幣金額暫代
-        amountForeign = amountForeignFromItems
-        amountTWD = amountForeignFromItems
-      } else {
-        // fallback：沒有明細單價時，退回 PI.totalAmount 加總
-        for (const sp of shipment.pis) {
-          const totalAmt = sp.pi.totalAmount
-          const currCode = sp.pi.currencyCode ?? 'TWD'
-          if (!totalAmt) continue
-          const base = currCode === 'TWD'
-            ? Number(totalAmt)
-            : (ciRate > 0 ? Number(totalAmt) / ciRate : Number(totalAmt))
-          amountTWD += base * calcExtraCharges(sp.pi.extraCharges)
-        }
-        amountForeign = ciRate > 0 ? amountTWD * ciRate : amountTWD
-      }
-
-      if (amountTWD > 0) {
-        const rateAtInvoice = ciRate > 0 ? 1 / ciRate : 1
-        const currencyCode = shipment.currencyCode ?? (ciRate > 0 ? 'EUR' : 'TWD')
-        await prisma.fIN_Receivable.create({
-          data: {
-            shipmentId,
-            customerId: shipment.customerId ?? undefined,
-            currencyCode,
-            amountForeign: new Prisma.Decimal(amountForeign),
-            rateAtInvoice: new Prisma.Decimal(rateAtInvoice),
-            amountTWD: new Prisma.Decimal(amountTWD),
-            status: 0,
-          },
-        })
-        result.arCreated = true
-      }
-    }
-
-    // ── 3. 應付帳款由用戶手工創建 ──────────────────────────────────────
-    // 不要自動產生虛擬 Receipt 或應付帳款
-    // 應付帳款應該通過對帳介面手工確認創建
-
-    // ── 4. PI.status = 2（已出貨）────────────────────────────────────
-    const piIds = shipment.pis.map(sp => sp.pi.id)
-    if (piIds.length > 0) {
-      await prisma.pI.updateMany({
-        where: { id: { in: piIds }, status: 0 },
-        data: { status: 2 },
-      })
-    }
-
+    const result = await confirmShipment(prisma, shipmentId, performedBy)
+    return NextResponse.json({ ok: true, ...result })
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 })
+    const msg = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ error: msg }, { status: msg === '找不到出貨單' ? 404 : 500 })
   }
-
-  return NextResponse.json({ ok: true, ...result })
 }
