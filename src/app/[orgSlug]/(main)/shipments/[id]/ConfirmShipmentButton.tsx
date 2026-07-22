@@ -95,7 +95,11 @@ export default function ConfirmShipmentButton({ shipmentId, alreadyConfirmed }: 
               </p>
             </div>
 
-            {notices.length > 0 && (
+            {notices.length === 0 ? (
+              <div className="px-6 py-3 border-b border-gray-100">
+                <p className="text-xs text-green-600">✓ 供應商出貨通知單皆已確認，無需額外處理</p>
+              </div>
+            ) : (
               <div className="px-6 py-4 border-b border-gray-100">
                 <p className="text-xs font-semibold text-gray-600 mb-2">
                   以下供應商出貨通知單尚未標記為已確認——若供應商已透過電話、LINE 等其他管道確認出貨
