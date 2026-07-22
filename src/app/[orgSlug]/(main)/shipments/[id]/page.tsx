@@ -9,6 +9,7 @@ import ConfirmShipmentButton from './ConfirmShipmentButton'
 import ShippingNoticePanel from './ShippingNoticePanel'
 import SOImportButton from './SOImportButton'
 import PIOrderPanel from './PIOrderPanel'
+import CustomsDocsPanel from './CustomsDocsPanel'
 
 type Props = { params: { orgSlug: string; id: string } }
 
@@ -225,6 +226,8 @@ export default async function ShipmentDetailPage({ params }: Props) {
       </div>
 
       <ShippingNoticePanel shipmentId={shipment.id} />
+
+      <CustomsDocsPanel shipmentId={shipment.id} />
 
       {shipment.items.length > 0 && (() => {
         // 序列化 Decimal → string，以 PI 分組，傳給 Client Component
