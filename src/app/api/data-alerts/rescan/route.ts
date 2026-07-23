@@ -23,6 +23,11 @@ export async function POST() {
     if (a.refType === 'SYS_SyncJob') continue  // 保留 sync job 類告警
 
     let exists = false
+    // WORKFLOW_GAP 型的 PO 告警：不能只查「這張 PO 還在不在」，
+    // 還要重新驗證「條件是否仍然成立」——PO 沒被刪除，但如果已經補入庫，
+    // 告警本身就該跟著解除，否則會變成永遠留著的殭屍告警。
+    let conditionStillTrue = true
+
     if (a.refType === 'SLS') {
       exists = !!(await prisma.sLS.findUnique({ where: { id: a.refId }, select: { id: true } }))
     } else if (a.refType === 'PI') {
@@ -30,10 +35,19 @@ export async function POST() {
     } else if (a.refType === 'PO_CustomerCopy') {
       exists = !!(await prisma.pO_CustomerCopy.findUnique({ where: { id: a.refId }, select: { id: true } }))
     } else if (a.refType === 'PO') {
-      exists = !!(await prisma.pO.findUnique({ where: { id: a.refId }, select: { id: true } }))
+      const po = await prisma.pO.findUnique({
+        where: { id: a.refId },
+        select: { items: { select: { quantity: true, receivedQty: true } } },
+      })
+      exists = !!po
+      if (po && a.type === 'WORKFLOW_GAP') {
+        const totalQty = po.items.reduce((s, i) => s + i.quantity, 0)
+        const receivedQty = po.items.reduce((s, i) => s + i.receivedQty, 0)
+        conditionStillTrue = totalQty > 0 && receivedQty < totalQty
+      }
     }
 
-    if (!exists) staleIds.push(a.id)
+    if (!exists || !conditionStillTrue) staleIds.push(a.id)
   }
 
   if (staleIds.length > 0) {
