@@ -57,8 +57,15 @@ export default function ConfirmShipmentButton({ shipmentId, alreadyConfirmed }: 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ noticeIds: Array.from(checkedNotices), confirmShipment: true }),
       })
-      const json = await res.json() as { ok?: boolean; error?: string }
+      const json = await res.json() as {
+        ok?: boolean; error?: string
+        shipmentResult?: { poReceiptsCreated?: number } | null
+      }
       if (!res.ok) throw new Error(json.error ?? '操作失敗')
+      const poCount = json.shipmentResult?.poReceiptsCreated ?? 0
+      if (poCount > 0) {
+        alert(`已為 ${poCount} 張供應商採購單自動推定入庫（依這次出貨實際用量，單價採用原始下單價）。`)
+      }
       setDone(true)
       setModalOpen(false)
       router.refresh()

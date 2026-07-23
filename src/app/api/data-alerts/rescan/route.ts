@@ -2,14 +2,19 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getRequestPrisma } from '@/lib/request-db'
+import { checkShippedButNotReceived } from '@/api/patisco/sync'
 
 export async function POST() {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const prisma = await getRequestPrisma()
+
+  // 手動觸發「PI 已出貨但 PO 未入庫」偵測，不用等下次 Patisco 同步
+  const { created } = await checkShippedButNotReceived(prisma, null)
+
   const alerts = await prisma.sYS_DataAlert.findMany({ where: { resolvedAt: null } })
-  if (alerts.length === 0) return NextResponse.json({ cleaned: 0 })
+  if (alerts.length === 0) return NextResponse.json({ cleaned: 0, created })
 
   const staleIds: number[] = []
 
@@ -38,5 +43,5 @@ export async function POST() {
     })
   }
 
-  return NextResponse.json({ cleaned: staleIds.length, total: alerts.length })
+  return NextResponse.json({ cleaned: staleIds.length, total: alerts.length, created })
 }

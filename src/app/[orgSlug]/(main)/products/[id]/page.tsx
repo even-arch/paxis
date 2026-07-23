@@ -348,9 +348,10 @@ const PRODUCT_TYPE_LABEL: Record<number, string> = {
 }
 
 const SOURCE_LABEL: Record<string, { text: string; cls: string }> = {
-  PO_RECEIPT:  { text: '採購入庫', cls: 'bg-green-100 text-green-700' },
-  AI_IMPORT:   { text: 'AI 匯入', cls: 'bg-purple-100 text-purple-700' },
-  MANUAL_EDIT: { text: '手動編輯', cls: 'bg-gray-100 text-gray-600' },
+  PO_RECEIPT:          { text: '採購入庫', cls: 'bg-green-100 text-green-700' },
+  AI_IMPORT:           { text: 'AI 匯入', cls: 'bg-purple-100 text-purple-700' },
+  MANUAL_EDIT:         { text: '手動編輯', cls: 'bg-gray-100 text-gray-600' },
+  AUTO_RECEIPT_ON_SHIP: { text: '出貨時自動入庫', cls: 'bg-teal-100 text-teal-700' },
 }
 
 function SourceBadge({ type }: { type: string }) {

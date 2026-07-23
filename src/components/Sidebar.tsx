@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
-import NotificationBell from './NotificationBell'
+import AlertsNavBadge from './AlertsNavBadge'
 
 type NavItem  = { label: string; href: string; icon: string; exact?: boolean; absolute?: boolean }
 type NavGroup = { section: string; items: NavItem[]; key: string }
@@ -131,6 +131,7 @@ function NavLinks({ groups, pathname, base, collapsed, onToggle }: {
               >
                 <span className="text-base leading-none">{item.icon}</span>
                 <span>{item.label}</span>
+                {item.href === '/alerts' && <AlertsNavBadge />}
               </Link>
             ))}
           </div>
@@ -183,12 +184,9 @@ export default function Sidebar({ companyName = 'PAXIS', orgSlug = '' }: { compa
     <aside className="w-52 bg-gray-900 text-white flex flex-col">
 
       {/* ── Logo ── */}
-      <div className="px-4 pt-4 pb-3 border-b border-gray-700 flex items-start justify-between">
-        <div>
-          <h1 className="text-lg font-bold tracking-tight">PAXIS</h1>
-          <p className="text-xs text-gray-400 truncate max-w-[140px]">{companyName}</p>
-        </div>
-        <NotificationBell />
+      <div className="px-4 pt-4 pb-3 border-b border-gray-700">
+        <h1 className="text-lg font-bold tracking-tight">PAXIS</h1>
+        <p className="text-xs text-gray-400 truncate max-w-[140px]">{companyName}</p>
       </div>
 
       {/* ── 主導覽 ── */}

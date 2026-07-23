@@ -50,7 +50,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
   }
 
-  let shipmentResult: { invConfirmed: number; invSkipped: number; arCreated: boolean } | null = null
+  let shipmentResult: { invConfirmed: number; invSkipped: number; arCreated: boolean; poReceiptsCreated: number } | null = null
   if (body.confirmShipment) {
     try {
       shipmentResult = await confirmShipment(prisma, shipmentId, performedBy)

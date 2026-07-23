@@ -1821,7 +1821,73 @@ async function step9_dataAlerts(prisma: PrismaClient, jobId: number): Promise<Sy
   // ② 出貨單引用了 Patisco 有但 PAXIS 沒有建立的 PI（shipmentPI 有 piNo 但查無 PI）
   // 已由 ① 涵蓋（slsItemId=null 代表 PI 缺失），不重複 alert
 
+  // ③ PI 已標記為已出貨，但關聯採購單尚未完成入庫
+  const gapResult = await checkShippedButNotReceived(prisma, jobId)
+  r.created += gapResult.created
+
   return r
+}
+
+/**
+ * PI 已標記為已出貨（status=2），但關聯的採購單尚未完成入庫（WORKFLOW_GAP）。
+ * 常見成因：供應商的貨其實已經到了、也出貨給客戶了，但沒人幫這張 PO 按過「入庫確認」，
+ * 長期下來會讓該 SKU 的庫存帳面出現負值卻無人察覺。
+ *
+ * 獨立匯出：除了跟著 Patisco 同步跑（Step 9），也供 /api/data-alerts/rescan
+ * 手動觸發，不用等下次同步才看得到。jobId 為 null 時代表手動觸發，不掛在任何 sync job 下。
+ */
+export async function checkShippedButNotReceived(
+  prisma: PrismaClient,
+  jobId: number | null,
+): Promise<{ created: number }> {
+  let created = 0
+
+  const shippedPIs = await prisma.pI.findMany({
+    where: { status: 2 },
+    select: {
+      id: true, piNo: true,
+      poOrders: { select: { id: true, poNo: true, items: { select: { quantity: true, receivedQty: true } } } },
+    },
+  })
+  for (const pi of shippedPIs) {
+    let poList = pi.poOrders
+    if (poList.length === 0) {
+      poList = await prisma.pO.findMany({
+        where: { poNo: pi.piNo },
+        select: { id: true, poNo: true, items: { select: { quantity: true, receivedQty: true } } },
+      })
+    }
+    for (const po of poList) {
+      const totalQty = po.items.reduce((s, i) => s + i.quantity, 0)
+      const receivedQty = po.items.reduce((s, i) => s + i.receivedQty, 0)
+      if (totalQty === 0 || receivedQty >= totalQty) continue // 已完成入庫或無品項，跳過
+
+      // 避免重複建立同一筆告警：已有未解決的同類告警就跳過
+      const existing = await prisma.sYS_DataAlert.findFirst({
+        where: { type: 'WORKFLOW_GAP', refType: 'PO', refId: po.id, resolvedAt: null },
+        select: { id: true },
+      })
+      if (existing) continue
+
+      await prisma.sYS_DataAlert.create({
+        data: {
+          type: 'WORKFLOW_GAP',
+          refType: 'PO',
+          refId: po.id,
+          refNo: po.poNo,
+          message: `採購單 ${po.poNo} 尚未完成入庫（已收 ${receivedQty}/${totalQty}），但關聯 PI ${pi.piNo} 已標記為已出貨`,
+          detail: {
+            piNo: pi.piNo, piId: pi.id, receivedQty, totalQty,
+            hint: '請確認這批貨是否曾實際入庫但漏了按確認，或原本就未走正式入庫流程。長期未入庫會讓該 SKU 的庫存帳面出現負值卻無人察覺。',
+          },
+          syncJobId: jobId,
+        },
+      })
+      created++
+    }
+  }
+
+  return { created }
 }
 
 // ─── Phase 2 主控 ─────────────────────────────────────────────────────────────
