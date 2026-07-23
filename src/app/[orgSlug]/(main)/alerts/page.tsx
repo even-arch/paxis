@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import { ALERTS_CHANGED_EVENT } from '@/components/AlertsNavBadge'
 
 interface DataAlert {
   id: number
@@ -94,7 +95,10 @@ export default function AlertsPage() {
     setResolvingId(id)
     try {
       const res = await fetch(`/api/data-alerts/${id}`, { method: 'PATCH' })
-      if (res.ok) setAlerts(prev => prev.filter(a => a.id !== id))
+      if (res.ok) {
+        setAlerts(prev => prev.filter(a => a.id !== id))
+        window.dispatchEvent(new Event(ALERTS_CHANGED_EVENT))
+      }
     } finally {
       setResolvingId(null)
     }
@@ -110,6 +114,7 @@ export default function AlertsPage() {
       if (data.created > 0) parts.push(`新發現 ${data.created} 筆流程缺口`)
       setRescanResult(parts.join('，'))
       await load()
+      window.dispatchEvent(new Event(ALERTS_CHANGED_EVENT))
     } finally {
       setRescanLoading(false)
     }
@@ -121,6 +126,7 @@ export default function AlertsPage() {
     setFinDismissed(next)
     saveFinDismissed(next)
     setSummary(null)
+    window.dispatchEvent(new Event(ALERTS_CHANGED_EVENT))
   }
 
   function dismissAllFinance() {
@@ -128,6 +134,7 @@ export default function AlertsPage() {
     visibleFinance.forEach(a => next.add(String(a.shipmentId)))
     setFinDismissed(next)
     saveFinDismissed(next)
+    window.dispatchEvent(new Event(ALERTS_CHANGED_EVENT))
     setSummary(null)
   }
 
