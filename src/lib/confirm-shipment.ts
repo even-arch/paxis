@@ -1,4 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client'
+import { extractBaseDocNo } from '@/lib/shipping-marks'
 
 /**
  * 確認出貨並記錄相關財務資訊：
@@ -260,16 +261,22 @@ async function autoReceiveLinkedPOs(
     const needed = neededByPi.get(pi.id)
     if (!needed) continue
 
-    let poList = pi.poOrders
-    if (poList.length === 0) {
-      poList = await prisma.pO.findMany({
-        where: { poNo: pi.piNo },
-        select: {
-          id: true, poNo: true, supplierId: true,
-          items: { select: { id: true, productId: true, quantity: true, receivedQty: true, unitPrice: true } },
-        },
-      })
-    }
+    // FK 連結的 PO 之外，同號但編號後面掛了不同尾綴的拆單 PO
+    // （如 "E2520149 VL" vs "E2520149 VLG"）不會被 FK 連到，要額外模糊補查，
+    // 否則像 JD-053 那樣分散在多張同號 PO 的情況只會補到其中一張。
+    const base = extractBaseDocNo(pi.piNo)
+    const fuzzyPOs = await prisma.pO.findMany({
+      where: { poNo: { startsWith: base } },
+      select: {
+        id: true, poNo: true, supplierId: true,
+        items: { select: { id: true, productId: true, quantity: true, receivedQty: true, unitPrice: true } },
+      },
+    })
+    const seenPoIds = new Set(pi.poOrders.map(po => po.id))
+    const poList = [
+      ...pi.poOrders,
+      ...fuzzyPOs.filter(po => extractBaseDocNo(po.poNo) === base && !seenPoIds.has(po.id)),
+    ]
 
     for (const po of poList) {
       // 這張 PO 裡，哪些品項需要補認入庫、補多少
