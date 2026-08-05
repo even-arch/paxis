@@ -109,7 +109,7 @@ interface Contact {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ORIGIN_DEFAULT: Address = {
-  name: '錫諾系統股份有限公司',
+  name: 'XINOSYS CORP.',
   addressLine: '',
   city: 'Taipei',
   stateProvinceCode: '',
@@ -686,8 +686,8 @@ export default function ShippingPage() {
       // API 直接回傳 company 物件（非 { company: ... }）
       if (data && (data.nameZh || data.nameEn)) {
         setOrigin({
-          name:              data.nameZh    || data.nameEn    || '',
-          addressLine:       data.addressZh || data.addressEn || '',
+          name:              data.nameEn    || data.nameZh    || '',
+          addressLine:       data.addressEn || data.addressZh || '',
           city:              data.city          || '',
           stateProvinceCode: '',
           postalCode:        data.postalCode    || '',

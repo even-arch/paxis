@@ -7,6 +7,9 @@ import type { ShippingAddress, ShippingPackage } from './types'
 
 const UPS_SHIP_URL = 'https://onlinetools.ups.com/api/shipments/v2403/ship'
 
+// UPS labels use Latin fonts — strip CJK and non-printable chars
+const toAscii = (s: string) => s.replace(/[^\x00-\x7F]/g, '').trim()
+
 export interface UpsShipmentRequest {
   accessToken: string
   accountNumber: string
@@ -63,37 +66,37 @@ export async function createUpsShipment(req: UpsShipmentRequest): Promise<UpsShi
       Shipment: {
         Description: req.referenceNo ?? 'PAXIS Shipment',
         Shipper: {
-          Name: req.shipper.name,
-          AttentionName: req.shipper.attentionName?.trim() || req.shipper.name,
+          Name: toAscii(req.shipper.name),
+          AttentionName: toAscii(req.shipper.attentionName?.trim() || req.shipper.name),
           ShipperNumber: req.accountNumber,
           Phone: { Number: (req.shipper.phone?.replace(/\D/g, '') || '0223938133') },
           ...(req.shipper.taxId?.trim() ? { TaxIdentificationNumber: req.shipper.taxId } : {}),
           Address: {
-            AddressLine: req.shipper.addressLine || undefined,
-            City: req.shipper.city,
+            AddressLine: toAscii(req.shipper.addressLine) || undefined,
+            City: toAscii(req.shipper.city),
             PostalCode: req.shipper.postalCode,
             CountryCode: req.shipper.countryCode.toUpperCase(),
           },
         },
         ShipTo: {
-          Name: req.shipTo.name,
-          AttentionName: req.shipTo.attentionName?.trim() || req.shipTo.name,
+          Name: toAscii(req.shipTo.name),
+          AttentionName: toAscii(req.shipTo.attentionName?.trim() || req.shipTo.name),
           ...(req.shipTo.phone?.trim() ? { Phone: { Number: req.shipTo.phone.replace(/\D/g, '') } } : {}),
           ...(req.shipTo.taxId?.trim() ? { TaxIdentificationNumber: req.shipTo.taxId } : {}),
           Address: {
-            AddressLine: req.shipTo.addressLine || undefined,
-            City: req.shipTo.city,
+            AddressLine: toAscii(req.shipTo.addressLine) || undefined,
+            City: toAscii(req.shipTo.city),
             ...(req.shipTo.stateProvinceCode?.trim() ? { StateProvinceCode: req.shipTo.stateProvinceCode.trim() } : {}),
             PostalCode: req.shipTo.postalCode,
             CountryCode: req.shipTo.countryCode.toUpperCase(),
           },
         },
         ShipFrom: {
-          Name: req.shipper.name,
-          AttentionName: req.shipper.attentionName?.trim() || req.shipper.name,
+          Name: toAscii(req.shipper.name),
+          AttentionName: toAscii(req.shipper.attentionName?.trim() || req.shipper.name),
           Address: {
-            AddressLine: req.shipper.addressLine || undefined,
-            City: req.shipper.city,
+            AddressLine: toAscii(req.shipper.addressLine) || undefined,
+            City: toAscii(req.shipper.city),
             PostalCode: req.shipper.postalCode,
             CountryCode: req.shipper.countryCode.toUpperCase(),
           },
