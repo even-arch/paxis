@@ -61,6 +61,7 @@ export async function scheduleUpsPickup(req: UpsPickupRequest): Promise<UpsPicku
       },
       PickupAddress: {
         CompanyName: req.pickupAddress.companyName,
+        ContactName: req.pickupAddress.contactName?.trim() || req.pickupAddress.companyName,
         AddressLine: req.pickupAddress.addressLine,
         City: req.pickupAddress.city,
         ...(req.pickupAddress.stateProvinceCode?.trim()
