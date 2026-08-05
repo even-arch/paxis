@@ -30,6 +30,7 @@ export interface ShippingChargeBreakdown {
 
 export interface ShippingAddress {
   name: string
+  attentionName?: string  // 聯絡人姓名（UPS AttentionName，若空則沿用 name）
   addressLine: string
   city: string
   stateProvinceCode?: string

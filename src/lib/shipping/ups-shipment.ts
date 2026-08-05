@@ -75,6 +75,7 @@ export async function createUpsShipment(req: UpsShipmentRequest): Promise<UpsShi
         },
         ShipTo: {
           Name: req.shipTo.name,
+          AttentionName: req.shipTo.attentionName?.trim() || req.shipTo.name,
           ...(req.shipTo.phone?.trim() ? { Phone: { Number: req.shipTo.phone.replace(/\D/g, '') } } : {}),
           ...(req.shipTo.taxId?.trim() ? { TaxIdentificationNumber: req.shipTo.taxId } : {}),
           Address: {
@@ -87,6 +88,7 @@ export async function createUpsShipment(req: UpsShipmentRequest): Promise<UpsShi
         },
         ShipFrom: {
           Name: req.shipper.name,
+          AttentionName: req.shipper.attentionName?.trim() || req.shipper.name,
           Address: {
             AddressLine: req.shipper.addressLine || undefined,
             City: req.shipper.city,
