@@ -64,7 +64,9 @@ export async function createUpsShipment(req: UpsShipmentRequest): Promise<UpsShi
         Description: req.referenceNo ?? 'PAXIS Shipment',
         Shipper: {
           Name: req.shipper.name,
+          AttentionName: req.shipper.attentionName?.trim() || req.shipper.name,
           ShipperNumber: req.accountNumber,
+          Phone: { Number: (req.shipper.phone?.replace(/\D/g, '') || '0223938133') },
           ...(req.shipper.taxId?.trim() ? { TaxIdentificationNumber: req.shipper.taxId } : {}),
           Address: {
             AddressLine: req.shipper.addressLine || undefined,
