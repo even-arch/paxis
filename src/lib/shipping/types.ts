@@ -36,6 +36,7 @@ export interface ShippingAddress {
   postalCode: string
   countryCode: string  // ISO 2-letter, e.g. 'TW', 'US'
   taxId?: string       // 統編 / Business Number（UPS 用於 business discount 識別）
+  phone?: string       // 收件方電話（UPS ShipTo 必填）
 }
 
 export interface ShippingPackage {

@@ -14,6 +14,7 @@ interface Address {
   postalCode: string
   countryCode: string
   taxId: string   // 統編 / Business Number
+  phone: string   // 收件方電話（UPS 必填）
 }
 
 interface PackageItem {
@@ -115,6 +116,7 @@ const ORIGIN_DEFAULT: Address = {
   postalCode: '100',
   countryCode: 'TW',
   taxId: '',
+  phone: '',
 }
 
 const TIER_STYLE: Record<string, { label: string; cls: string }> = {
@@ -198,6 +200,11 @@ function AddressBlock({
         <div>
           <input value={value.taxId} onChange={set('taxId')}
             placeholder="統編 / Business Number（選填，UPS 用於 business discount）"
+            className="w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
+        </div>
+        <div>
+          <input value={value.phone} onChange={set('phone')}
+            placeholder="電話號碼（UPS 必填，如 0223938133）"
             className="w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
         </div>
       </div>
@@ -298,7 +305,7 @@ export default function ShippingPage() {
   // Addresses
   const [origin, setOrigin] = useState<Address>(ORIGIN_DEFAULT)
   const [destination, setDestination] = useState<Address>({
-    name: '', addressLine: '', city: '', stateProvinceCode: '', postalCode: '', countryCode: '', taxId: '',
+    name: '', addressLine: '', city: '', stateProvinceCode: '', postalCode: '', countryCode: '', taxId: '', phone: '',
   })
 
   // AI parse
@@ -444,6 +451,7 @@ export default function ShippingPage() {
           postalCode:         r.postalCode  || '',
           countryCode:        r.countryCode || '',
           taxId:              '',
+          phone:              '',
         })
       } else if (d.soldTo) {
         setDestination(prev => ({ ...prev, name: prev.name || d.soldTo! }))
@@ -494,6 +502,7 @@ export default function ShippingPage() {
             postalCode: d.recipient.postalCode || '',
             countryCode: d.recipient.countryCode || '',
             taxId: d.recipient.taxId || '',
+            phone: '',
           })
         }
 
@@ -684,6 +693,7 @@ export default function ShippingPage() {
           postalCode:        data.postalCode    || '',
           countryCode:       data.countryCode   || 'TW',
           taxId:             data.taxId         || '',
+          phone:             data.phone         || '',
         })
       }
     } catch { /* ignore */ }
@@ -727,6 +737,7 @@ export default function ShippingPage() {
         postalCode: pi.customerPostal ?? '',
         countryCode: pi.customerCountry ?? '',
         taxId: pi.customerTaxId ?? '',
+        phone: '',
       })
     }
     // 把 PI 品項填入第一箱的內容物
@@ -1083,6 +1094,7 @@ export default function ShippingPage() {
       postalCode: c.postalCode ?? '',
       countryCode: c.countryCode ?? '',
       taxId: c.taxId ?? '',
+      phone: '',
     }
     if (picker.field === 'origin') setOrigin(addr)
     else setDestination(addr)

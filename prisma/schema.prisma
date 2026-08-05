@@ -322,8 +322,12 @@ model PRD_Product {
   invAdjustments    INV_Adjustment[]
   deliveryNoteItems SLS_DeliveryNoteItem[]
   shippingNoticeItems PO_ShippingNoticeItem[]
-  bomHeaders        BOM_Header[]  @relation("BomProduct")
-  usedInBomItems    BOM_Item[]    @relation("BomComponent")
+  bomHeaders           BOM_Header[]    @relation("BomProduct")
+  usedInBomItems       BOM_Item[]      @relation("BomComponent")
+  mfgRoutes            MFG_Route[]
+  mfgRouteStepsInput   MFG_RouteStep[] @relation("RouteStepInput")
+  mfgRouteStepsOutput  MFG_RouteStep[] @relation("RouteStepOutput")
+  mfgMoldProducts      MFG_MoldProduct[]
 
   @@index([sku])
   @@index([modelNo])
@@ -403,14 +407,27 @@ model BOM_Header {
   isActive  Boolean     @default(true)
   note      String?
 
+  // BOM 衍生/繼承（儲存差異，不存副本；文件 3.5）
+  parentBomId          Int?
+  parentBom            BOM_Header?   @relation("BomInheritance", fields: [parentBomId], references: [id])
+  childBoms            BOM_Header[]  @relation("BomInheritance")
+  derivedForCustomerId Int?          // 哪個客戶需求觸發了這次衍生
+  derivedForCustomer   CUS_Customer? @relation("BomDerivedForCustomer", fields: [derivedForCustomerId], references: [id])
+  diffNote             String?       // 與父版本的差異描述
+  validFrom            DateTime?
+  validTo              DateTime?
+
   createdBy Int?        // SYS_User id；手動建立時必填
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
-  items     BOM_Item[]
+  items        BOM_Item[]
+  moldProducts MFG_MoldProduct[]
 
   @@unique([productId, version])
   @@index([productId])
+  @@index([parentBomId])
+  @@index([derivedForCustomerId])
   @@map("BOM_Header")
 }
 
@@ -431,6 +448,10 @@ model BOM_Item {
 
   sortOrder   Int         @default(0)
   note        String?
+  validFrom   DateTime?
+  validTo     DateTime?
+  // 繼承覆蓋用：子 BOM 以此標記「移除從父版本繼承的這個零件」
+  isDeleted   Boolean     @default(false)
 
   @@unique([bomId, componentId])
   @@index([componentId])
@@ -471,15 +492,18 @@ model SUP_Supplier {
   chargeTemplateId  Int?
   chargeTemplate    PRN_ChargeTemplate? @relation(fields: [chargeTemplateId], references: [id])
 
-  products       SUP_SupplierProduct[]
-  purchaseOrders PO[]
-  contacts       SUP_Contact[]
-  payables       FIN_Payable[]
-  companyAliases SYS_CompanyAlias[]
-  fobAllocations  SLS_FobCostAllocation[]
-  paymentVouchers FIN_PaymentVoucher[]
-  shippingNotices PO_ShippingNotice[]
-  bomItems       BOM_Item[]
+  products             SUP_SupplierProduct[]
+  purchaseOrders       PO[]
+  contacts             SUP_Contact[]
+  payables             FIN_Payable[]
+  companyAliases       SYS_CompanyAlias[]
+  fobAllocations       SLS_FobCostAllocation[]
+  paymentVouchers      FIN_PaymentVoucher[]
+  shippingNotices      PO_ShippingNotice[]
+  bomItems             BOM_Item[]
+  mfgSupplierProcesses MFG_SupplierProcess[]
+  mfgMoldsCurrentAt   MFG_Mold[] @relation("MoldCurrentLocation")
+  mfgMoldsOriginalAt  MFG_Mold[] @relation("MoldOriginalSupplier")
 
   @@index([name])
   @@map("SUP_Supplier")
@@ -592,6 +616,8 @@ model CUS_Customer {
   customerProducts  CUS_CustomerProduct[]
   companyAliases    SYS_CompanyAlias[]
   printDefaults     PRN_CustomerDefault[]
+  mfgMolds          MFG_Mold[]
+  derivedBoms       BOM_Header[] @relation("BomDerivedForCustomer")
 
   @@index([name])
   @@map("CUS_Customer")
@@ -1973,4 +1999,223 @@ model UPS_Shipment {
 
   @@index([slsId])
   @@map("UPS_Shipment")
+}
+
+// =============================================================================
+// 製造管理 (MFG_) — Phase 1：產品結構
+//
+// 涵蓋：製程類型、工藝路線、供應商加工能力與報價、模具治具
+// BOM 繼承/衍生欄位已直接加在現有 BOM_Header / BOM_Item 上。
+//
+// Phase 2（批次 MFG_Batch、委外工單 MFG_WorkOrder、品管 MFG_QCRecord）
+// 待產品結構資料建立後再補。
+// =============================================================================
+
+// 製程類型（開放清單，使用者自行維護，不寫死列舉值）
+// 範例：毛胚、振動、CNC、陽極、熱處理、電鍍、雷雕、印刷…
+model MFG_ProcessType {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  routeSteps        MFG_RouteStep[]
+  supplierProcesses MFG_SupplierProcess[]
+
+  @@map("MFG_ProcessType")
+}
+
+// 工藝路線：一個部件從原料到完成的完整加工序列
+// 一個 PRD_Product 可以有多個版本的路線（version），isActive 標記現行版
+model MFG_Route {
+  id        Int         @id @default(autoincrement())
+  productId Int                           // 路線的最終產出物
+  product   PRD_Product @relation(fields: [productId], references: [id])
+  version   Int         @default(1)
+  isActive  Boolean     @default(true)
+  note      String?
+  createdBy Int?        // SYS_User id
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  steps MFG_RouteStep[]
+
+  @@unique([productId, version])
+  @@index([productId])
+  @@map("MFG_Route")
+}
+
+// 工段：路線中每一道加工步驟
+// 規則：第 N 段的 outputProductId = 第 N+1 段的 inputProductId
+//       最後一段的 outputProductId = MFG_Route.productId
+model MFG_RouteStep {
+  id              Int             @id @default(autoincrement())
+  routeId         Int
+  route           MFG_Route       @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  stepNo          Int             // 順序（從 1 起算）
+  processTypeId   Int
+  processType     MFG_ProcessType @relation(fields: [processTypeId], references: [id])
+  inputProductId  Int             // 投入物料（PRD_Product）
+  inputProduct    PRD_Product     @relation("RouteStepInput", fields: [inputProductId], references: [id])
+  outputProductId Int             // 產出物料（PRD_Product）
+  outputProduct   PRD_Product     @relation("RouteStepOutput", fields: [outputProductId], references: [id])
+  stdLeadTimeDays Int?            // 標準工期（天）
+  yieldRate       Decimal?        // 標準良率（0.00–1.00）
+  incomingQcRequired Boolean      @default(true)
+  note            String?
+
+  moldProducts MFG_MoldProduct[]
+
+  @@unique([routeId, stepNo])
+  @@index([processTypeId])
+  @@index([inputProductId])
+  @@index([outputProductId])
+  @@map("MFG_RouteStep")
+}
+
+// 供應商加工能力：哪家供應商能做哪種製程
+// 候選池邏輯：查某工段（processTypeId）→ 找所有對應的 MFG_SupplierProcess → 列出候選
+model MFG_SupplierProcess {
+  id              Int             @id @default(autoincrement())
+  supplierId      Int
+  supplier        SUP_Supplier    @relation(fields: [supplierId], references: [id])
+  processTypeId   Int
+  processType     MFG_ProcessType @relation(fields: [processTypeId], references: [id])
+
+  qualityGrade    String?         // A | B | C，供使用者參考，系統不自動排序（文件 2.1）
+  leadTimeDaysMin Int?
+  leadTimeDaysMax Int?
+  conditions      String?         // 適用材質/規格/公差限制（自由文字）
+
+  isActive        Boolean  @default(true)
+  // 報價最後確認時間：用於 staleness 判斷（文件 2.5）
+  lastConfirmedAt DateTime?
+  note            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  priceTiers  MFG_PriceTier[]
+  processFees MFG_ProcessFee[]
+
+  @@unique([supplierId, processTypeId])
+  @@index([processTypeId])
+  @@map("MFG_SupplierProcess")
+}
+
+// 階梯單價：同一供應商同一製程，依數量區間不同單價
+model MFG_PriceTier {
+  id                Int                 @id @default(autoincrement())
+  supplierProcessId Int
+  supplierProcess   MFG_SupplierProcess @relation(fields: [supplierProcessId], references: [id], onDelete: Cascade)
+  qtyFrom           Int                 // 數量下限（含）
+  qtyTo             Int?                // 數量上限（含）；null = 無上限
+  unitPrice         Decimal
+  currency          String   @default("TWD")
+  validFrom         DateTime
+  validTo           DateTime?
+  note              String?
+
+  @@index([supplierProcessId])
+  @@map("MFG_PriceTier")
+}
+
+// 附加費用：三種計次方式（文件 5.3）
+// PER_PROJECT = 專案一次性（開模費、首件檢驗、樣品費）
+// PER_BATCH   = 每批一次，與數量無關（開機費、每批運費）
+// PER_QTY     = 隨件數計算（抽樣隨批量變動的檢驗費）
+model MFG_ProcessFee {
+  id                Int                 @id @default(autoincrement())
+  supplierProcessId Int
+  supplierProcess   MFG_SupplierProcess @relation(fields: [supplierProcessId], references: [id], onDelete: Cascade)
+  name              String              // 開機費 | 首件檢驗 | 樣品費…
+  chargeType        String              // PER_PROJECT | PER_BATCH | PER_QTY
+  amount            Decimal
+  currency          String   @default("TWD")
+  validFrom         DateTime
+  validTo           DateTime?
+  note              String?
+
+  @@index([supplierProcessId])
+  @@map("MFG_ProcessFee")
+}
+
+// 模具/治具主檔：獨立資產，不附屬於任一產品（文件 6.1）
+model MFG_Mold {
+  id          Int    @id @default(autoincrement())
+  moldNo      String @unique   // 內部模具編號
+  name        String
+  description String?
+
+  // 實體位置（物在哪）
+  currentSupplierId  Int?
+  currentSupplier    SUP_Supplier? @relation("MoldCurrentLocation", fields: [currentSupplierId], references: [id])
+
+  // 所有權（帳上歸誰）
+  ownerType    String        // SELF | CUSTOMER
+  customerId   Int?          // ownerType=CUSTOMER 時填寫
+  customer     CUS_Customer? @relation(fields: [customerId], references: [id])
+  businessType String?       // OEM | ODM | OWN_BRAND
+
+  // 原始開模資訊（用於重模談判，見文件 6.2）
+  originalSupplierId Int?
+  originalSupplier   SUP_Supplier? @relation("MoldOriginalSupplier", fields: [originalSupplierId], references: [id])
+  drawingOwner       String?       // SELF | SUPPLIER（圖面在誰手上）
+
+  // 壽命追蹤（estimatedUsedShots 為推估值，非精確數，文件 6.5）
+  totalCapacity      Int?
+  estimatedUsedShots Int   @default(0)
+  warningThreshold   Int?  // 剩餘不足 X 模時預警
+
+  isActive  Boolean  @default(true)
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions MFG_MoldTx[]
+  products     MFG_MoldProduct[]
+
+  @@map("MFG_Mold")
+}
+
+// 模具費用記錄：支出面（開模/維修/重做）與回收面（訂單攤提）
+model MFG_MoldTx {
+  id     Int      @id @default(autoincrement())
+  moldId Int
+  mold   MFG_Mold @relation(fields: [moldId], references: [id])
+
+  // INITIAL_COST = 原始開模費
+  // MAINTENANCE  = 維修費
+  // REBUILD      = 重做費（遠低於 INITIAL_COST，設計圖已存在）
+  // RECOVERY     = 從訂單回收（客戶攤提）
+  txType   String
+  amount   Decimal
+  currency String   @default("TWD")
+  txDate   DateTime
+
+  relatedOrderId Int?    // 回收時關聯的訂單（選填）
+  note           String?
+  createdBy      Int?    // SYS_User id
+  createdAt      DateTime @default(now())
+
+  @@index([moldId])
+  @@map("MFG_MoldTx")
+}
+
+// 模具 ↔ 產品多對多：一副模具可被多個 BOM/工段共用（文件 6.1）
+model MFG_MoldProduct {
+  id          Int            @id @default(autoincrement())
+  moldId      Int
+  mold        MFG_Mold       @relation(fields: [moldId], references: [id])
+  productId   Int
+  product     PRD_Product    @relation(fields: [productId], references: [id])
+  bomId       Int?           // 哪個 BOM 版本在使用（選填）
+  bom         BOM_Header?    @relation(fields: [bomId], references: [id])
+  routeStepId Int?           // 哪個工段在使用（選填）
+  routeStep   MFG_RouteStep? @relation(fields: [routeStepId], references: [id])
+  note        String?
+
+  @@index([moldId])
+  @@index([productId])
+  @@map("MFG_MoldProduct")
 }
