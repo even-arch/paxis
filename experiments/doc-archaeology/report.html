@@ -1,0 +1,62 @@
+<!doctype html><html lang=zh-Hant><meta charset=utf-8>
+<title>Point Asia — 單據考古五分鐘報告</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:-apple-system,"PingFang TC","Noto Sans TC",sans-serif;margin:0;background:#f6f7f9;color:#1a2036;line-height:1.6}
+.wrap{max-width:1080px;margin:0 auto;padding:40px 28px 80px}
+h1{font-size:26px;margin:0 0 4px;color:#1A2B5E}
+.sub{color:#6b7488;font-size:14px;margin-bottom:28px}
+h2{font-size:17px;margin:36px 0 12px;color:#1A2B5E;border-left:4px solid #E8315B;padding-left:10px}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:22px 0}
+.card{background:#fff;border:1px solid #e5e8ef;border-radius:10px;padding:16px}
+.card .v{font-size:27px;font-weight:700;color:#1A2B5E;line-height:1.2}
+.card .l{font-size:12px;color:#6b7488;margin-top:4px}
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e8ef;border-radius:10px;overflow:hidden;font-size:13.5px}
+th{background:#f0f2f7;text-align:left;padding:9px 11px;font-weight:600;color:#42506b;font-size:12.5px}
+td{padding:9px 11px;border-top:1px solid #eef0f5}
+td.n{text-align:right;font-variant-numeric:tabular-nums}
+td.m{font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
+.hi{font-weight:700;color:#1A2B5E} .warn{color:#E8315B;font-weight:700}
+.bar{height:9px;background:#E8315B;border-radius:5px;opacity:.75}
+.note{background:#fff8e6;border:1px solid #f0dca8;border-radius:8px;padding:12px 14px;font-size:13.5px;margin:12px 0}
+.fin{background:#fff;border:1px solid #e5e8ef;border-radius:10px;padding:16px 18px;margin:10px 0}
+.fin b{color:#E8315B}
+footer{margin-top:44px;padding-top:16px;border-top:1px solid #e0e3ea;color:#8b93a6;font-size:12px}
+</style><div class=wrap>
+<h1>Point Asia — 單據考古：五分鐘報告</h1>
+<div class=sub>來源：<code>~/Desktop/PointAsia</code> 118 個檔案，未經任何人工整理 · 產生時間 2026-08-01</div>
+
+<div class=cards>
+<div class=card><div class=v>118 → 21</div><div class=l>檔案數 → 格式家族數</div></div>
+<div class=card><div class=v>58 → 10</div><div class=l>核心貿易單據 → 格式數</div></div>
+<div class=card><div class=v>100%</div><div class=l>必要欄位抽取覆蓋率</div></div>
+<div class=card><div class=v>18/18</div><div class=l>品項加總與文件總額相符</div></div>
+</div>
+
+<h2>你可能不知道的三件事</h2>
+<div class=fin>① <b>你的毛利有一半以上不是來自商品價差，是來自 PI 上那筆 5% handling charge。</b><br>
+商品本身的買賣價差只有 1.3%–6.4%；扣掉手續費之後，E2620085 這張單的商品毛利只有 <b>1.3%</b>。</div>
+<div class=fin>② <b>E2620097 你少收了客戶 150 元。</b><br>
+客戶自己的 PO 上寫的單價比你 PI 開出去的還高——你按比較低的價格開了發票。</div>
+<div class=fin>③ <b>E2620095 你比客戶 PO 多開了 1,000 元（客戶 PO 9,400／你的 PI 10,400）。</b><br>
+同一批貨，兩份文件兜不起來。這種差異在對帳時才會被發現。</div>
+
+<h2>A. 逐單毛利（採購正PO vs 我方 PI）</h2>
+<table><tr><th>單號</th><th>供應商</th><th class=n>採購金額</th><th class=n>PI 商品額</th><th class=n>手續費 5%</th><th class=n>PI 總額</th><th class=n>毛利</th><th class=n>毛利率</th></tr>
+<tr><td class=m>E2620085</td><td>禾詰企業有限公司 (上荏)</td><td class=n>18,910</td><td class=n>19,210</td><td class=n>960</td><td class=n>20,170</td><td class=n>1,260</td><td class='n hi'>6.2%</td></tr><tr><td class=m>E2620086</td><td>保忠精密工具股份有限公司</td><td class=n>27,000</td><td class=n>27,900</td><td class=n>1,395</td><td class=n>29,295</td><td class=n>2,295</td><td class='n hi'>7.8%</td></tr><tr><td class=m>E2620097</td><td>雅邦企業股份有限公司</td><td class=n>37,530</td><td class=n>39,770</td><td class=n>1,988</td><td class=n>41,758</td><td class=n>4,228</td><td class='n hi'>10.1%</td></tr>
+<tr style="background:#f8f9fc;font-weight:700"><td colspan=2>合計</td><td class=n>83,440</td><td></td><td></td><td class=n>91,224</td><td class=n>7,784</td><td class='n hi'>8.5%</td></tr></table>
+
+<h2>B. 價格不一致（客戶 PO vs 我方 PI）</h2>
+<table><tr><th>單號</th><th>SKU</th><th class=n>客戶 PO 單價</th><th class=n>我方 PI 單價</th><th class=n>差額</th></tr><tr><td class=m>E2620097</td><td class=m>10109401</td><td class=n>140.00</td><td class=n>139.00</td><td class='n warn'>-1.00</td></tr><tr><td class=m>E2620097</td><td class=m>10109501</td><td class=n>152.00</td><td class=n>151.00</td><td class='n warn'>-1.00</td></tr></table>
+<div class=note>同一個 SKU <code>10109501</code> 在 E2620096 開 152、在 E2620097 開 151。同一個客戶、相隔幾天、同一顆料，兩個價格。</div>
+
+<h2>C. 供應商集中度（依採購金額）</h2>
+<table><tr><th>供應商</th><th class=n>採購金額 (TWD)</th><th class=n>占比</th><th></th></tr><tr><td>雅邦企業股份有限公司</td><td class=n>136,500</td><td class=n>61.9%</td><td><div class=bar style='width:136px'></div></td></tr><tr><td>禾詰企業有限公司 (上荏)</td><td class=n>48,645</td><td class=n>22.1%</td><td><div class=bar style='width:49px'></div></td></tr><tr><td>保忠精密工具股份有限公司</td><td class=n>27,000</td><td class=n>12.2%</td><td><div class=bar style='width:27px'></div></td></tr><tr><td>金享車業股份有限公司</td><td class=n>8,400</td><td class=n>3.8%</td><td><div class=bar style='width:8px'></div></td></tr></table>
+<div class=note>雅邦一家占 <b>61.9%</b>。這批單據裡沒有任何一顆料有第二家供應商報價紀錄——議價空間與斷料風險都集中在同一個點上。</div>
+
+<h2>D. 交易鏈完整度</h2>
+<div class=note>15 個單號中，<b>E2620097</b> 串起最完整的 7 個節點：詢價單 → 供應商裝箱單 → 正PO（給雅邦）→ 副PO（客戶下的）→ 正PI（給客戶）→ 商業發票 S260630 → S260714。<br>
+整條鏈跨三方、兩種語言（中／德）、五種文件格式，全部靠同一個單號 <code>E2620097</code> 串起來——這是勾稽能成立的唯一原因。</div>
+
+<footer>本報告由自動管線產生：分群 → 產生抽取配方 → 批次抽取 → 對帳驗證。人工介入僅發生在「確認每一種格式的配方」這一步，共 3 次修訂。</footer>
+</div></html>

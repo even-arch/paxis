@@ -119,6 +119,9 @@ export async function createUpsShipment(req: UpsShipmentRequest): Promise<UpsShi
     },
   }
 
+  const reqBody = JSON.stringify(body)
+  console.log('[UPS Ship] ShipTo:', JSON.stringify((body as { ShipmentRequest: { Shipment: { ShipTo: unknown } } }).ShipmentRequest.Shipment.ShipTo))
+
   const res = await fetch(UPS_SHIP_URL, {
     method: 'POST',
     headers: {
@@ -127,14 +130,15 @@ export async function createUpsShipment(req: UpsShipmentRequest): Promise<UpsShi
       transId: `paxis_${Date.now()}`,
       transactionSrc: 'paxis',
     },
-    body: JSON.stringify(body),
+    body: reqBody,
   })
 
   const data = await res.json() as Record<string, unknown>
 
   if (!res.ok) {
-    const errors = (data as { response?: { errors?: Array<{ message: string }> } }).response?.errors
-    const msg = errors?.[0]?.message ?? `UPS Shipping API 錯誤 ${res.status}`
+    console.log('[UPS Ship] Error response:', JSON.stringify(data))
+    const errors = (data as { response?: { errors?: Array<{ message: string; code?: string }> } }).response?.errors
+    const msg = errors?.map(e => `[${e.code}] ${e.message}`).join('; ') ?? `UPS Shipping API 錯誤 ${res.status}`
     throw new Error(msg)
   }
 
