@@ -41,8 +41,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '缺少必填欄位' }, { status: 400 })
   }
 
-  console.log('[create-shipment] destination.phone:', body.destination?.phone, '| full dest:', JSON.stringify(body.destination))
-
   try {
     const creds = await resolveUpsCreds(prisma)
     if (!creds) {
