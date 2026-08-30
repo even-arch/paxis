@@ -18,7 +18,8 @@ export default async function EditSupplierPage({
     const rows = await prisma.$queryRaw<{ commissionPct: string | null }[]>`
       SELECT "commissionPct"::text FROM "SUP_Supplier" WHERE id = ${Number(params.id)} LIMIT 1
     `
-    commissionPctStr = rows[0]?.commissionPct ?? ''
+    const raw = rows[0]?.commissionPct
+    commissionPctStr = raw != null ? String(Number(raw)) : ''
   } catch { /* column not yet in DB */ }
 
   if (!supplier || !supplier.isActive) notFound()
