@@ -28,6 +28,7 @@ export default async function EditSupplierPage({
     paymentTerms: supplier.paymentTerms ?? '',
     currencyCode: supplier.currencyCode ?? '',
     defaultTradeTerms: supplier.defaultTradeTerms ?? '',
+    commissionPct: supplier.commissionPct != null ? String(supplier.commissionPct) : '',
     note: supplier.note ?? '',
     chargeTemplateId: supplier.chargeTemplateId ? String(supplier.chargeTemplateId) : '',
   }

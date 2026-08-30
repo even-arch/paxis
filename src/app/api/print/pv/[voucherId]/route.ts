@@ -66,6 +66,11 @@ export async function GET(
     .filter(a => a.category === 'LOGISTICS' && Number(a.amountTWD) < 0)
     .reduce((sum, a) => sum + Number(a.amountTWD), 0)
 
+  // 佣金扣款項目
+  const commissionDeductionTWD = adjustments
+    .filter(a => a.category === 'COMMISSION' && Number(a.amountTWD) < 0)
+    .reduce((sum, a) => sum + Number(a.amountTWD), 0)
+
   const sup = voucher.supplier
 
   return NextResponse.json({
@@ -127,6 +132,7 @@ export async function GET(
       vatTWD,
       totalTWD,
       fobDeductionTWD,
+      commissionDeductionTWD,
     },
   })
 }

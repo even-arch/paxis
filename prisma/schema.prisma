@@ -480,6 +480,10 @@ model SUP_Supplier {
   // 報價原則（Incoterms）：FOB / FOR / EXW / CIF / CFR…
   defaultTradeTerms String?
 
+  // 佣金：供應商承諾給我方的回扣比例（%，不含稅，付款時直接少付）
+  // null 或 0 = 無佣金；2.00 = 2%
+  commissionPct     Decimal?
+
   isActive      Boolean   @default(true)
   archivedAt    DateTime? // 封存時間；非 null = 已封存，正常查詢排除
   syncJobId     Int?      // Patisco sync job ID，用於回滾

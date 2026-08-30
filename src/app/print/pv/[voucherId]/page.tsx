@@ -74,6 +74,7 @@ type PVData = {
     vatTWD: number
     totalTWD: number
     fobDeductionTWD: number
+    commissionDeductionTWD: number
   }
 }
 
@@ -128,7 +129,8 @@ export default function PrintPVPage() {
 
   const { voucher, supplier, company, items, adjustments, totals } = data
   const hasFobDeduction = totals.fobDeductionTWD !== 0
-  const isCreditNote = hasFobDeduction
+  const hasCommission = totals.commissionDeductionTWD !== 0
+  const isCreditNote = hasFobDeduction || hasCommission
 
   return (
     <>
@@ -213,7 +215,7 @@ export default function PrintPVPage() {
 
 function PVDocument({ data, invoiceNo }: { data: PVData; invoiceNo: string }) {
   const { voucher, supplier, company, items, adjustments, totals } = data
-  const isCreditNote = totals.fobDeductionTWD !== 0
+  const isCreditNote = totals.fobDeductionTWD !== 0 || totals.commissionDeductionTWD !== 0
 
   const tableStyle: React.CSSProperties = {
     width: '100%',
@@ -418,7 +420,7 @@ function PVDocument({ data, invoiceNo }: { data: PVData; invoiceNo: string }) {
         </tbody>
       </table>
 
-      {/* 折讓說明框（僅在有 FOB 扣款時顯示）*/}
+      {/* 折讓說明框（有 FOB 代墊或佣金時顯示）*/}
       {isCreditNote && (
         <div style={{
           border: '1.5px solid #c0392b',
@@ -432,17 +434,25 @@ function PVDocument({ data, invoiceNo }: { data: PVData; invoiceNo: string }) {
             折讓說明（供核銷用）
           </div>
           <div style={{ color: '#444', lineHeight: '1.7' }}>
-            <p>
-              本批出貨之採購條件為 <strong>FOB</strong>，依報價約定，
-              國內段運費、報關費、倉儲及貨櫃相關費用由貴方負擔。
-            </p>
-            <p>
-              惟因本次出貨由本公司統一委託報關/貨代代辦，前述費用已由本公司代墊，
-              共計 <strong style={{ color: '#c0392b' }}>{fmtTWD(Math.abs(totals.fobDeductionTWD))}</strong>，
-              依材積比例分攤至貴方帳款，故本通知單實付金額已扣除上述代墊費用。
-            </p>
+            {/* 佣金說明 */}
+            {totals.commissionDeductionTWD !== 0 && (
+              <p>
+                依雙方議定之佣金條件，本次付款金額扣除佣金（不含稅）
+                共計 <strong style={{ color: '#c0392b' }}>{fmtTWD(Math.abs(totals.commissionDeductionTWD))}</strong>。
+              </p>
+            )}
+            {/* FOB 代墊說明 */}
+            {totals.fobDeductionTWD !== 0 && (
+              <p style={totals.commissionDeductionTWD !== 0 ? { marginTop: '1.5mm' } : undefined}>
+                本批採購條件為 <strong>FOB</strong>，國內段報關/運費等由貴方負擔，
+                惟由本公司代墊，共計 <strong style={{ color: '#c0392b' }}>{fmtTWD(Math.abs(totals.fobDeductionTWD))}</strong>，
+                依材積比例分攤後自本通知單扣除。
+              </p>
+            )}
             <p style={{ marginTop: '2mm' }}>
-              請依上述折讓金額開立折讓單，向主管稅務機關核銷。如有任何疑問，請聯絡本公司。
+              以上折讓金額（不含稅）合計 <strong style={{ color: '#c0392b' }}>
+                {fmtTWD(Math.abs(totals.fobDeductionTWD) + Math.abs(totals.commissionDeductionTWD))}
+              </strong>，請依此開立折讓單向主管稅務機關核銷。如有疑問，請聯絡本公司。
             </p>
           </div>
         </div>

@@ -53,6 +53,7 @@ export async function PUT(req: NextRequest, {
       paymentTerms: body.paymentTerms || null,
       currencyCode: body.currencyCode || null,
       defaultTradeTerms: body.defaultTradeTerms || null,
+      commissionPct: body.commissionPct !== '' && body.commissionPct != null ? Number(body.commissionPct) : null,
       note: body.note || null,
       chargeTemplateId: body.chargeTemplateId ? Number(body.chargeTemplateId) : null,
     },
