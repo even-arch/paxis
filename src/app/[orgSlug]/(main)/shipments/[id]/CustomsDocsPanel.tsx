@@ -151,9 +151,9 @@ export default function CustomsDocsPanel({ shipmentId }: { shipmentId: number })
     <div className="bg-white rounded-lg shadow p-5 mb-6">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">貨代費用 &amp; 報關文件</h2>
+          <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">報關文件</h2>
           <p className="text-xs text-gray-400 mt-0.5">
-            上傳貨代發票、提單、商業發票、出口報單，系統自動解析費用項目供 FOB 分攤扣款使用
+            上傳貨代發票、提單、商業發票、出口報單，AI 自動解析文件種類與金額，並與系統 PI 做三方勾稽
           </p>
         </div>
         <div>
@@ -169,7 +169,7 @@ export default function CustomsDocsPanel({ shipmentId }: { shipmentId: number })
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
             className="text-xs px-3 py-1.5 rounded border border-teal-300 text-teal-700 hover:bg-teal-50 disabled:opacity-50">
-            {uploading ? 'AI 解析中...' : '📎 上傳文件'}
+            {uploading ? 'AI 解析中...' : '📎 上傳報關文件'}
           </button>
         </div>
       </div>

@@ -11,6 +11,8 @@ type Payable = {
   status: number
   dueDate: string | null
   note: string | null
+  shipmentId: number | null
+  shipment: { id: number; shipmentNo: string; actualShipDate: string | null } | null
   receipt: {
     id?: number
     receiptNo?: string
@@ -18,6 +20,15 @@ type Payable = {
     order: { id: number; poNo: string } | null
   }
   voucherItem: null | { id: number }
+}
+
+type FobAlloc = {
+  shipmentId: number
+  shipmentNo: string
+  deductionTWD: number
+  allocDetails: { name: string; allocatedTWD: number }[]
+  usedCbmFallback: boolean
+  cbmPct: number
 }
 type Adjustment = { name: string; amountTWD: number; category: string; note: string }
 type VoucherItem = {
@@ -89,6 +100,10 @@ export default function VouchersPage() {
   // 調整輸入暫存
   const [adjForm, setAdjForm] = useState({ name: '', amountTWD: '', category: 'OTHER', note: '' })
 
+  // FOB 費用分攤
+  const [fobAllocs, setFobAllocs] = useState<FobAlloc[]>([])
+  const [loadingFob, setLoadingFob] = useState(false)
+
   // 檢視 voucher
   const [viewVoucher, setViewVoucher] = useState<Voucher | null>(null)
   const [saving, setSaving] = useState(false)
@@ -117,9 +132,65 @@ export default function VouchersPage() {
       setAdjustments([])
       setCreating(false)
       setViewVoucher(null)
+      setFobAllocs([])
       loadForSupplier(selectedSupplierId)
     }
   }, [selectedSupplierId, loadForSupplier])
+
+  // 當選擇的應付帳款改變時，自動抓取相關出貨的 FOB 分攤資料
+  useEffect(() => {
+    if (selectedPayableIds.length === 0 || !selectedSupplierId) {
+      setFobAllocs([])
+      return
+    }
+    const selected = payables.filter(p => selectedPayableIds.includes(p.id))
+    const shipmentMap = new Map<number, string>()
+    for (const p of selected) {
+      if (p.shipmentId && p.shipment) {
+        shipmentMap.set(p.shipmentId, p.shipment.shipmentNo)
+      }
+    }
+    if (shipmentMap.size === 0) {
+      setFobAllocs([])
+      return
+    }
+    setLoadingFob(true)
+    Promise.all(
+      Array.from(shipmentMap.entries()).map(async ([shipmentId, shipmentNo]) => {
+        try {
+          const res = await fetch(`/api/shipments/${shipmentId}/fob-allocation`)
+          if (!res.ok) return null
+          const data = await res.json()
+          type RawSup = {
+            supplierId: number; isFob: boolean; totalDeductionTWD: number; cbmPct: number
+            allocations: { costItemName: string; allocatedTWD: number }[]
+          }
+          const thisSupplierEntries: RawSup[] = (data.suppliers ?? []).filter(
+            (s: RawSup) => s.supplierId === selectedSupplierId && s.isFob
+          )
+          if (thisSupplierEntries.length === 0) return null
+          const totalDeduction = thisSupplierEntries.reduce((sum, s) => sum + s.totalDeductionTWD, 0)
+          if (totalDeduction === 0) return null
+          const totalCbmPct = thisSupplierEntries.reduce((sum, s) => sum + s.cbmPct, 0)
+          const detailMap = new Map<string, number>()
+          for (const sup of thisSupplierEntries) {
+            for (const a of sup.allocations) {
+              detailMap.set(a.costItemName, (detailMap.get(a.costItemName) ?? 0) + a.allocatedTWD)
+            }
+          }
+          return {
+            shipmentId, shipmentNo, deductionTWD: totalDeduction,
+            allocDetails: Array.from(detailMap.entries()).map(([name, allocatedTWD]) => ({ name, allocatedTWD })),
+            usedCbmFallback: data.usedCbmFallback ?? false,
+            cbmPct: totalCbmPct,
+          } satisfies FobAlloc
+        } catch { return null }
+      })
+    ).then(results => {
+      setFobAllocs(results.filter((r): r is FobAlloc => r !== null))
+      setLoadingFob(false)
+    })
+  }, [selectedPayableIds, payables, selectedSupplierId])
 
   // 計算金額
   const itemsTotal = selectedPayableIds.reduce((sum, id) => {
@@ -279,6 +350,64 @@ export default function VouchersPage() {
                     </table>
                   )}
                 </div>
+
+                {/* FOB 費用分攤（自動偵測） */}
+                {loadingFob && (
+                  <p className="text-xs text-gray-400">載入相關出貨的 FOB 分攤資料...</p>
+                )}
+                {fobAllocs.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-gray-600 mb-2">FOB 費用分攤（依出貨扣款）</p>
+                    {fobAllocs.map(alloc => {
+                      const alreadyAdded = adjustments.some(
+                        a => a.name.includes(alloc.shipmentNo) && a.category === 'FORMULA'
+                      )
+                      return (
+                        <div key={alloc.shipmentId}
+                          className="border border-orange-200 rounded-lg bg-orange-50 px-3 py-2.5 mb-2">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-sm font-mono text-gray-800">{alloc.shipmentNo}</span>
+                                {alloc.usedCbmFallback ? (
+                                  <span className="text-xs text-amber-600">（以金額比例分攤）</span>
+                                ) : (
+                                  <span className="text-xs text-gray-400">材積佔比 {alloc.cbmPct.toFixed(1)}%</span>
+                                )}
+                              </div>
+                              <div className="space-y-0.5 pl-1">
+                                {alloc.allocDetails.map(d => (
+                                  <div key={d.name} className="text-xs text-gray-500">
+                                    {d.name}：−NT$ {d.allocatedTWD.toLocaleString()}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="text-sm font-semibold text-red-600 mb-1.5">
+                                −NT$ {alloc.deductionTWD.toLocaleString()}
+                              </div>
+                              <button
+                                disabled={alreadyAdded}
+                                onClick={() => {
+                                  if (alreadyAdded) return
+                                  setAdjustments(prev => [...prev, {
+                                    name: `FOB 費用分攤（${alloc.shipmentNo}）`,
+                                    amountTWD: -alloc.deductionTWD,
+                                    category: 'FORMULA',
+                                    note: alloc.allocDetails.map(d => `${d.name}: -NT$${d.allocatedTWD}`).join('; '),
+                                  }])
+                                }}
+                                className="text-xs px-2.5 py-1 rounded border border-orange-300 text-orange-700 hover:bg-orange-100 disabled:opacity-40 disabled:cursor-default">
+                                {alreadyAdded ? '已加入' : '加入扣款'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
 
                 {/* 調整項目 */}
                 <div>
