@@ -254,7 +254,7 @@ export default function ShipmentPayablesPanel({
     const adjustments = deductionTWD > 0 ? [{
       name: `FOB 費用分攤（${shipmentNo}）`,
       amountTWD: -deductionTWD,
-      category: 'FORMULA',
+      category: 'LOGISTICS',
       note: (alloc?.allocDetails ?? []).map(a => `${a.costItemName}: -NT$${a.allocatedTWD.toLocaleString()}`).join('; '),
     }] : []
 

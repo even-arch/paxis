@@ -109,10 +109,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     await prisma.fIN_PaymentVoucherAdjustment.delete({ where: { id: body.removeAdjustmentId } })
   }
 
-  // 更新 note / vatPct
+  // 更新 note / vatPct / 發票欄位
   const updateData: Record<string, unknown> = {}
   if (body.note !== undefined) updateData.note = body.note
   if (body.vatPct !== undefined) updateData.vatPct = body.vatPct
+  if (body.supplierInvoiceNo !== undefined) updateData.supplierInvoiceNo = body.supplierInvoiceNo || null
+  if (body.supplierInvoicePrefix !== undefined) updateData.supplierInvoicePrefix = body.supplierInvoicePrefix || null
+  if (body.supplierInvoiceDate !== undefined) updateData.supplierInvoiceDate = body.supplierInvoiceDate ? new Date(body.supplierInvoiceDate) : null
 
   const voucher = await prisma.fIN_PaymentVoucher.update({
     where: { id },

@@ -61,9 +61,9 @@ export async function GET(
   const vatTWD = Math.round(afterAdjustmentTWD * Number(voucher.vatPct) / 100)
   const totalTWD = afterAdjustmentTWD + vatTWD
 
-  // FOB 扣款項目（負數的 LOGISTICS 類調整）
+  // FOB 扣款項目（LOGISTICS 或 FORMULA 類，負數）
   const fobDeductionTWD = adjustments
-    .filter(a => a.category === 'LOGISTICS' && Number(a.amountTWD) < 0)
+    .filter(a => (a.category === 'LOGISTICS' || a.category === 'FORMULA') && Number(a.amountTWD) < 0)
     .reduce((sum, a) => sum + Number(a.amountTWD), 0)
 
   // 佣金扣款項目
@@ -81,6 +81,8 @@ export async function GET(
       vatPct: Number(voucher.vatPct),
       note: voucher.note,
       supplierInvoiceNo: voucher.supplierInvoiceNo,
+      supplierInvoicePrefix: (voucher as Record<string, unknown>).supplierInvoicePrefix as string | null ?? null,
+      supplierInvoiceDate: ((voucher as Record<string, unknown>).supplierInvoiceDate as Date | null)?.toISOString() ?? null,
       sentAt: voucher.sentAt?.toISOString() ?? null,
       confirmedAt: voucher.confirmedAt?.toISOString() ?? null,
       paidAt: voucher.paidAt?.toISOString() ?? null,

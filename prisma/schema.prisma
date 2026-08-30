@@ -1844,8 +1844,10 @@ model FIN_PaymentVoucher {
   vatPct      Decimal  @default(5)         // 營業稅率（%）
   note        String?
 
-  // 供應商本次開立的發票號碼（手填；未來可升級為掃描匯入）
-  supplierInvoiceNo String?
+  // 供應商本次開立的統一發票（手填，折讓證明使用）
+  supplierInvoiceNo     String?   // 號碼（如 24154966）
+  supplierInvoicePrefix String?   // 字軌（如 XV）
+  supplierInvoiceDate   DateTime? // 發票日期
 
   sentAt      DateTime?
   confirmedAt DateTime?
