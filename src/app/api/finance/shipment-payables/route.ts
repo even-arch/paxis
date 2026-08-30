@@ -30,7 +30,7 @@ export async function GET() {
       dueDate: true,
       status: true,
       shipmentId: true,
-      supplier: { select: { id: true, name: true, shortName: true, defaultTradeTerms: true } },
+      supplier: { select: { id: true, name: true, shortName: true, defaultTradeTerms: true, commissionPct: true } },
       po: { select: { id: true, poNo: true, tradeTerms: true } },
       shipment: {
         select: {
@@ -57,7 +57,7 @@ export async function GET() {
     fobCostItems: { id: number; name: string; amountTWD: number; note: string | null }[]
     payables: {
       id: number; supplierId: number; supplierName: string; supplierFullName: string
-      defaultTradeTerms: string | null; poNo: string | null; poId: number | null
+      defaultTradeTerms: string | null; commissionPct: number; poNo: string | null; poId: number | null
       amountTWD: number; fobCostDeductionTWD: number | null; dueDate: unknown
       status: number; tradeTerms: string | null
     }[]
@@ -83,6 +83,7 @@ export async function GET() {
       supplierName: p.supplier.shortName ?? p.supplier.name,
       supplierFullName: p.supplier.name,
       defaultTradeTerms: p.supplier.defaultTradeTerms,
+      commissionPct: Number(p.supplier.commissionPct ?? 0),
       poNo: p.po?.poNo ?? null,
       poId: p.poId,
       amountTWD: Number(p.amountTWD),

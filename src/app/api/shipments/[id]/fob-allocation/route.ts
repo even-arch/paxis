@@ -14,10 +14,10 @@
  * 演算法（材積比例）：
  *   - 從 FIN_Payable 取得此出貨的所有 PO（含供應商）
  *   - 判斷每張 PO 的交易條件：PO.tradeTerms ?? SUP_Supplier.defaultTradeTerms
- *   - 只有 FOB 供應商的材積納入分攤基礎
+ *   - 分母 = 全部出貨供應商材積（FOB + FOR），代表這批出貨的 100%
+ *   - 每家 FOB 供應商的比例 = 自身材積 / 全部出貨材積（FOR 那份由我們承擔，不向 FOR 收取）
  *   - 材積來源：SLS_Item.cbm，以 rawSku 對應到各 PO 的 PO_Item.product.sku
- *   - 若同一 SKU 出現在多張 FOB PO 中，依各 PO 數量比例分配材積
- *   - 若完全無 CBM 資料，改以各 PO amountTWD 比例分攤（fallback）
+ *   - 若 FOB 供應商完全無 CBM 資料，改以各 PO amountTWD 比例分攤（fallback，分母亦為全部供應商）
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -37,7 +37,7 @@ interface SupplierInfo {
   tradeTerms: string | null   // 最終有效條款（PO 覆蓋 → 供應商預設）
   amountTWD: number           // FIN_Payable.amountTWD（作為 fallback 基準）
   cbm: number                 // 匹配到的材積
-  cbmPct: number              // 佔 FOB 總材積的 %（FOR 供應商此欄為 0）
+  cbmPct: number              // 佔全部出貨材積的 %（FOR 供應商此欄為 0；分母含 FOR）
   isFob: boolean
   allocations: {              // 每筆費用分攤明細
     costItemId: number
@@ -236,22 +236,25 @@ async function computeAllocation(
     }
   })
 
-  // 計算 FOB 供應商的 CBM 比例
+  // 計算 CBM 比例
+  // 分母 = 全部出貨供應商材積（含 FOR），FOB 只收自己那一份；FOR 那份由我們承擔
   const fobSuppliers = supplierInfos.filter(s => s.isFob)
   const totalFobCbm = fobSuppliers.reduce((sum, s) => sum + s.cbm, 0)
-  const totalFobAmount = fobSuppliers.reduce((sum, s) => sum + s.amountTWD, 0)
+  const totalAllCbm = supplierInfos.reduce((sum, s) => sum + s.cbm, 0)   // 分母
+  const totalAllAmount = supplierInfos.reduce((sum, s) => sum + s.amountTWD, 0) // fallback 分母
 
-  // fallback：若無 CBM 資料，改以金額比例分攤
+  // fallback：若 FOB 供應商全無 CBM 資料，改以金額比例分攤
   let usedCbmFallback = false
   if (totalFobCbm === 0 && fobSuppliers.length > 0) {
     usedCbmFallback = true
-    // 以 amountTWD 比例當替代基準
+    // fallback 亦以全部供應商金額為分母，FOB 只收自己那份
     for (const sup of fobSuppliers) {
-      sup.cbmPct = totalFobAmount > 0 ? (sup.amountTWD / totalFobAmount) * 100 : 0
+      sup.cbmPct = totalAllAmount > 0 ? (sup.amountTWD / totalAllAmount) * 100 : 0
     }
   } else {
+    // 正常路徑：以全部出貨總材積為分母
     for (const sup of fobSuppliers) {
-      sup.cbmPct = totalFobCbm > 0 ? (sup.cbm / totalFobCbm) * 100 : 0
+      sup.cbmPct = totalAllCbm > 0 ? (sup.cbm / totalAllCbm) * 100 : 0
     }
   }
 
@@ -271,6 +274,7 @@ async function computeAllocation(
     costItems:       costItems.map(i => ({ id: i.id, name: i.name, amountTWD: Number(i.amountTWD) })),
     totalCostTWD,
     totalFobCbm,
+    totalAllCbm,
     usedCbmFallback,
   }
 }

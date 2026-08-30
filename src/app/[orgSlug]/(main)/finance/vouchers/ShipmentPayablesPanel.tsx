@@ -14,6 +14,7 @@ export type SupplierPayable = {
   supplierName: string
   supplierFullName: string
   defaultTradeTerms: string | null
+  commissionPct: number
   poNo: string | null
   poId: number | null
   amountTWD: number
@@ -95,6 +96,7 @@ export default function ShipmentPayablesPanel({
   const [allocMap, setAllocMap] = useState<Map<number, AllocEntry>>(new Map())
   const [usedCbmFallback, setUsedCbmFallback] = useState(false)
   const [totalFobCbm, setTotalFobCbm] = useState(0)
+  const [totalAllCbm, setTotalAllCbm] = useState(0)
   const [totalCostTWD, setTotalCostTWD] = useState(0)
 
   // Form state
@@ -129,6 +131,7 @@ export default function ShipmentPayablesPanel({
         setAllocMap(buildAllocMap(data.suppliers ?? []))
         setUsedCbmFallback(data.usedCbmFallback ?? false)
         setTotalFobCbm(data.totalFobCbm ?? 0)
+        setTotalAllCbm(data.totalAllCbm ?? 0)
         setTotalCostTWD(data.totalCostTWD ?? 0)
       }
       if (docsRes.ok) {
@@ -323,7 +326,7 @@ export default function ShipmentPayablesPanel({
           <div className="flex items-center gap-3">
             {totalCostTWD > 0 && (
               <span className="text-sm font-mono text-gray-700 font-semibold">
-                合計 {fmtTWD(totalCostTWD)}（未稅）
+                合計 {fmtTWD(totalCostTWD)}
               </span>
             )}
             <input
@@ -407,7 +410,7 @@ export default function ShipmentPayablesPanel({
           />
           <input
             type="number"
-            placeholder="NT$（未稅）"
+            placeholder="NT$ 金額"
             value={newItemAmount}
             onChange={e => setNewItemAmount(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') addCostItem() }}
@@ -423,10 +426,12 @@ export default function ShipmentPayablesPanel({
 
         {/* CBM fallback 提醒 */}
         {usedCbmFallback && costItems.length > 0 && (
-          <p className="text-xs text-amber-600 mt-2">⚠ 無材積（CBM）資料，改以應付金額比例分攤</p>
+          <p className="text-xs text-amber-600 mt-2">⚠ 無材積（CBM）資料，改以應付金額比例分攤（分母為全部供應商）</p>
         )}
-        {!usedCbmFallback && totalFobCbm > 0 && (
-          <p className="text-xs text-gray-400 mt-2">FOB 供應商總材積 {totalFobCbm.toFixed(4)} m³</p>
+        {!usedCbmFallback && totalAllCbm > 0 && (
+          <p className="text-xs text-gray-400 mt-2">
+            出貨總材積 {totalAllCbm.toFixed(4)} m³，其中 FOB {totalFobCbm.toFixed(4)} m³（{totalAllCbm > 0 ? ((totalFobCbm / totalAllCbm) * 100).toFixed(1) : 0}%）— FOB 供應商僅分攤自身比例的費用
+          </p>
         )}
       </div>
 
@@ -452,7 +457,7 @@ export default function ShipmentPayablesPanel({
               <tr>
                 <th className="text-left px-4 py-2 text-xs text-gray-400 font-normal">供應商 / 採購單</th>
                 <th className="text-center px-3 py-2 text-xs text-gray-400 font-normal">條款</th>
-                <th className="text-right px-3 py-2 text-xs text-gray-400 font-normal">應付（未稅）</th>
+                <th className="text-right px-3 py-2 text-xs text-gray-400 font-normal">應付金額</th>
                 <th className="text-right px-3 py-2 text-xs text-gray-400 font-normal">FOB 扣款</th>
                 <th className="text-right px-3 py-2 text-xs text-gray-400 font-normal">淨付款</th>
                 <th className="px-4 py-2 text-xs text-gray-400 font-normal text-right">稅率 / 開單</th>
@@ -463,9 +468,11 @@ export default function ShipmentPayablesPanel({
                 const alloc = allocMap.get(group.supplierId)
                 const isFob = isFobTerms(group.tradeTerms)
                 const deduction = isFob && alloc ? alloc.totalDeductionTWD : 0
-                const netAmount = group.totalAmountTWD - deduction
+                const commissionPct = group.payables[0]?.commissionPct ?? 0
+                const commission = commissionPct > 0 ? Math.round(group.totalAmountTWD * commissionPct / 100) : 0
+                const netAmount = group.totalAmountTWD - deduction - commission
                 const vat = vatMap[group.supplierId] ?? 5
-                const vatAmount = netAmount * vat / 100
+                const vatAmount = Math.round(netAmount * vat / 100)
                 const done = createdFor.has(group.supplierId)
 
                 return (
@@ -488,6 +495,12 @@ export default function ShipmentPayablesPanel({
                           {!usedCbmFallback && alloc.cbmPct > 0 && (
                             <div className="text-xs text-blue-400">材積佔比 {alloc.cbmPct.toFixed(1)}%</div>
                           )}
+                        </div>
+                      )}
+                      {/* 佣金 / Rebate */}
+                      {commissionPct > 0 && (
+                        <div className="text-xs text-purple-500 mt-0.5">
+                          佣金 {commissionPct}%：−NT$ {commission.toLocaleString()}
                         </div>
                       )}
                     </td>
