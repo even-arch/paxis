@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -110,9 +110,11 @@ export default function ShipmentPayablesPanel({
   const [vatMap, setVatMap] = useState<Record<number, number>>({})
   const [creatingVoucher, setCreatingVoucher] = useState<number | null>(null) // supplierId
   const [createdFor, setCreatedFor] = useState<Set<number>>(new Set())        // supplierIds done
+  const [uploading, setUploading] = useState(false)
 
   const [error, setError] = useState('')
   const [msg, setMsg] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
 
   // ── Load FOB allocation + customs-doc suggestions ─────────────────────────
   const loadAlloc = useCallback(async () => {
@@ -196,6 +198,27 @@ export default function ShipmentPayablesPanel({
       setError(err instanceof Error ? err.message : '套用失敗')
     } finally {
       setApplyingSuggKey(null)
+    }
+  }
+
+  // ── Upload forwarder invoice → AI parse → suggestions ────────────────────
+  async function handleUpload(files: FileList) {
+    setUploading(true); setError('')
+    try {
+      const form = new FormData()
+      Array.from(files).forEach(f => form.append('files', f))
+      const res = await fetch(`/api/shipments/${shipmentId}/customs-docs`, { method: 'POST', body: form })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? '上傳失敗')
+      const okCount = (data.results ?? []).filter((r: { ok: boolean }) => r.ok).length
+      const failCount = (data.results ?? []).length - okCount
+      setMsg(`已解析 ${okCount} 個文件${failCount > 0 ? `，${failCount} 個解析失敗` : ''}，建議已更新`)
+      await loadAlloc()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '上傳失敗')
+    } finally {
+      setUploading(false)
+      if (fileRef.current) fileRef.current.value = ''
     }
   }
 
@@ -297,11 +320,27 @@ export default function ShipmentPayablesPanel({
               貨代發票的費用，依材積比例分攤給 FOB 供應商
             </p>
           </div>
-          {totalCostTWD > 0 && (
-            <span className="text-sm font-mono text-gray-700 font-semibold">
-              合計 {fmtTWD(totalCostTWD)}（未稅）
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            {totalCostTWD > 0 && (
+              <span className="text-sm font-mono text-gray-700 font-semibold">
+                合計 {fmtTWD(totalCostTWD)}（未稅）
+              </span>
+            )}
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              accept=".pdf,.png,.jpg,.jpeg"
+              className="hidden"
+              onChange={e => { if (e.target.files?.length) handleUpload(e.target.files) }}
+            />
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="text-xs px-3 py-1.5 rounded border border-teal-300 text-teal-700 hover:bg-teal-50 disabled:opacity-50 whitespace-nowrap">
+              {uploading ? 'AI 解析中...' : '📎 上傳貨代發票'}
+            </button>
+          </div>
         </div>
 
         {/* 現有費用項目 */}
@@ -325,7 +364,7 @@ export default function ShipmentPayablesPanel({
           </div>
         ) : !loadingAlloc ? (
           <p className="text-xs text-gray-400 mb-3">
-            尚無費用項目。請手動輸入，或從出貨單上傳的報關文件匯入。
+            尚無費用項目。請上傳貨代發票讓 AI 解析，或直接手動輸入金額。
           </p>
         ) : null}
 
