@@ -134,7 +134,7 @@ export default function SupplierForm({ initialData, supplierId }: Props) {
               {TRADE_TERMS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
           </Field>
-          <Field label="佣金比例（%）">
+          <Field label="佣金比例">
             <div className="flex items-center gap-2">
               <input
                 type="number" min="0" max="100" step="0.01"
@@ -143,7 +143,7 @@ export default function SupplierForm({ initialData, supplierId }: Props) {
                 placeholder="0"
                 className={inp + ' w-28'}
               />
-              <span className="text-sm text-gray-500">%（不含稅，0 = 無佣金）</span>
+              <span className="text-sm text-gray-500">%（不含稅）— 2% 請輸入 <code className="bg-gray-100 px-1 rounded text-xs">2</code>，空白 = 不扣佣金</span>
             </div>
           </Field>
           <Field label="統一編號 / Tax ID">
