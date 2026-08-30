@@ -39,11 +39,18 @@ export default async function ShipmentsPage({ params, searchParams }: Props) {
       orderBy: { [sort]: dir },
       skip: (page - 1) * limit,
       take: limit,
-      include: {
+      select: {
+        id: true,
+        shipmentNo: true,
+        actualShipDate: true,
+        portOfLoading: true,
+        currencyCode: true,
+        source: true,
+        performedAt: true,
         customer: { select: { name: true, shortName: true } },
         _count: { select: { items: true, pis: true } },
         stockMovements: { where: { type: 4 }, select: { id: true }, take: 1 },
-        pis: { include: { pi: { select: { piNo: true } } }, take: 3 },
+        pis: { take: 3, select: { pi: { select: { piNo: true } } } },
       },
     }),
   ])

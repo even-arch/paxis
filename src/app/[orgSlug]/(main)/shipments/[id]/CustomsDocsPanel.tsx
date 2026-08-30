@@ -48,7 +48,8 @@ const DOC_TYPE_COLOR: Record<string, string> = {
   OTHER: 'bg-gray-100 text-gray-500',
 }
 
-function fmt(n: number) {
+function fmt(n: number | null | undefined) {
+  if (n == null) return '—'
   return n.toLocaleString(undefined, { maximumFractionDigits: 2 })
 }
 
@@ -150,9 +151,9 @@ export default function CustomsDocsPanel({ shipmentId }: { shipmentId: number })
     <div className="bg-white rounded-lg shadow p-5 mb-6">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">報關文件</h2>
+          <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">貨代費用 &amp; 報關文件</h2>
           <p className="text-xs text-gray-400 mt-0.5">
-            上傳貨代發票、提單、商業發票、出口報單等（非必填），系統會自動歸檔並解析重點
+            上傳貨代發票、提單、商業發票、出口報單，系統自動解析費用項目供 FOB 分攤扣款使用
           </p>
         </div>
         <div>
@@ -168,7 +169,7 @@ export default function CustomsDocsPanel({ shipmentId }: { shipmentId: number })
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
             className="text-xs px-3 py-1.5 rounded border border-teal-300 text-teal-700 hover:bg-teal-50 disabled:opacity-50">
-            {uploading ? 'AI 解析中...' : '📎 上傳報關文件'}
+            {uploading ? 'AI 解析中...' : '📎 上傳文件'}
           </button>
         </div>
       </div>
@@ -180,8 +181,8 @@ export default function CustomsDocsPanel({ shipmentId }: { shipmentId: number })
         <p className="text-xs text-gray-400">載入中...</p>
       ) : docs.length === 0 ? (
         <p className="text-xs text-gray-400">
-          尚未上傳任何報關文件。上傳後系統會自動判斷文件種類（貨代發票/提單/商業發票/出口報單），
-          解析金額與品項重點，並與系統內資料做三方勾稽。
+          尚未上傳任何文件。上傳後系統會自動判斷文件種類（貨代發票/提單/商業發票/出口報單），
+          解析費用項目與品項重點，並與系統內資料做三方勾稽。
         </p>
       ) : (
         <div className="space-y-4">
@@ -268,9 +269,14 @@ export default function CustomsDocsPanel({ shipmentId }: { shipmentId: number })
           {/* ── 建議：貨代費用項目 ── */}
           {suggestions && suggestions.freightItems.length > 0 && (
             <div className="border border-gray-200 rounded-lg p-4">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                建議：建立費用項目（依貨代發票，供 FOB 費用平攤扣款）
-              </h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  建議：建立費用項目（依貨代發票，供 FOB 費用平攤扣款）
+                </h3>
+                <span className="text-xs font-mono text-gray-700 font-semibold">
+                  合計 NT$ {fmt(suggestions.freightItems.reduce((s, f) => s + (f.amountTWD ?? 0), 0))}（未稅）
+                </span>
+              </div>
               <div className="space-y-1.5">
                 {suggestions.freightItems.map((f, i) => {
                   const key = `freight-${f.docId}-${i}`
@@ -288,7 +294,7 @@ export default function CustomsDocsPanel({ shipmentId }: { shipmentId: number })
                 })}
               </div>
               <p className="text-xs text-gray-400 mt-2">
-                套用後會依供應商毛重比例分攤，於「成本」頁面查看與套用扣款結果。
+                套用後費用項目即加入 FOB 分攤，依材積（CBM）比例分配給各 FOB 供應商。
               </p>
             </div>
           )}
