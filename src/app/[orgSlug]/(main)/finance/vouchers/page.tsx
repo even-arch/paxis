@@ -514,12 +514,12 @@ function VoucherDetail({ voucher, onStatusChange, saving }: {
           >
             {saving ? '更新中...' : nextAction.label}
           </button>
-          {voucher.status === 'CONFIRMED' && (
-            <button onClick={() => window.print()}
-              className="border border-gray-300 text-gray-700 px-5 py-2 rounded-md text-sm hover:bg-gray-50">
-              列印 / PDF
-            </button>
-          )}
+          <button
+            onClick={() => window.open(`/print/pv/${voucher.id}`, '_blank')}
+            className="border border-gray-300 text-gray-700 px-5 py-2 rounded-md text-sm hover:bg-gray-50"
+          >
+            🖨 列印付款通知單
+          </button>
         </div>
       )}
 

@@ -27,6 +27,7 @@ export default async function EditSupplierPage({
     taxId: supplier.taxId ?? '',
     paymentTerms: supplier.paymentTerms ?? '',
     currencyCode: supplier.currencyCode ?? '',
+    defaultTradeTerms: supplier.defaultTradeTerms ?? '',
     note: supplier.note ?? '',
     chargeTemplateId: supplier.chargeTemplateId ? String(supplier.chargeTemplateId) : '',
   }

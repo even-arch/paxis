@@ -78,6 +78,7 @@ export default async function SupplierDetailPage({
           <Row label="簡稱" value={supplier.shortName} />
           <Row label="慣用幣別" value={supplier.currencyCode} />
           <Row label="付款條件" value={supplier.paymentTerms} />
+          <Row label="報價原則" value={supplier.defaultTradeTerms} />
           <Row label="統一編號" value={supplier.taxId} />
         </Card>
 
