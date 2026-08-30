@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
       const name = body.supplier.name.trim()
       // 再次嘗試比對（防止剛好有同名）
       const existing = await prisma.sUP_Supplier.findFirst({
+        omit: { commissionPct: true },
         where: { OR: [
           { name: { equals: name, mode: 'insensitive' } },
           { shortName: { equals: name, mode: 'insensitive' } },
@@ -69,6 +70,7 @@ export async function POST(req: NextRequest) {
         supplierId = existing.id
       } else {
         const created = await prisma.sUP_Supplier.create({
+          omit: { commissionPct: true },
           data: {
             name,
             shortName:     body.supplier.shortName?.trim() || (name.length > 20 ? name.slice(0, 20) : null),

@@ -13,6 +13,7 @@ export async function GET(_req: NextRequest, {
 
   const supplier = await prisma.sUP_Supplier.findUnique({
     where: { id: Number(params.id) },
+    omit: { commissionPct: true },
     include: {
       contacts: true,
       products: {
@@ -36,28 +37,43 @@ export async function PUT(req: NextRequest, {
 
   const body = await req.json()
 
-  const supplier = await prisma.sUP_Supplier.update({
-    where: { id: Number(params.id) },
-    data: {
-      name: body.name,
-      shortName: body.shortName || null,
-      address: body.address || null,
-      city: body.city || null,
-      countryCode: body.countryCode || null,
-      postalCode: body.postalCode || null,
-      phoneNo: body.phoneNo || null,
-      fax: body.fax || null,
-      email: body.email || null,
-      contactPerson: body.contactPerson || null,
-      taxId: body.taxId || null,
-      paymentTerms: body.paymentTerms || null,
-      currencyCode: body.currencyCode || null,
-      defaultTradeTerms: body.defaultTradeTerms || null,
-      commissionPct: body.commissionPct !== '' && body.commissionPct != null ? Number(body.commissionPct) : null,
-      note: body.note || null,
-      chargeTemplateId: body.chargeTemplateId ? Number(body.chargeTemplateId) : null,
-    },
-  })
+  const baseData = {
+    name: body.name,
+    shortName: body.shortName || null,
+    address: body.address || null,
+    city: body.city || null,
+    countryCode: body.countryCode || null,
+    postalCode: body.postalCode || null,
+    phoneNo: body.phoneNo || null,
+    fax: body.fax || null,
+    email: body.email || null,
+    contactPerson: body.contactPerson || null,
+    taxId: body.taxId || null,
+    paymentTerms: body.paymentTerms || null,
+    currencyCode: body.currencyCode || null,
+    defaultTradeTerms: body.defaultTradeTerms || null,
+    note: body.note || null,
+    chargeTemplateId: body.chargeTemplateId ? Number(body.chargeTemplateId) : null,
+  }
+
+  let supplier
+  try {
+    supplier = await prisma.sUP_Supplier.update({
+      where: { id: Number(params.id) },
+      omit: { commissionPct: true },
+      data: {
+        ...baseData,
+        commissionPct: body.commissionPct !== '' && body.commissionPct != null ? Number(body.commissionPct) : null,
+      },
+    })
+  } catch {
+    // commissionPct 欄位尚未在 DB 中，略過
+    supplier = await prisma.sUP_Supplier.update({
+      where: { id: Number(params.id) },
+      omit: { commissionPct: true },
+      data: baseData,
+    })
+  }
 
   return NextResponse.json(supplier)
 }

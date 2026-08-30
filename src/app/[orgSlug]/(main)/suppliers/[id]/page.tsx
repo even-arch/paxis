@@ -14,6 +14,7 @@ export default async function SupplierDetailPage({
   const [supplier, recentOrders, allProducts, orderedItems] = await Promise.all([
     prisma.sUP_Supplier.findUnique({
       where: { id: Number(params.id) },
+      omit: { commissionPct: true },
       include: {
         contacts: true,
         chargeTemplate: { select: { id: true, name: true, description: true } },
@@ -47,6 +48,15 @@ export default async function SupplierDetailPage({
 
   if (!supplier || !supplier.isActive) notFound()
 
+  // commissionPct 欄位尚未 db:push 時的防護查詢
+  let commissionPct: string | null = null
+  try {
+    const rows = await prisma.$queryRaw<{ commissionPct: string | null }[]>`
+      SELECT "commissionPct"::text FROM "SUP_Supplier" WHERE id = ${Number(params.id)} LIMIT 1
+    `
+    commissionPct = rows[0]?.commissionPct ?? null
+  } catch { /* column not yet in DB */ }
+
   const STATUS_LABELS: Record<number, { label: string; color: string }> = {
     0: { label: '草稿',   color: 'bg-gray-100 text-gray-500' },
     1: { label: '已送出', color: 'bg-blue-100 text-blue-700' },
@@ -79,7 +89,7 @@ export default async function SupplierDetailPage({
           <Row label="慣用幣別" value={supplier.currencyCode} />
           <Row label="付款條件" value={supplier.paymentTerms} />
           <Row label="報價原則" value={supplier.defaultTradeTerms} />
-          <Row label="佣金比例" value={supplier.commissionPct != null && Number(supplier.commissionPct) > 0 ? `${supplier.commissionPct}%` : undefined} />
+          <Row label="佣金比例" value={commissionPct && Number(commissionPct) > 0 ? `${commissionPct}%` : undefined} />
           <Row label="統一編號" value={supplier.taxId} />
         </Card>
 

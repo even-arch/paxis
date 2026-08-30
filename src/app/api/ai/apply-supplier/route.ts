@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
 
     // 前端明確選擇某個現有供應商 → 直接用，補填空白欄位
     if (useExistingId) {
-      let supplier = await prisma.sUP_Supplier.findUnique({ where: { id: useExistingId } })
+      let supplier = await prisma.sUP_Supplier.findUnique({ where: { id: useExistingId }, omit: { commissionPct: true } })
       if (!supplier) return NextResponse.json({ error: '指定的供應商不存在' }, { status: 404 })
 
       const patch: Record<string, string> = {}
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
       if (!supplier.phoneNo && phone)          patch.phoneNo       = phone
       if (!supplier.contactPerson && contactPerson) patch.contactPerson = contactPerson
       if (Object.keys(patch).length > 0) {
-        supplier = await prisma.sUP_Supplier.update({ where: { id: supplier.id }, data: patch })
+        supplier = await prisma.sUP_Supplier.update({ where: { id: supplier.id }, omit: { commissionPct: true }, data: patch })
       }
       return NextResponse.json({
         ok: true,
@@ -74,6 +74,7 @@ export async function POST(req: NextRequest) {
 
     // 1. 完全匹配（name 或 shortName 完全一致，不區分大小寫）
     let supplier = await prisma.sUP_Supplier.findFirst({
+      omit: { commissionPct: true },
       where: {
         OR: [
           { name: { equals: name, mode: 'insensitive' } },
@@ -92,7 +93,7 @@ export async function POST(req: NextRequest) {
       if (!supplier.phoneNo && phone)          patch.phoneNo       = phone
       if (!supplier.contactPerson && contactPerson) patch.contactPerson = contactPerson
       if (Object.keys(patch).length > 0) {
-        supplier = await prisma.sUP_Supplier.update({ where: { id: supplier.id }, data: patch })
+        supplier = await prisma.sUP_Supplier.update({ where: { id: supplier.id }, omit: { commissionPct: true }, data: patch })
       }
       return NextResponse.json({
         ok: true,
@@ -115,6 +116,7 @@ export async function POST(req: NextRequest) {
 
     // 3. 找不到或使用者確認新建 → 建立供應商
     supplier = await prisma.sUP_Supplier.create({
+      omit: { commissionPct: true },
       data: {
         name,
         shortName:     supplierShortName?.trim() || (name.length > 20 ? name.slice(0, 20) : null),

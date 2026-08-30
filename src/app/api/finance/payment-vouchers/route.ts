@@ -59,12 +59,6 @@ export async function POST(req: NextRequest) {
     },
   })
 
-  // 取得供應商佣金比例
-  const supplier = await prisma.sUP_Supplier.findUnique({
-    where: { id: Number(supplierId) },
-    select: { commissionPct: true },
-  })
-
   if (payables.length !== payableIds.length) {
     return NextResponse.json({ error: '部分單據已被加入其他付款通知單，或不屬於此供應商' }, { status: 400 })
   }
@@ -77,8 +71,16 @@ export async function POST(req: NextRequest) {
   })
   const voucherNo = `PV-${dateStr}-${String(countToday + 1).padStart(4, '0')}`
 
+  // 取得供應商佣金比例（try/catch：欄位可能尚未 db:push）
+  let commissionPct = 0
+  try {
+    const rows = await prisma.$queryRaw<{ commissionPct: number | null }[]>`
+      SELECT "commissionPct" FROM "SUP_Supplier" WHERE id = ${Number(supplierId)} LIMIT 1
+    `
+    commissionPct = rows[0]?.commissionPct ? Number(rows[0].commissionPct) : 0
+  } catch { /* column not yet in DB */ }
+
   // 若供應商有佣金比例，自動計算並加入調整（不含稅，從採購金額直接扣）
-  const commissionPct = supplier?.commissionPct ? Number(supplier.commissionPct) : 0
   const subtotal = payables.reduce((sum, p) => sum + Number(p.amountTWD), 0)
   const commissionAdjustments = commissionPct > 0
     ? [{ name: `佣金 ${commissionPct}%`, amountTWD: -Math.round(subtotal * commissionPct / 100), category: 'COMMISSION', note: null }]

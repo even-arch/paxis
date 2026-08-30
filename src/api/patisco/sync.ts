@@ -522,6 +522,7 @@ export async function step2_suppliers(prisma: PrismaClient, jobId: number): Prom
       const existing = await prisma.sUP_Supplier.findFirst({ where: { name: info.name }, select: { id: true } })
       if (existing) { r.skipped++; continue }
       await prisma.sUP_Supplier.create({
+        omit: { commissionPct: true },
         data: {
           name: info.name,
           address: info.address,

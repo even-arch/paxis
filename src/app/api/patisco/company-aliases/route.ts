@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
     if (existing) {
       resolvedSupplierId = existing.id
     } else {
-      const rec = await prisma.sUP_Supplier.create({ data: { name: displayName } })
+      const rec = await prisma.sUP_Supplier.create({ omit: { commissionPct: true }, data: { name: displayName } })
       resolvedSupplierId = rec.id
     }
   }

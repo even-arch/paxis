@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
     if (supplierName) {
       // 先找完全符合，再找部分符合
       let supplier = await prisma.sUP_Supplier.findFirst({
+        omit: { commissionPct: true },
         where: {
           OR: [
             { name: { equals: supplierName, mode: 'insensitive' } },
@@ -50,6 +51,7 @@ export async function POST(req: NextRequest) {
 
       if (!supplier) {
         supplier = await prisma.sUP_Supplier.create({
+          omit: { commissionPct: true },
           data: {
             name: supplierName,
             shortName: supplierName.length > 20 ? supplierName.slice(0, 20) : null,
