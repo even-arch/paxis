@@ -356,13 +356,17 @@ export default function PrintPVPage() {
       </div>
 
       {/* ── 列印層 ── */}
+      {/*
+        @page margin 設 0，由容器自帶 padding，確保列印容器和螢幕預覽完全同尺寸，
+        印章百分比位置才能在螢幕和紙張上對準。
+      */}
       <div className="print-only">
-        <div style={{ position: 'relative' }}>
+        <div className="print-doc-page" style={{ position: 'relative' }}>
           <PVDocument data={data} />
           <SealPrintLayer manager={sealManager} target="pv" />
         </div>
         {isCreditNote && (
-          <div style={{ pageBreakBefore: 'always', position: 'relative' }}>
+          <div className="print-doc-page" style={{ pageBreakBefore: 'always', position: 'relative' }}>
             <CreditNoteDocument
               data={data}
               invoiceRows={invoiceRows}
@@ -376,10 +380,16 @@ export default function PrintPVPage() {
       <style>{`
         @media print {
           .no-print { display: none !important; }
-          .print-only { display: block !important; position: relative; }
+          .print-only { display: block !important; }
           .print-page { display: none !important; }
-          @page { size: A4; margin: 12mm 15mm; }
+          @page { size: A4; margin: 0; }
           body { font-size: 9pt; }
+          .print-doc-page {
+            width: 210mm;
+            min-height: 297mm;
+            padding: 12mm 15mm;
+            box-sizing: border-box;
+          }
         }
         @media screen {
           .print-only { display: none !important; }
