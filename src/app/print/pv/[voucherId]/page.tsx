@@ -139,6 +139,7 @@ export default function PrintPVPage() {
 
   const sealManager = useSealManager()
   const previewRef = useRef<HTMLDivElement>(null)
+  const creditNoteRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     fetch(`/api/print/pv/${voucherId}`)
@@ -308,14 +309,15 @@ export default function PrintPVPage() {
               sealManager.placeSeal(
                 (e.clientX - rect.left) / rect.width * 100,
                 (e.clientY - rect.top) / rect.height * 100,
+                'pv',
               )
             }}
           >
             <PVDocument data={data} />
-            <SealOverlayLayer manager={sealManager} containerRef={previewRef} />
+            <SealOverlayLayer manager={sealManager} containerRef={previewRef} target="pv" />
           </div>
 
-          {/* 折讓證明預覽（可直接在表格裡編輯） */}
+          {/* 折讓證明預覽（可直接在表格裡編輯；也支援用印） */}
           {isCreditNote && (
             <>
               <div className="no-print mt-4 mb-2 flex items-center gap-3">
@@ -326,13 +328,27 @@ export default function PrintPVPage() {
                 </button>
                 <span className="text-xs text-gray-400">總折讓金額（不含稅）：NT$ {invoiceRows.reduce((s, r) => s + (Number(r.amountExclTax) || 0), 0).toLocaleString()}</span>
               </div>
-              <div className="print-page bg-white mx-auto shadow-lg">
+              <div
+                ref={creditNoteRef}
+                className="print-page bg-white mx-auto shadow-lg"
+                style={{ position: 'relative', cursor: sealManager.armedSeal ? 'crosshair' : undefined }}
+                onClick={e => {
+                  if (!sealManager.armedSeal || !creditNoteRef.current) return
+                  const rect = creditNoteRef.current.getBoundingClientRect()
+                  sealManager.placeSeal(
+                    (e.clientX - rect.left) / rect.width * 100,
+                    (e.clientY - rect.top) / rect.height * 100,
+                    'cn',
+                  )
+                }}
+              >
                 <CreditNoteDocument
                   data={data}
                   invoiceRows={invoiceRows}
                   vatPct={vatPct}
                   onChangeRows={{ update: updateRow, remove: removeInvoiceRow }}
                 />
+                <SealOverlayLayer manager={sealManager} containerRef={creditNoteRef} target="cn" />
               </div>
             </>
           )}
@@ -340,16 +356,19 @@ export default function PrintPVPage() {
       </div>
 
       {/* ── 列印層 ── */}
-      <div className="print-only" style={{ position: 'relative' }}>
-        <PVDocument data={data} />
-        <SealPrintLayer manager={sealManager} />
+      <div className="print-only">
+        <div style={{ position: 'relative' }}>
+          <PVDocument data={data} />
+          <SealPrintLayer manager={sealManager} target="pv" />
+        </div>
         {isCreditNote && (
-          <div style={{ pageBreakBefore: 'always' }}>
+          <div style={{ pageBreakBefore: 'always', position: 'relative' }}>
             <CreditNoteDocument
               data={data}
               invoiceRows={invoiceRows}
               vatPct={vatPct}
             />
+            <SealPrintLayer manager={sealManager} target="cn" />
           </div>
         )}
       </div>

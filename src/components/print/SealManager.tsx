@@ -14,6 +14,7 @@ export type PlacedSeal = {
   yPct: number       // 上邊緣，相對容器高度 %（UI 操作時一律用 top）
   widthPct: number   // 寬度 %；高度固定 = widthPct × 0.75（4:3）
   anchor: 'top' | 'bottom'  // top=從上定位；bottom=從下定位（跟著內容底部）
+  target?: 'pv' | 'cn'     // 放在哪份文件上：pv=付款通知單；cn=折讓證明（預設 pv）
 }
 
 // 存入 template 的精簡格式（不含 imageBase64，印時從 savedSeals 查）
@@ -88,7 +89,7 @@ export function useSealManager() {
 
   const disarm = useCallback(() => setArmedSeal(null), [])
 
-  const placeSeal = useCallback((xPct: number, yPct: number) => {
+  const placeSeal = useCallback((xPct: number, yPct: number, target: 'pv' | 'cn' = 'pv') => {
     if (!armedSeal) return
     const uid = Math.random().toString(36).slice(2)
     setPlacedSeals(prev => [...prev, {
@@ -99,6 +100,7 @@ export function useSealManager() {
       yPct: Math.max(0, yPct - 7.5),
       widthPct: 20,
       anchor: 'bottom', // 預設 bottom，章幾乎都放在下方
+      target,
     }])
     setArmedSeal(null)
   }, [armedSeal])
@@ -307,15 +309,18 @@ export function SealSidebarSection({
 export function SealOverlayLayer({
   manager,
   containerRef,
+  target = 'pv',
 }: {
   manager: SealManager
   containerRef: RefObject<HTMLDivElement>
+  target?: 'pv' | 'cn'
 }) {
-  if (manager.placedSeals.length === 0) return null
+  const seals = manager.placedSeals.filter(s => (s.target ?? 'pv') === target)
+  if (seals.length === 0) return null
 
   return (
     <>
-      {manager.placedSeals.map(seal => (
+      {seals.map(seal => (
         <DraggableSealItem key={seal.uid} seal={seal} manager={manager} containerRef={containerRef} />
       ))}
     </>
@@ -486,12 +491,13 @@ export function PageBreakIndicator({ pages = 3 }: { pages?: number }) {
 
 // ── Print Layer（列印用，依 anchor 決定定位方式）─────────────────────────────
 
-export function SealPrintLayer({ manager }: { manager: SealManager }) {
-  if (manager.placedSeals.length === 0) return null
+export function SealPrintLayer({ manager, target = 'pv' }: { manager: SealManager; target?: 'pv' | 'cn' }) {
+  const seals = manager.placedSeals.filter(s => (s.target ?? 'pv') === target)
+  if (seals.length === 0) return null
 
   return (
     <>
-      {manager.placedSeals.map(seal => {
+      {seals.map(seal => {
         const heightPct = seal.widthPct * 0.75
         // bottom-anchor：從容器底部往上算距離
         // 使用者在螢幕拖曳時看到 top = yPct%，
