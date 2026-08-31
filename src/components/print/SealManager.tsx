@@ -68,6 +68,15 @@ async function removeWhiteBackground(file: File, threshold = 240): Promise<strin
   })
 }
 
+// ── A4 座標基準 ───────────────────────────────────────────────────────────────
+// 所有印章位置（xPct / yPct / widthPct）都以 A4 紙張為基準：
+//   xPct = A4 寬（210mm）的百分比
+//   yPct = A4 高（297mm）的百分比
+//   widthPct = A4 寬的百分比；章高 = widthMm × 0.75（4:3 固定比例）
+
+const A4_W = 210 // mm
+const A4_H = 297 // mm
+
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useSealManager() {
@@ -371,7 +380,9 @@ function DraggableSealItem({
     }
   }, [seal.uid, manager, containerRef])
 
-  const heightPct = seal.widthPct * 0.75
+  // widthPct 是 A4 寬（210mm）的百分比
+  // 章高 = 章寬 × 0.75（4:3），換算成 A4 高（297mm）的百分比
+  const heightPct = seal.widthPct * A4_W * 0.75 / A4_H
 
   return (
     <div
@@ -489,7 +500,7 @@ export function PageBreakIndicator({ pages = 3 }: { pages?: number }) {
   )
 }
 
-// ── Print Layer（列印用，依 anchor 決定定位方式）─────────────────────────────
+// ── Print Layer（列印用）──────────────────────────────────────────────────────
 
 export function SealPrintLayer({ manager, target = 'pv' }: { manager: SealManager; target?: 'pv' | 'cn' }) {
   const seals = manager.placedSeals.filter(s => (s.target ?? 'pv') === target)
@@ -498,11 +509,14 @@ export function SealPrintLayer({ manager, target = 'pv' }: { manager: SealManage
   return (
     <>
       {seals.map(seal => {
-        const heightPct = seal.widthPct * 0.75
-        // bottom-anchor：從容器底部往上算距離
-        // 使用者在螢幕拖曳時看到 top = yPct%，
-        // 換算 bottom = 100 - yPct - heightPct（章的下緣距容器底部的距離）
-        const bottomPct = 100 - seal.yPct - heightPct
+        const widthMm  = seal.widthPct / 100 * A4_W
+        const heightMm = widthMm * 0.75                  // 固定 4:3，不受容器高度影響
+        const leftMm   = seal.xPct   / 100 * A4_W
+        const topMm    = seal.yPct   / 100 * A4_H
+        // bottom-anchor：章原本是以「top」存，換算成從頁面頂部的 mm 即可
+        const posStyle = seal.anchor === 'bottom'
+          ? { top: `${topMm}mm` }   // bottom-anchor 在螢幕是 top，列印同樣用 top
+          : { top: `${topMm}mm` }
 
         return (
           <img
@@ -510,13 +524,10 @@ export function SealPrintLayer({ manager, target = 'pv' }: { manager: SealManage
             src={seal.imageBase64}
             style={{
               position: 'absolute',
-              left: `${seal.xPct}%`,
-              ...(seal.anchor === 'bottom'
-                ? { bottom: `${Math.max(0, bottomPct)}%` }
-                : { top: `${seal.yPct}%` }
-              ),
-              width: `${seal.widthPct}%`,
-              height: `${heightPct}%`,
+              left: `${leftMm}mm`,
+              ...posStyle,
+              width:  `${widthMm}mm`,
+              height: `${heightMm}mm`,
               objectFit: 'contain',
               zIndex: 5,
             }}
