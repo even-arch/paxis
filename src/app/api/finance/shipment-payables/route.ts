@@ -19,7 +19,12 @@ export async function GET() {
     where: {
       shipmentId: { not: null },
       status: { in: [0, 1] },
-      voucherItem: null,
+      // 顯示尚未建單、或已建單但尚未付款的記錄
+      // 只有 PAID 才真正從待出貨移除
+      OR: [
+        { voucherItem: null },
+        { voucherItem: { voucher: { status: { not: 'PAID' } } } },
+      ],
     },
     select: {
       id: true,
@@ -36,6 +41,11 @@ export async function GET() {
         select: {
           id: true, shipmentNo: true, actualShipDate: true,
           customer: { select: { name: true, shortName: true } },
+        },
+      },
+      voucherItem: {
+        select: {
+          voucher: { select: { id: true, voucherNo: true, status: true } },
         },
       },
     },
@@ -60,6 +70,7 @@ export async function GET() {
       defaultTradeTerms: string | null; commissionPct: number; poNo: string | null; poId: number | null
       amountTWD: number; fobCostDeductionTWD: number | null; dueDate: unknown
       status: number; tradeTerms: string | null
+      voucherInfo: { id: number; voucherNo: string; status: string } | null
     }[]
   }>()
 
@@ -91,6 +102,9 @@ export async function GET() {
       dueDate: p.dueDate,
       status: p.status,
       tradeTerms: p.po?.tradeTerms ?? p.supplier.defaultTradeTerms ?? null,
+      voucherInfo: p.voucherItem
+        ? { id: p.voucherItem.voucher.id, voucherNo: p.voucherItem.voucher.voucherNo, status: p.voucherItem.voucher.status }
+        : null,
     })
   }
 

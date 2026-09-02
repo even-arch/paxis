@@ -129,7 +129,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   return NextResponse.json(voucher)
 }
 
-// DELETE /api/finance/payment-vouchers/[id] — 僅 DRAFT 可刪，刪除後 Payable 解鎖
+// DELETE /api/finance/payment-vouchers/[id] — 已付款不可刪，其餘狀態可刪
 export async function DELETE(_req: NextRequest, { params }: Params) {
   const prisma = await getRequestPrisma()
   const session = await getServerSession(authOptions)
@@ -138,8 +138,8 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const id = Number(params.id)
   const existing = await prisma.fIN_PaymentVoucher.findUnique({ where: { id }, select: { status: true } })
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  if (existing.status !== 'DRAFT') {
-    return NextResponse.json({ error: '只有草稿狀態的付款通知單可以刪除' }, { status: 400 })
+  if (existing.status === 'PAID') {
+    return NextResponse.json({ error: '已付款的通知單不可刪除' }, { status: 400 })
   }
 
   await prisma.fIN_PaymentVoucher.delete({ where: { id } })
