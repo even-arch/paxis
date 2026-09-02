@@ -22,6 +22,11 @@ export type SupplierPayable = {
   dueDate: string | null
   status: number
   tradeTerms: string | null
+  voucherInfo: { id: number; voucherNo: string; status: string } | null
+}
+
+const VOUCHER_STATUS_ZH: Record<string, string> = {
+  DRAFT: '草稿', SENT: '已傳送', CONFIRMED: '供應商確認', PAID: '已付款',
 }
 
 type AllocEntry = {
@@ -241,9 +246,9 @@ export default function ShipmentPayablesPanel({
     }
   }
 
-  // ── Create payment voucher for a supplier (all their payables in this shipment) ─
+  // ── Create payment voucher for a supplier (只針對尚未建單的 payable) ─────────
   async function createVoucher(supplierId: number) {
-    const supplierPayables = payables.filter(p => p.supplierId === supplierId)
+    const supplierPayables = payables.filter(p => p.supplierId === supplierId && !p.voucherInfo)
     if (supplierPayables.length === 0) return
 
     const alloc = allocMap.get(supplierId)
@@ -473,7 +478,11 @@ export default function ShipmentPayablesPanel({
                 const netAmount = group.totalAmountTWD - deduction - commission
                 const vat = vatMap[group.supplierId] ?? 5
                 const vatAmount = Math.round(netAmount * vat / 100)
-                const done = createdFor.has(group.supplierId)
+                // 全部 payable 都已有通知單 = 已完成；或本次剛建立
+                const allVouchered = group.payables.every(p => p.voucherInfo != null)
+                const done = allVouchered || createdFor.has(group.supplierId)
+                // 找已建單的資訊（若有多張取第一張）
+                const groupVoucherInfo = group.payables.find(p => p.voucherInfo)?.voucherInfo ?? null
 
                 return (
                   <tr key={group.supplierId} className={!isFob ? 'opacity-70' : ''}>
@@ -529,7 +538,27 @@ export default function ShipmentPayablesPanel({
                     </td>
                     <td className="px-4 py-3 text-right">
                       {done ? (
-                        <span className="text-xs text-green-600 font-medium">✓ 已開單</span>
+                        <div className="space-y-1 text-right">
+                          <div className="text-xs text-green-600 font-medium">✓ 已開通知單</div>
+                          {groupVoucherInfo && (
+                            <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                              <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                                groupVoucherInfo.status === 'PAID' ? 'bg-green-100 text-green-700' :
+                                groupVoucherInfo.status === 'SENT' ? 'bg-blue-100 text-blue-700' :
+                                groupVoucherInfo.status === 'CONFIRMED' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-gray-100 text-gray-600'
+                              }`}>
+                                {VOUCHER_STATUS_ZH[groupVoucherInfo.status] ?? groupVoucherInfo.status}
+                              </span>
+                              <a
+                                href={`/print/pv/${groupVoucherInfo.id}`}
+                                target="_blank"
+                                className="text-xs font-mono text-blue-500 hover:underline">
+                                {groupVoucherInfo.voucherNo}
+                              </a>
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         <div className="flex items-center justify-end gap-2">
                           <select

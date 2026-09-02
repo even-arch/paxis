@@ -242,7 +242,7 @@ export default function VouchersPage() {
                         {new Date(v.createdAt).toLocaleDateString('zh-TW')}
                       </td>
                       <td className="px-4 py-2.5 text-right" onClick={e => e.stopPropagation()}>
-                        {v.status === 'DRAFT' && (
+                        {v.status !== 'PAID' && (
                           <button onClick={() => deleteVoucher(v.id)}
                             className="text-xs text-gray-400 hover:text-red-500">刪除</button>
                         )}
