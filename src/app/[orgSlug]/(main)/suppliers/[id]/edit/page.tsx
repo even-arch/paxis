@@ -9,7 +9,18 @@ export default async function EditSupplierPage({
   const prisma = await getPagePrisma(params.orgSlug)
   const supplier = await prisma.sUP_Supplier.findUnique({
     where: { id: Number(params.id) },
+    omit: { commissionPct: true },
   })
+
+  // commissionPct 欄位可能尚未在 DB 中（等待 schema-sync），單獨讀取
+  let commissionPctStr = ''
+  try {
+    const rows = await prisma.$queryRaw<{ commissionPct: string | null }[]>`
+      SELECT "commissionPct"::text FROM "SUP_Supplier" WHERE id = ${Number(params.id)} LIMIT 1
+    `
+    const raw = rows[0]?.commissionPct
+    commissionPctStr = raw != null ? String(Number(raw)) : ''
+  } catch { /* column not yet in DB */ }
 
   if (!supplier || !supplier.isActive) notFound()
 
@@ -27,6 +38,8 @@ export default async function EditSupplierPage({
     taxId: supplier.taxId ?? '',
     paymentTerms: supplier.paymentTerms ?? '',
     currencyCode: supplier.currencyCode ?? '',
+    defaultTradeTerms: supplier.defaultTradeTerms ?? '',
+    commissionPct: commissionPctStr,
     note: supplier.note ?? '',
     chargeTemplateId: supplier.chargeTemplateId ? String(supplier.chargeTemplateId) : '',
   }

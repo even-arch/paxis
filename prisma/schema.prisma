@@ -480,6 +480,10 @@ model SUP_Supplier {
   // 報價原則（Incoterms）：FOB / FOR / EXW / CIF / CFR…
   defaultTradeTerms String?
 
+  // 佣金：供應商承諾給我方的回扣比例（%，不含稅，付款時直接少付）
+  // null 或 0 = 無佣金；2.00 = 2%
+  commissionPct     Decimal?
+
   isActive      Boolean   @default(true)
   archivedAt    DateTime? // 封存時間；非 null = 已封存，正常查詢排除
   syncJobId     Int?      // Patisco sync job ID，用於回滾
@@ -1584,9 +1588,9 @@ model SLS_FobCostAllocation {
 
   poId        Int?     // 對應的 PO（用於追蹤；可 null）
 
-  grossWeightKg Decimal  // 此供應商在本次出貨的毛重（kg）
-  weightPct     Decimal  // 佔所有 FOB 供應商總重的百分比（0-100）
-  allocatedTWD  Decimal  // 分攤金額 = costItem.amountTWD × weightPct / 100
+  cbm           Decimal  // 此供應商在本次出貨的材積（m³）
+  cbmPct        Decimal  // 佔所有 FOB 供應商總材積的百分比（0-100）
+  allocatedTWD  Decimal  // 分攤金額 = costItem.amountTWD × cbmPct / 100
 
   // 扣款狀態：false=待套用, true=已寫入 FIN_Payable.fobCostDeductionTWD
   applied     Boolean  @default(false)
@@ -1839,6 +1843,11 @@ model FIN_PaymentVoucher {
 
   vatPct      Decimal  @default(5)         // 營業稅率（%）
   note        String?
+
+  // 供應商本次開立的統一發票（手填，折讓證明使用）
+  supplierInvoiceNo     String?   // 號碼（如 24154966）
+  supplierInvoicePrefix String?   // 字軌（如 XV）
+  supplierInvoiceDate   DateTime? // 發票日期
 
   sentAt      DateTime?
   confirmedAt DateTime?

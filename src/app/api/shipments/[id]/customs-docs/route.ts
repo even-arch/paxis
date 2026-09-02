@@ -110,6 +110,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const existingSet = new Set(existingItems.map(i => existingKey(i.name, Number(i.amountTWD))))
     for (const doc of forwarderDocs) {
       for (const item of doc.freightItems ?? []) {
+        if (item.amountTWD == null) continue  // AI 無法換算 TWD，跳過
         if (existingSet.has(existingKey(item.name, item.amountTWD))) continue
         freightItemSuggestions.push({ docId: doc.id, name: item.name, amountTWD: item.amountTWD, note: item.note })
       }

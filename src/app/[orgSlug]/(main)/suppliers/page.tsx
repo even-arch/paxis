@@ -36,6 +36,7 @@ export default async function SuppliersPage({ params, searchParams }: Props) {
       orderBy: { [sort]: dir },
       skip: (page - 1) * limit,
       take: limit,
+      omit: { commissionPct: true },
       include: { _count: { select: { products: true } } },
     }),
   ])

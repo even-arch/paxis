@@ -19,6 +19,7 @@ export type SupplierFormData = {
   paymentTerms: string
   currencyCode: string
   defaultTradeTerms: string
+  commissionPct: string     // '' = 無佣金，'2' = 2%
   note: string
   chargeTemplateId: string  // '' = 不套用
 }
@@ -26,7 +27,7 @@ export type SupplierFormData = {
 const empty: SupplierFormData = {
   name: '', shortName: '', address: '', city: '', countryCode: '',
   postalCode: '', phoneNo: '', fax: '', email: '', contactPerson: '',
-  taxId: '', paymentTerms: '', currencyCode: '', defaultTradeTerms: '', note: '',
+  taxId: '', paymentTerms: '', currencyCode: '', defaultTradeTerms: '', commissionPct: '', note: '',
   chargeTemplateId: '',
 }
 
@@ -132,6 +133,18 @@ export default function SupplierForm({ initialData, supplierId }: Props) {
               <option value="">未設定</option>
               {TRADE_TERMS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
+          </Field>
+          <Field label="佣金比例">
+            <div className="flex items-center gap-2">
+              <input
+                type="number" min="0" max="100" step="0.01"
+                value={form.commissionPct}
+                onChange={e => set('commissionPct', e.target.value)}
+                placeholder="0"
+                className={inp + ' w-28'}
+              />
+              <span className="text-sm text-gray-500">%（不含稅）— 2% 請輸入 <code className="bg-gray-100 px-1 rounded text-xs">2</code>，空白 = 不扣佣金</span>
+            </div>
           </Field>
           <Field label="統一編號 / Tax ID">
             <input type="text" value={form.taxId} onChange={e => set('taxId', e.target.value)} className={inp} />

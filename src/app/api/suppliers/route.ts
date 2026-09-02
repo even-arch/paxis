@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
       orderBy: { name: 'asc' },
       skip: (page - 1) * limit,
       take: limit,
+      omit: { commissionPct: true },
       include: {
         _count: { select: { products: true } },
       },
@@ -49,6 +50,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
 
   const supplier = await prisma.sUP_Supplier.create({
+    omit: { commissionPct: true },
     data: {
       name: body.name,
       shortName: body.shortName || null,
