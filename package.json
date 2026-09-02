@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma db push --accept-data-loss && prisma generate && prisma generate --schema=prisma-master/schema.prisma && next build",
+    "build": "prisma generate && prisma generate --schema=prisma-master/schema.prisma && next build",
     "start": "next start",
     "lint": "next lint",
     "pages:build": "npx @cloudflare/next-on-pages",
