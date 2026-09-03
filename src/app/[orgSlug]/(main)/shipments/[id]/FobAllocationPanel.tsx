@@ -47,6 +47,7 @@ type AllocationData = {
   costItems: CostItem[]
   totalCostTWD: number
   totalFobCbm: number
+  totalAllCbm: number
   usedCbmFallback: boolean
 }
 
@@ -213,15 +214,24 @@ export default function FobAllocationPanel({ shipmentId }: { shipmentId: number 
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                   供應商分攤預覽
                 </span>
-                {data.usedCbmFallback ? (
-                  <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-0.5">
-                    ⚠ 無材積資料，以金額比例分攤
-                  </span>
-                ) : data.totalFobCbm > 0 ? (
-                  <span className="text-xs text-gray-400">
-                    FOB 總材積 {fmtCbm(data.totalFobCbm)}
-                  </span>
-                ) : null}
+                <div className="flex items-center gap-2">
+                  {data.usedCbmFallback ? (
+                    <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-0.5">
+                      ⚠ 無材積資料，以金額比例分攤
+                    </span>
+                  ) : null}
+                  {data.totalAllCbm > 0 ? (
+                    <span className="text-xs text-gray-500 font-mono">
+                      出貨總材積 {fmtCbm(data.totalAllCbm)}
+                      {data.totalFobCbm > 0 && data.totalFobCbm < data.totalAllCbm &&
+                        `（FOB ${fmtCbm(data.totalFobCbm)}）`}
+                    </span>
+                  ) : data.totalFobCbm > 0 ? (
+                    <span className="text-xs text-gray-400">
+                      FOB 總材積 {fmtCbm(data.totalFobCbm)}
+                    </span>
+                  ) : null}
+                </div>
               </div>
 
               <table className="w-full text-sm">
@@ -230,18 +240,18 @@ export default function FobAllocationPanel({ shipmentId }: { shipmentId: number 
                     <th className="text-left px-4 py-2 text-xs text-gray-400 font-normal">供應商 / 訂單</th>
                     <th className="text-center px-3 py-2 text-xs text-gray-400 font-normal">條款</th>
                     <th className="text-right px-3 py-2 text-xs text-gray-400 font-normal">未稅應付</th>
-                    <th className="text-right px-3 py-2 text-xs text-gray-400 font-normal">材積</th>
-                    <th className="text-right px-3 py-2 text-xs text-gray-400 font-normal">佔比</th>
+                    <th className="text-right px-3 py-2 text-xs text-gray-400 font-normal">採計材積</th>
+                    <th className="text-right px-3 py-2 text-xs text-gray-400 font-normal">佔比（全部）</th>
                     <th className="text-right px-4 py-2 text-xs text-gray-400 font-normal">應扣（未稅）</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {grouped.map(sup => (
                     <tr key={sup.supplierId}
-                        className={sup.isFob ? '' : 'opacity-40'}>
+                        className={sup.isFob ? '' : 'bg-gray-50/50'}>
                       {/* 供應商名稱 + PO 號（換行展示） */}
                       <td className="px-4 py-2.5">
-                        <div className="font-medium text-gray-800">{sup.supplierName}</div>
+                        <div className={`font-medium ${sup.isFob ? 'text-gray-800' : 'text-gray-500'}`}>{sup.supplierName}</div>
                         {sup.poNos.length > 0 && (
                           <div className="text-xs text-gray-400 font-mono mt-0.5">
                             {sup.poNos.join('、')}
@@ -261,10 +271,15 @@ export default function FobAllocationPanel({ shipmentId }: { shipmentId: number 
                         {fmtTWD(sup.amountTWD)}
                       </td>
                       <td className="px-3 py-2.5 text-right font-mono text-xs text-gray-600">
-                        {sup.isFob ? fmtCbm(sup.cbm) : '—'}
+                        {sup.cbm > 0 ? fmtCbm(sup.cbm) : '—'}
                       </td>
-                      <td className="px-3 py-2.5 text-right font-mono text-xs text-gray-600">
-                        {sup.isFob ? `${sup.cbmPct.toFixed(1)}%` : '—'}
+                      <td className="px-3 py-2.5 text-right font-mono text-xs">
+                        {sup.cbmPct > 0 ? (
+                          <span className={sup.isFob ? 'text-gray-700 font-semibold' : 'text-gray-400'}>
+                            {sup.cbmPct.toFixed(1)}%
+                            {!sup.isFob && <span className="text-gray-300 ml-0.5 font-normal">*</span>}
+                          </span>
+                        ) : '—'}
                       </td>
                       <td className="px-4 py-2.5 text-right">
                         {sup.isFob ? (
@@ -272,7 +287,7 @@ export default function FobAllocationPanel({ shipmentId }: { shipmentId: number 
                             −{fmtTWD(sup.totalDeductionTWD)}
                           </span>
                         ) : (
-                          <span className="text-gray-300 text-xs">不扣款</span>
+                          <span className="text-gray-300 text-xs">不分攤</span>
                         )}
                       </td>
                     </tr>
@@ -300,6 +315,13 @@ export default function FobAllocationPanel({ shipmentId }: { shipmentId: number 
                 </div>
               )}
             </div>
+          )}
+
+          {/* FOR 供應商佔比說明 */}
+          {grouped.some(g => !g.isFob && g.cbmPct > 0) && (
+            <p className="text-xs text-gray-400 px-1">
+              * FOR 供應商佔比僅供核對參考，費用由我方承擔，不向該供應商扣款。
+            </p>
           )}
 
           {/* ── 套用按鈕 ── */}
