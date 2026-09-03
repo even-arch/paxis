@@ -177,109 +177,76 @@ async function computeAllocation(
 
   // ── 材積資料抓取（ft³）────────────────────────────────────────────────────
   //
-  // 資料來源：出貨通知單（PO_ShippingNotice / PO_ShippingNoticeItem）
-  //   每張通知單對應一家供應商，品項列表就是這家供應商在本次出貨中要出的產品。
-  //   對應到 SLS_Item（裝箱單）：用 productId（主要）或 product.sku/rawSku（fallback）比對。
-  //   邏輯同 /api/print/shipping-notice/[id]，差別是這裡對每家供應商各做一次。
+  // 資料來源：出貨通知單（PO_ShippingNotice）
+  //   完全複製 /api/print/shipping-notice/[id] 的 filter 邏輯：
+  //     noticeSkus = notice.items.map(it => it.product.sku)
+  //     filter SLS_Item：rawSku ?? slsItem.product.sku ∈ noticeSkus
+  //     totalFt = sum(matched SLS_Items.cubicFt)
+  //   這個 totalFt 就是印刷路由在頁尾顯示的「本次出貨總材積」，是唯一可信的來源。
 
-  // Step 1: 抓此出貨的所有出貨通知單
+  // Step 1: 此出貨的所有出貨通知單（一家供應商一張）
   const shippingNotices = await prisma.pO_ShippingNotice.findMany({
     where: { sourceShipmentId: shipmentId },
     select: {
+      supplierId: true,
       items: {
         select: {
           poId: true,
           notifiedQuantity: true,
-          productId: true,
           product: { select: { sku: true } },
         },
       },
     },
   })
 
-  // Step 2: 抓裝箱單品項
+  // Step 2: 裝箱單所有品項（含 sku fallback 路徑）
   const slsItems = await prisma.sLS_Item.findMany({
     where: { shipmentId },
     select: {
       rawSku: true,
       cubicFt: true,
       cbm: true,
-      slsItemId: true,
-      slsItem: { select: { productId: true, product: { select: { sku: true } } } },
+      slsItem: { select: { product: { select: { sku: true } } } },
     },
   })
 
-  // Step 3: 建兩張查找表（互斥：有 slsItemId 走 productId，沒有走 rawSku）
-  //   productId → ft³  （有 slsItemId 的品項）
-  //   sku       → ft³  （無 slsItemId 的品項，用 rawSku）
-  const productFtMap = new Map<number, number>()
-  const rawSkuFtMap  = new Map<string, number>()
-
-  for (const item of slsItems) {
-    const ft = item.cubicFt
-      ? Number(item.cubicFt)
-      : item.cbm ? Number(item.cbm) * 35.3147 : 0
-    if (ft === 0) continue
-
-    if (item.slsItem?.productId) {
-      // 有 productId → 走精確路徑，不再放進 rawSku map（避免重複計算）
-      productFtMap.set(item.slsItem.productId, (productFtMap.get(item.slsItem.productId) ?? 0) + ft)
-    } else if (item.rawSku) {
-      // 無 productId → 只走 rawSku fallback
-      rawSkuFtMap.set(item.rawSku, (rawSkuFtMap.get(item.rawSku) ?? 0) + ft)
-    }
-  }
-
-  // Step 4: 從通知單建立 productId/sku → [{poId, qty}] 的反查表
-  const productPoNoticeMap = new Map<number, { poId: number; qty: number }[]>()
-  const skuPoNoticeMap     = new Map<string, { poId: number; qty: number }[]>()
-
-  for (const notice of shippingNotices) {
-    for (const it of notice.items) {
-      const pArr = productPoNoticeMap.get(it.productId) ?? []
-      pArr.push({ poId: it.poId, qty: it.notifiedQuantity })
-      productPoNoticeMap.set(it.productId, pArr)
-
-      if (it.product.sku) {
-        const sArr = skuPoNoticeMap.get(it.product.sku) ?? []
-        sArr.push({ poId: it.poId, qty: it.notifiedQuantity })
-        skuPoNoticeMap.set(it.product.sku, sArr)
-      }
-    }
-  }
-
-  // Step 5: 比例分配 helper
-  function distributeToPos(
-    ft: number,
-    pos: { poId: number; qty: number }[],
-    map: Map<number, number>,
-  ) {
-    if (ft === 0 || pos.length === 0) return
-    if (pos.length === 1) {
-      map.set(pos[0].poId, (map.get(pos[0].poId) ?? 0) + ft)
-      return
-    }
-    const totalQty = pos.reduce((s, p) => s + p.qty, 0)
-    for (const { poId, qty } of pos) {
-      const share = totalQty > 0 ? ft * qty / totalQty : ft / pos.length
-      map.set(poId, (map.get(poId) ?? 0) + share)
-    }
-  }
-
-  // Step 6: 計算每張 PO 的採計 ft³
+  // Step 3: 逐家供應商 → 複製 print route 的 filter → 算出 totalFt
+  //   同一 SKU 若出現在多家通知單（極罕見），各家都拿全部；需人工確認通知單是否正確。
+  //   同一供應商若有多張 PO，依各 PO notifiedQuantity 比例拆分。
   const poCubicFtMap = new Map<number, number>()
 
-  // 主要路徑：productId 比對
-  productFtMap.forEach((ft, productId) => {
-    const pos = productPoNoticeMap.get(productId)
-    if (pos?.length) distributeToPos(ft, pos, poCubicFtMap)
-  })
+  for (const notice of shippingNotices) {
+    // 和 print route 完全相同的 noticeSkus 建法
+    const noticeSkus = new Set<string>(
+      notice.items.map(it => it.product.sku).filter((s): s is string => !!s),
+    )
+    if (noticeSkus.size === 0) continue
 
-  // Fallback 路徑：rawSku 比對（僅針對無 productId 的品項）
-  rawSkuFtMap.forEach((ft, sku) => {
-    const pos = skuPoNoticeMap.get(sku)
-    if (pos?.length) distributeToPos(ft, pos, poCubicFtMap)
-  })
+    // 和 print route 完全相同的 filter
+    const totalFt = slsItems
+      .filter(it => {
+        const sku = it.rawSku ?? it.slsItem?.product?.sku
+        return sku != null && noticeSkus.has(sku)
+      })
+      .reduce((sum, it) => {
+        return sum + (it.cubicFt ? Number(it.cubicFt) : it.cbm ? Number(it.cbm) * 35.3147 : 0)
+      }, 0)
+
+    if (totalFt === 0) continue
+
+    // 按此供應商各 PO 的 notifiedQuantity 比例拆分 totalFt
+    const poQtyMap = new Map<number, number>()
+    for (const it of notice.items) {
+      if (it.product.sku && noticeSkus.has(it.product.sku)) {
+        poQtyMap.set(it.poId, (poQtyMap.get(it.poId) ?? 0) + it.notifiedQuantity)
+      }
+    }
+    const totalQty = Array.from(poQtyMap.values()).reduce((s, q) => s + q, 0)
+    poQtyMap.forEach((qty, poId) => {
+      const share = totalQty > 0 ? totalFt * qty / totalQty : totalFt
+      poCubicFtMap.set(poId, (poCubicFtMap.get(poId) ?? 0) + share)
+    })
+  }
 
   // ── 計算各 payable（供應商）的有效條款與採計材積 ─────────────────────────
 
