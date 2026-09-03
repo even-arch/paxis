@@ -123,8 +123,9 @@ export default function ShipmentPayablesPanel({
   const [applyingSuggKey, setApplyingSuggKey] = useState<string | null>(null)
   const [applyingAlloc, setApplyingAlloc] = useState(false)
   const [vatMap, setVatMap] = useState<Record<number, number>>({})
-  const [creatingVoucher, setCreatingVoucher] = useState<number | null>(null) // supplierId
+  const [creatingVoucher, setCreatingVoucher] = useState<number | null>(null) // supplierId（舊，保留供個別建單）
   const [createdFor, setCreatedFor] = useState<Set<number>>(new Set())        // supplierIds done
+  const [creatingAll, setCreatingAll] = useState(false)
   const [uploading, setUploading] = useState(false)
 
   // 手動調整材積
@@ -347,6 +348,97 @@ export default function ShipmentPayablesPanel({
     }
   }
 
+  // ── 一次建立全部未開通知單的供應商（解決按個別建立時 state 歸零的問題）────────
+  async function createAllVouchers() {
+    // 先確認哪些供應商還沒開單
+    const pending = supplierGroups.filter(
+      g => !g.payables.every(p => p.voucherInfo != null) && !createdFor.has(g.supplierId),
+    )
+    if (pending.length === 0) return
+
+    const names = pending.map(g => g.supplierName).join('、')
+    if (!confirm(`即將為以下供應商建立付款通知單：\n${names}\n\n確定繼續？`)) return
+
+    setCreatingAll(true); setError(''); setMsg('')
+
+    // Step 1：若有 ft³ 調整，先套用分攤並取得最新 allocMap
+    let currentAllocMap = allocMap
+    if (hasEdits) {
+      try {
+        const overrides: Record<string, number> = {}
+        for (const [sid, val] of Object.entries(editedCubicFt)) {
+          const n = parseFloat(val)
+          if (!isNaN(n) && n >= 0) overrides[sid] = n
+        }
+        const res = await fetch(`/api/shipments/${shipmentId}/fob-allocation`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ overrides }),
+        })
+        if (!res.ok) throw new Error(await safeErrMsg(res, 'FOB 分攤套用失敗'))
+        const data = await res.json()
+        currentAllocMap = buildAllocMap(data.suppliers ?? [])
+        setAllocMap(currentAllocMap)
+        setTotalAllCubicFt(data.totalAllCubicFt ?? 0)
+        setTotalFobCubicFt(data.totalFobCubicFt ?? 0)
+        setEditedCubicFt({})
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'FOB 分攤套用失敗')
+        setCreatingAll(false)
+        return
+      }
+    }
+
+    // Step 2：逐家建立付款通知單（sequential，失敗不中斷其他）
+    const created: string[] = []
+    const failed: string[] = []
+
+    for (const group of pending) {
+      const supplierPayables = group.payables.filter(p => !p.voucherInfo)
+      if (supplierPayables.length === 0) continue
+
+      const alloc = currentAllocMap.get(group.supplierId)
+      const isFob = isFobTerms(group.tradeTerms)
+      const deductionTWD = isFob ? (alloc?.totalDeductionTWD ?? 0) : 0
+      const vatPct = vatMap[group.supplierId] ?? 5
+
+      const adjustments = deductionTWD > 0 ? [{
+        name: `FOB 費用分攤（${shipmentNo}）`,
+        amountTWD: -deductionTWD,
+        category: 'LOGISTICS',
+        note: (alloc?.allocDetails ?? []).map(a => `${a.costItemName}: -NT$${a.allocatedTWD.toLocaleString()}`).join('; '),
+      }] : []
+
+      try {
+        const res = await fetch('/api/finance/payment-vouchers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            supplierId: group.supplierId,
+            payableIds: supplierPayables.map(p => p.id),
+            adjustments,
+            vatPct,
+            note: null,
+          }),
+        })
+        if (!res.ok) throw new Error(await safeErrMsg(res, '建立失敗'))
+        created.push(group.supplierName)
+        setCreatedFor(prev => new Set(Array.from(prev).concat(group.supplierId)))
+      } catch (err) {
+        failed.push(`${group.supplierName}：${err instanceof Error ? err.message : '建立失敗'}`)
+      }
+    }
+
+    setCreatingAll(false)
+    if (created.length > 0) {
+      setMsg(`✓ 已建立 ${created.join('、')} 的付款通知單`)
+      onVoucherCreated()  // 只在最後呼叫一次，避免中途重建 component 損失 state
+    }
+    if (failed.length > 0) {
+      setError(failed.join('\n'))
+    }
+  }
+
   // ── Derived ───────────────────────────────────────────────────────────────
   // Group payables by supplierId (a supplier may have multiple POs in this shipment)
   const supplierGroups = Array.from(
@@ -506,29 +598,36 @@ export default function ShipmentPayablesPanel({
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
             供應商付款
           </h3>
-          {costItems.length > 0 && fobGroupCount > 0 && (
-            <div className="flex items-center gap-2">
-              {voucherLocked ? (
-                <span className="text-xs text-gray-400">已有通知單送出，材積已鎖定</span>
-              ) : (
-                <>
-                  {hasEdits && (
-                    <button
-                      onClick={handleRecalc}
-                      className="text-xs px-3 py-1.5 rounded border border-amber-400 text-amber-700 bg-amber-50 hover:bg-amber-100">
-                      🔄 重新計算
-                    </button>
-                  )}
+          <div className="flex items-center gap-2">
+            {costItems.length > 0 && fobGroupCount > 0 && !voucherLocked && (
+              <>
+                {hasEdits && (
                   <button
-                    onClick={applyAllocation}
-                    disabled={applyingAlloc}
-                    className="text-xs px-3 py-1.5 rounded border border-teal-300 text-teal-700 hover:bg-teal-50 disabled:opacity-50">
-                    {applyingAlloc ? '套用中...' : '確認套用 FOB 分攤'}
+                    onClick={handleRecalc}
+                    className="text-xs px-3 py-1.5 rounded border border-amber-400 text-amber-700 bg-amber-50 hover:bg-amber-100">
+                    🔄 重新計算
                   </button>
-                </>
-              )}
-            </div>
-          )}
+                )}
+                <button
+                  onClick={applyAllocation}
+                  disabled={applyingAlloc}
+                  className="text-xs px-3 py-1.5 rounded border border-teal-300 text-teal-700 hover:bg-teal-50 disabled:opacity-50">
+                  {applyingAlloc ? '套用中...' : '確認套用 FOB 分攤'}
+                </button>
+              </>
+            )}
+            {voucherLocked && costItems.length > 0 && fobGroupCount > 0 && (
+              <span className="text-xs text-gray-400">已有通知單送出，材積已鎖定</span>
+            )}
+            {supplierGroups.some(g => !g.payables.every(p => p.voucherInfo != null) && !createdFor.has(g.supplierId)) && (
+              <button
+                onClick={createAllVouchers}
+                disabled={creatingAll}
+                className="text-xs px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap">
+                {creatingAll ? '建立中...' : '建立全部付款通知單'}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -671,12 +770,6 @@ export default function ShipmentPayablesPanel({
                             <option value={5}>含稅 5%</option>
                             <option value={0}>免稅</option>
                           </select>
-                          <button
-                            onClick={() => createVoucher(group.supplierId)}
-                            disabled={creatingVoucher === group.supplierId}
-                            className="text-xs px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap">
-                            {creatingVoucher === group.supplierId ? '建立中...' : '建立付款通知單'}
-                          </button>
                         </div>
                       )}
                     </td>
