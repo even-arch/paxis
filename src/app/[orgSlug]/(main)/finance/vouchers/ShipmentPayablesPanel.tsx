@@ -251,8 +251,9 @@ export default function ShipmentPayablesPanel({
     }
   }
 
-  // ── 手動調整材積後重新計算（pure client-side）────────────────────────────
-  function handleRecalc() {
+  // ── 重新計算並直接儲存到 DB ───────────────────────────────────────────────
+  async function handleRecalc() {
+    // 1. client-side 立即預覽（使用者馬上看到新數字）
     const adjustedFt = new Map<number, number>()
     allocMap.forEach((entry, sid) => {
       const override = editedCubicFt[sid]
@@ -278,6 +279,32 @@ export default function ShipmentPayablesPanel({
     setAllocMap(newAllocMap)
     setTotalAllCubicFt(newTotalAll)
     setTotalFobCubicFt(Array.from(newAllocMap.values()).filter(e => e.isFob).reduce((s, e) => s + e.cubicFt, 0))
+
+    // 2. 儲存到 DB（如此建立通知單時拿到的是正確數字）
+    setApplyingAlloc(true); setError('')
+    try {
+      const overrides: Record<string, number> = {}
+      for (const [sid, val] of Object.entries(editedCubicFt)) {
+        const n = parseFloat(val)
+        if (!isNaN(n) && n >= 0) overrides[sid] = n
+      }
+      const res = await fetch(`/api/shipments/${shipmentId}/fob-allocation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ overrides }),
+      })
+      if (!res.ok) throw new Error(await safeErrMsg(res, '儲存失敗'))
+      const data = await res.json()
+      setAllocMap(buildAllocMap(data.suppliers ?? []))
+      setTotalAllCubicFt(data.totalAllCubicFt ?? 0)
+      setTotalFobCubicFt(data.totalFobCubicFt ?? 0)
+      setEditedCubicFt({})
+      setMsg('✓ 材積已儲存')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '儲存失敗')
+    } finally {
+      setApplyingAlloc(false)
+    }
   }
 
   // ── Apply FOB allocation to DB ────────────────────────────────────────────
@@ -642,8 +669,9 @@ export default function ShipmentPayablesPanel({
                 {hasEdits && (
                   <button
                     onClick={handleRecalc}
-                    className="text-xs px-3 py-1.5 rounded border border-amber-400 text-amber-700 bg-amber-50 hover:bg-amber-100">
-                    🔄 重新計算
+                    disabled={applyingAlloc}
+                    className="text-xs px-3 py-1.5 rounded border border-amber-400 text-amber-700 bg-amber-50 hover:bg-amber-100 disabled:opacity-50">
+                    {applyingAlloc ? '儲存中...' : '🔄 重新計算'}
                   </button>
                 )}
                 <button

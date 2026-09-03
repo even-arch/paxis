@@ -157,7 +157,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     })
   }
 
-  const updatedResult = await computeAllocation(prisma, shipmentId)
+  // 回傳時帶入同樣的 overrides，確保 response 反映使用者輸入的材積
+  const updatedResult = await computeAllocation(prisma, shipmentId, cubicFtOverrides)
   return NextResponse.json({ ok: true, ...updatedResult })
 }
 
