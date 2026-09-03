@@ -3,7 +3,7 @@
  *
  * GET  /api/shipments/[id]/fob-allocation
  *   計算並預覽本次出貨的 FOB 費用分攤結果（不寫入 DB）
- *   回傳：各供應商的材積、百分比、各費用項目的應扣金額、是否 FOB
+ *   回傳：各供應商的材積（ft³）、佔比、各費用項目的應扣金額、是否 FOB
  *
  * POST /api/shipments/[id]/fob-allocation
  *   確認並套用分攤結果：
@@ -15,9 +15,12 @@
  *   - 從 FIN_Payable 取得此出貨的所有 PO（含供應商）
  *   - 判斷每張 PO 的交易條件：PO.tradeTerms ?? SUP_Supplier.defaultTradeTerms
  *   - 分母 = 全部出貨供應商材積（FOB + FOR），代表這批出貨的 100%
- *   - 每家 FOB 供應商的比例 = 自身材積 / 全部出貨材積（FOR 那份由我們承擔，不向 FOR 收取）
- *   - 材積來源：SLS_Item.cbm，以 rawSku 對應到各 PO 的 PO_Item.product.sku
- *   - 若 FOB 供應商完全無 CBM 資料，改以各 PO amountTWD 比例分攤（fallback，分母亦為全部供應商）
+ *   - FOB 供應商的比例 = 自身材積 / 全部出貨材積（FOR 那份由我們承擔，不向 FOR 收取）
+ *   - 材積來源：SLS_Item.cubicFt（ft³，Patisco 原始值）
+ *   - 比對路徑：SLS_Item.slsItemId → PO_CustomerCopy_Item.productId → PO_Item.productId
+ *     （避免依賴 rawSku 字串比對，客戶 SKU 格式與內部 SKU 不一致時會抓不到資料）
+ *   - 若 slsItemId 為 null，fallback 用 rawSku 對 product.sku 比對
+ *   - 若 FOB 供應商完全無材積資料，改以各 PO amountTWD 比例分攤
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -34,20 +37,19 @@ interface SupplierInfo {
   supplierName: string
   poId: number | null
   poNo: string | null
-  tradeTerms: string | null   // 最終有效條款（PO 覆蓋 → 供應商預設）
-  amountTWD: number           // FIN_Payable.amountTWD（作為 fallback 基準）
-  cbm: number                 // 匹配到的材積
-  cbmPct: number              // 佔全部出貨材積的 %（FOR 供應商此欄為 0；分母含 FOR）
+  tradeTerms: string | null
+  amountTWD: number
+  cubicFt: number          // 採計材積（ft³）
+  cbmPct: number           // 佔全部出貨材積的 %（分母含 FOR）
   isFob: boolean
-  allocations: {              // 每筆費用分攤明細
+  allocations: {
     costItemId: number
     costItemName: string
     allocatedTWD: number
   }[]
-  totalDeductionTWD: number   // 此供應商全部費用加總
+  totalDeductionTWD: number
 }
 
-// 判斷是否為 FOB（含 FOB 及其衍生條款）
 function isFobTerms(terms: string | null | undefined): boolean {
   if (!terms) return false
   const t = terms.toUpperCase().trim()
@@ -108,11 +110,10 @@ export async function POST(_req: NextRequest, { params }: Params) {
             costItemId:   alloc.costItemId,
             supplierId:   sup.supplierId,
             poId:         sup.poId,
-            cbm:          new Decimal(sup.cbm.toFixed(6)),
+            cubicFt:      new Decimal(sup.cubicFt.toFixed(4)),
             cbmPct:       new Decimal(sup.cbmPct.toFixed(4)),
             allocatedTWD: new Decimal(alloc.allocatedTWD.toFixed(0)),
             applied:      true,
-            // 找對應的 FIN_Payable
             payableId: sup.poId
               ? (await tx.fIN_Payable.findUnique({
                   where: { shipmentId_poId: { shipmentId, poId: sup.poId } },
@@ -173,53 +174,72 @@ async function computeAllocation(
     },
   })
 
-  // 取得此出貨的 SLS_Item（材積資料）
+  // ── 材積資料抓取（ft³）────────────────────────────────────────────────────
+  //
+  // 正確路徑：SLS_Item.slsItemId → PO_CustomerCopy_Item.productId
+  // 用 productId 比對 PO_Item.productId，避免靠 rawSku 字串比對
+  // （rawSku 是 Patisco 客戶 SKU，格式與內部 product.sku 不一致）
+
   const slsItems = await prisma.sLS_Item.findMany({
     where: { shipmentId },
-    select: { rawSku: true, cbm: true, cubicFt: true, quantity: true },
+    select: {
+      rawSku: true,
+      cubicFt: true,
+      cbm: true,
+      slsItemId: true,
+      slsItem: { select: { productId: true } },
+    },
   })
 
-  // 建立 SKU → 材積 map（rawSku → 各 SLS_Item 的 cbm 合計）
-  const skuCbmMap = new Map<string, number>()
-  for (const item of slsItems) {
-    if (!item.rawSku) continue
-    const cbmValue = item.cbm
-      ? Number(item.cbm)
-      : item.cubicFt
-        ? Number(item.cubicFt) * 0.028317
-        : 0
-    skuCbmMap.set(item.rawSku, (skuCbmMap.get(item.rawSku) ?? 0) + cbmValue)
-  }
+  // 建立兩張查找表：
+  //   productId → 該產品在本次出貨的總 ft³（主要路徑）
+  //   rawSku → 總 ft³（fallback：slsItemId 為 null 時用）
+  const productCubicFtMap = new Map<number, number>()
+  const skuCubicFtMap = new Map<string, number>()
 
-  // 為每張 PO 拉取品項的 product.sku
-  const poProductSkus = new Map<number, { sku: string; quantity: number }[]>()
-  if (payables.some(p => p.poId)) {
-    const poIds = payables.map(p => p.poId).filter(Boolean) as number[]
-    const poItems = await prisma.pO_Item.findMany({
-      where: { orderId: { in: poIds } },
-      select: { orderId: true, quantity: true, product: { select: { sku: true } } },
-    })
-    for (const item of poItems) {
-      if (!item.product.sku) continue
-      const existing = poProductSkus.get(item.orderId) ?? []
-      existing.push({ sku: item.product.sku, quantity: item.quantity })
-      poProductSkus.set(item.orderId, existing)
+  for (const item of slsItems) {
+    // ft³ 優先；cbm 轉換 fallback（1 m³ = 35.3147 ft³）
+    const ft = item.cubicFt
+      ? Number(item.cubicFt)
+      : item.cbm ? Number(item.cbm) * 35.3147 : 0
+
+    if (item.slsItem?.productId) {
+      productCubicFtMap.set(
+        item.slsItem.productId,
+        (productCubicFtMap.get(item.slsItem.productId) ?? 0) + ft,
+      )
+    } else if (item.rawSku) {
+      skuCubicFtMap.set(item.rawSku, (skuCubicFtMap.get(item.rawSku) ?? 0) + ft)
     }
   }
 
-  // 計算每個 payable（供應商在本次出貨）的有效交易條款與材積
+  // 取得各 PO 的品項（productId + product.sku 供 fallback）
+  const poIds = payables.map(p => p.poId).filter(Boolean) as number[]
+  const poItems = poIds.length > 0
+    ? await prisma.pO_Item.findMany({
+        where: { orderId: { in: poIds } },
+        select: { orderId: true, productId: true, product: { select: { sku: true } } },
+      })
+    : []
+
+  // 計算每張 PO 的總採計 ft³
+  const poCubicFtMap = new Map<number, number>()
+  for (const item of poItems) {
+    // 主要路徑：productId 比對
+    let ft = productCubicFtMap.get(item.productId) ?? 0
+    // Fallback：product.sku 對 rawSku（主要路徑找不到時）
+    if (ft === 0 && item.product.sku) {
+      ft = skuCubicFtMap.get(item.product.sku) ?? 0
+    }
+    poCubicFtMap.set(item.orderId, (poCubicFtMap.get(item.orderId) ?? 0) + ft)
+  }
+
+  // ── 計算各 payable（供應商）的有效條款與採計材積 ─────────────────────────
+
   const supplierInfos: SupplierInfo[] = payables.map(p => {
     const effectiveTerms = p.po?.tradeTerms ?? p.supplier.defaultTradeTerms
     const isFob = isFobTerms(effectiveTerms)
-
-    // 計算此供應商在本次出貨的 CBM
-    let cbm = 0
-    if (p.poId) {
-      const skusForPo = poProductSkus.get(p.poId) ?? []
-      for (const { sku } of skusForPo) {
-        cbm += skuCbmMap.get(sku) ?? 0
-      }
-    }
+    const cubicFt = p.poId ? (poCubicFtMap.get(p.poId) ?? 0) : 0
 
     return {
       supplierId:        p.supplier.id,
@@ -228,41 +248,38 @@ async function computeAllocation(
       poNo:              p.po?.poNo ?? null,
       tradeTerms:        effectiveTerms ?? null,
       amountTWD:         Number(p.amountTWD),
-      cbm,
-      cbmPct:            0,    // 後面計算
+      cubicFt,
+      cbmPct:            0,
       isFob,
-      allocations:       [],   // 後面計算
-      totalDeductionTWD: 0,    // 後面計算
+      allocations:       [],
+      totalDeductionTWD: 0,
     }
   })
 
-  // 計算 CBM 比例
-  // 分母 = 全部出貨供應商材積（含 FOR），FOB 只收自己那一份；FOR 那份由我們承擔
-  const fobSuppliers = supplierInfos.filter(s => s.isFob)
-  const totalFobCbm = fobSuppliers.reduce((sum, s) => sum + s.cbm, 0)
-  const totalAllCbm = supplierInfos.reduce((sum, s) => sum + s.cbm, 0)   // 分母
-  const totalAllAmount = supplierInfos.reduce((sum, s) => sum + s.amountTWD, 0) // fallback 分母
+  // ── 計算佔比（分母 = 全部供應商材積，含 FOR）─────────────────────────────
 
-  // fallback：若 FOB 供應商全無 CBM 資料，改以金額比例分攤
+  const fobSuppliers = supplierInfos.filter(s => s.isFob)
+  const totalFobCubicFt = fobSuppliers.reduce((sum, s) => sum + s.cubicFt, 0)
+  const totalAllCubicFt = supplierInfos.reduce((sum, s) => sum + s.cubicFt, 0)
+  const totalAllAmount  = supplierInfos.reduce((sum, s) => sum + s.amountTWD, 0)
+
   let usedCbmFallback = false
-  if (totalFobCbm === 0 && fobSuppliers.length > 0) {
+
+  if (totalFobCubicFt === 0 && fobSuppliers.length > 0) {
+    // Fallback：FOB 供應商全無材積，改以金額比例分攤
     usedCbmFallback = true
-    // fallback 亦以全部供應商金額為分母，FOB 只收自己那份
-    for (const sup of fobSuppliers) {
-      sup.cbmPct = totalAllAmount > 0 ? (sup.amountTWD / totalAllAmount) * 100 : 0
-    }
-    // FOR 供應商亦以金額比例顯示（參考用，不扣款）
-    for (const sup of supplierInfos.filter(s => !s.isFob)) {
+    for (const sup of supplierInfos) {
       sup.cbmPct = totalAllAmount > 0 ? (sup.amountTWD / totalAllAmount) * 100 : 0
     }
   } else {
     // 正常路徑：以全部出貨總材積為分母，全部供應商都算出參考佔比
     for (const sup of supplierInfos) {
-      sup.cbmPct = totalAllCbm > 0 ? (sup.cbm / totalAllCbm) * 100 : 0
+      sup.cbmPct = totalAllCubicFt > 0 ? (sup.cubicFt / totalAllCubicFt) * 100 : 0
     }
   }
 
-  // 計算各費用項目對各 FOB 供應商的分攤金額
+  // ── 計算各費用項目對各 FOB 供應商的分攤金額 ──────────────────────────────
+
   const totalCostTWD = costItems.reduce((sum, i) => sum + Number(i.amountTWD), 0)
   for (const sup of fobSuppliers) {
     sup.allocations = costItems.map(item => ({
@@ -274,11 +291,11 @@ async function computeAllocation(
   }
 
   return {
-    suppliers:       supplierInfos,
-    costItems:       costItems.map(i => ({ id: i.id, name: i.name, amountTWD: Number(i.amountTWD) })),
+    suppliers:        supplierInfos,
+    costItems:        costItems.map(i => ({ id: i.id, name: i.name, amountTWD: Number(i.amountTWD) })),
     totalCostTWD,
-    totalFobCbm,
-    totalAllCbm,
+    totalFobCubicFt,
+    totalAllCubicFt,
     usedCbmFallback,
   }
 }

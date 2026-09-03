@@ -32,7 +32,7 @@ const VOUCHER_STATUS_ZH: Record<string, string> = {
 type AllocEntry = {
   supplierId: number
   isFob: boolean
-  cbm: number
+  cubicFt: number
   cbmPct: number
   totalDeductionTWD: number
   allocDetails: { costItemName: string; allocatedTWD: number }[]
@@ -52,14 +52,14 @@ function isFobTerms(terms: string | null | undefined) {
 
 // Group per-PO alloc entries by supplierId
 function buildAllocMap(suppliers: {
-  supplierId: number; isFob: boolean; cbm: number; cbmPct: number; totalDeductionTWD: number
+  supplierId: number; isFob: boolean; cubicFt: number; cbmPct: number; totalDeductionTWD: number
   allocations: { costItemName: string; allocatedTWD: number }[]
 }[]): Map<number, AllocEntry> {
   const map = new Map<number, AllocEntry>()
   for (const s of suppliers) {
     const existing = map.get(s.supplierId)
     if (existing) {
-      existing.cbm += s.cbm
+      existing.cubicFt += s.cubicFt
       existing.cbmPct += s.cbmPct
       existing.totalDeductionTWD += s.totalDeductionTWD
       for (const a of s.allocations) {
@@ -71,7 +71,7 @@ function buildAllocMap(suppliers: {
       map.set(s.supplierId, {
         supplierId: s.supplierId,
         isFob: s.isFob,
-        cbm: s.cbm,
+        cubicFt: s.cubicFt,
         cbmPct: s.cbmPct,
         totalDeductionTWD: s.totalDeductionTWD,
         allocDetails: s.allocations.map(a => ({ ...a })),
@@ -103,8 +103,8 @@ export default function ShipmentPayablesPanel({
   const [suggestions, setSuggestions] = useState<FreightSuggestion[]>([])
   const [allocMap, setAllocMap] = useState<Map<number, AllocEntry>>(new Map())
   const [usedCbmFallback, setUsedCbmFallback] = useState(false)
-  const [totalFobCbm, setTotalFobCbm] = useState(0)
-  const [totalAllCbm, setTotalAllCbm] = useState(0)
+  const [totalFobCubicFt, setTotalFobCubicFt] = useState(0)
+  const [totalAllCubicFt, setTotalAllCubicFt] = useState(0)
   const [totalCostTWD, setTotalCostTWD] = useState(0)
 
   // Form state
@@ -138,8 +138,8 @@ export default function ShipmentPayablesPanel({
         const data = await allocRes.json()
         setAllocMap(buildAllocMap(data.suppliers ?? []))
         setUsedCbmFallback(data.usedCbmFallback ?? false)
-        setTotalFobCbm(data.totalFobCbm ?? 0)
-        setTotalAllCbm(data.totalAllCbm ?? 0)
+        setTotalFobCubicFt(data.totalFobCubicFt ?? 0)
+        setTotalAllCubicFt(data.totalAllCubicFt ?? 0)
         setTotalCostTWD(data.totalCostTWD ?? 0)
       }
       if (docsRes.ok) {
@@ -436,9 +436,9 @@ export default function ShipmentPayablesPanel({
         {usedCbmFallback && costItems.length > 0 && (
           <p className="text-xs text-amber-600 mt-2">⚠ 無材積（CBM）資料，改以應付金額比例分攤（分母為全部供應商）</p>
         )}
-        {!usedCbmFallback && totalAllCbm > 0 && (
+        {!usedCbmFallback && totalAllCubicFt > 0 && (
           <p className="text-xs text-gray-400 mt-2">
-            出貨總材積 {totalAllCbm.toFixed(4)} m³（分母）；其中 FOB {totalFobCbm.toFixed(4)} m³（{((totalFobCbm / totalAllCbm) * 100).toFixed(1)}%）、FOR {(totalAllCbm - totalFobCbm).toFixed(4)} m³（{(((totalAllCbm - totalFobCbm) / totalAllCbm) * 100).toFixed(1)}%*）。
+            出貨總材積 {totalAllCubicFt.toFixed(2)} ft³（分母）；其中 FOB {totalFobCubicFt.toFixed(2)} ft³（{((totalFobCubicFt / totalAllCubicFt) * 100).toFixed(1)}%）、FOR {(totalAllCubicFt - totalFobCubicFt).toFixed(2)} ft³（{(((totalAllCubicFt - totalFobCubicFt) / totalAllCubicFt) * 100).toFixed(1)}%*）。
             * FOR 供應商佔比僅供核對，費用由我方承擔，不扣款。
           </p>
         )}
@@ -498,11 +498,11 @@ export default function ShipmentPayablesPanel({
                         </div>
                       )}
                       {/* 材積 / 採計佔比（全部供應商都顯示） */}
-                      {alloc && (alloc.cbm > 0 || alloc.cbmPct > 0) && (
+                      {alloc && (alloc.cubicFt > 0 || alloc.cbmPct > 0) && (
                         <div className="text-xs mt-0.5">
-                          {alloc.cbm > 0 && (
+                          {alloc.cubicFt > 0 && (
                             <span className="text-gray-400 font-mono">
-                              採計 {alloc.cbm.toFixed(4)} m³
+                              採計 {alloc.cubicFt.toFixed(2)} ft³
                             </span>
                           )}
                           {alloc.cbmPct > 0 && (
