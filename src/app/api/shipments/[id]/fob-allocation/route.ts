@@ -213,25 +213,60 @@ async function computeAllocation(
     }
   }
 
-  // 取得各 PO 的品項（productId + product.sku 供 fallback）
+  // 取得各 PO 的品項（productId + quantity + product.sku 供 fallback）
   const poIds = payables.map(p => p.poId).filter(Boolean) as number[]
   const poItems = poIds.length > 0
     ? await prisma.pO_Item.findMany({
         where: { orderId: { in: poIds } },
-        select: { orderId: true, productId: true, product: { select: { sku: true } } },
+        select: { orderId: true, productId: true, quantity: true, product: { select: { sku: true } } },
       })
     : []
 
-  // 計算每張 PO 的總採計 ft³
-  const poCubicFtMap = new Map<number, number>()
+  // 建立兩張反查表：
+  //   productId → [{poId, quantity}]  用於比例分配（主要路徑）
+  //   sku → [{poId, quantity}]        用於比例分配（fallback）
+  const productPoQtyMap = new Map<number, { poId: number; quantity: number }[]>()
+  const skuPoQtyMap = new Map<string, { poId: number; quantity: number }[]>()
   for (const item of poItems) {
-    // 主要路徑：productId 比對
-    let ft = productCubicFtMap.get(item.productId) ?? 0
-    // Fallback：product.sku 對 rawSku（主要路徑找不到時）
-    if (ft === 0 && item.product.sku) {
-      ft = skuCubicFtMap.get(item.product.sku) ?? 0
+    const idArr = productPoQtyMap.get(item.productId) ?? []
+    idArr.push({ poId: item.orderId, quantity: item.quantity })
+    productPoQtyMap.set(item.productId, idArr)
+    if (item.product.sku) {
+      const skuArr = skuPoQtyMap.get(item.product.sku) ?? []
+      skuArr.push({ poId: item.orderId, quantity: item.quantity })
+      skuPoQtyMap.set(item.product.sku, skuArr)
     }
-    poCubicFtMap.set(item.orderId, (poCubicFtMap.get(item.orderId) ?? 0) + ft)
+  }
+
+  // 將 totalFt 依各 PO 數量比例分配
+  // 若只有一家 PO 有該產品 → 全部歸它
+  // 若多家 PO 都有該產品 → 按 PO_Item.quantity 比例拆分（避免雙重計算）
+  function distributeToPos(
+    totalFt: number,
+    pos: { poId: number; quantity: number }[],
+    map: Map<number, number>,
+  ) {
+    if (totalFt === 0 || pos.length === 0) return
+    if (pos.length === 1) {
+      map.set(pos[0].poId, (map.get(pos[0].poId) ?? 0) + totalFt)
+      return
+    }
+    const totalQty = pos.reduce((s, p) => s + p.quantity, 0)
+    for (const { poId, quantity } of pos) {
+      const share = totalQty > 0 ? totalFt * quantity / totalQty : totalFt / pos.length
+      map.set(poId, (map.get(poId) ?? 0) + share)
+    }
+  }
+
+  // 計算每張 PO 的總採計 ft³（比例分配版）
+  const poCubicFtMap = new Map<number, number>()
+  for (const [productId, totalFt] of productCubicFtMap) {
+    const pos = productPoQtyMap.get(productId)
+    if (pos) distributeToPos(totalFt, pos, poCubicFtMap)
+  }
+  for (const [sku, totalFt] of skuCubicFtMap) {
+    const pos = skuPoQtyMap.get(sku)
+    if (pos) distributeToPos(totalFt, pos, poCubicFtMap)
   }
 
   // ── 計算各 payable（供應商）的有效條款與採計材積 ─────────────────────────

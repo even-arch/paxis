@@ -1,11 +1,10 @@
 // GET /api/v1/inventory — POS 系統查詢所有庫存水位
 import { NextRequest, NextResponse } from 'next/server'
-import { getRequestPrisma } from '@/lib/request-db'
+import { prisma } from '@/lib/db'
 import { verifyPosApiKey } from '@/lib/posAuth'
 
 export async function GET(req: NextRequest) {
-  const prisma = await getRequestPrisma()
-    if (!verifyPosApiKey(req)) {
+  if (!verifyPosApiKey(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
