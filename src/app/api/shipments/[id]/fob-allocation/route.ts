@@ -260,14 +260,14 @@ async function computeAllocation(
 
   // 計算每張 PO 的總採計 ft³（比例分配版）
   const poCubicFtMap = new Map<number, number>()
-  for (const [productId, totalFt] of productCubicFtMap) {
+  productCubicFtMap.forEach((totalFt, productId) => {
     const pos = productPoQtyMap.get(productId)
     if (pos) distributeToPos(totalFt, pos, poCubicFtMap)
-  }
-  for (const [sku, totalFt] of skuCubicFtMap) {
+  })
+  skuCubicFtMap.forEach((totalFt, sku) => {
     const pos = skuPoQtyMap.get(sku)
     if (pos) distributeToPos(totalFt, pos, poCubicFtMap)
-  }
+  })
 
   // ── 計算各 payable（供應商）的有效條款與採計材積 ─────────────────────────
 
