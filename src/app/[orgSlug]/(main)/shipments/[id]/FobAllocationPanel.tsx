@@ -17,7 +17,7 @@ type SupplierAlloc = {
   poNo: string | null
   tradeTerms: string | null
   amountTWD: number
-  cbm: number
+  cubicFt: number
   cbmPct: number
   isFob: boolean
   allocations: {
@@ -34,9 +34,9 @@ type GroupedSupplier = {
   supplierName: string
   tradeTerms: string | null
   isFob: boolean
-  amountTWD: number        // 所有 PO 未稅合計
-  cbm: number              // 合計材積
-  cbmPct: number           // 佔比（各 PO 加總）
+  amountTWD: number
+  cubicFt: number
+  cbmPct: number
   totalDeductionTWD: number
   poNos: string[]
   allocations: { costItemId: number; costItemName: string; allocatedTWD: number }[]
@@ -46,8 +46,8 @@ type AllocationData = {
   suppliers: SupplierAlloc[]
   costItems: CostItem[]
   totalCostTWD: number
-  totalFobCbm: number
-  totalAllCbm: number
+  totalFobCubicFt: number
+  totalAllCubicFt: number
   usedCbmFallback: boolean
 }
 
@@ -55,8 +55,8 @@ function fmtTWD(n: number) {
   return `NT$ ${n.toLocaleString()}`
 }
 
-function fmtCbm(n: number) {
-  return n === 0 ? '—' : `${n.toFixed(4)} m³`
+function fmtFt(n: number) {
+  return n === 0 ? '—' : `${n.toFixed(2)} ft³`
 }
 
 function groupBySupplier(suppliers: SupplierAlloc[]): GroupedSupplier[] {
@@ -65,11 +65,10 @@ function groupBySupplier(suppliers: SupplierAlloc[]): GroupedSupplier[] {
     const existing = map.get(sup.supplierId)
     if (existing) {
       existing.amountTWD += sup.amountTWD
-      existing.cbm += sup.cbm
+      existing.cubicFt += sup.cubicFt
       existing.cbmPct += sup.cbmPct
       existing.totalDeductionTWD += sup.totalDeductionTWD
       if (sup.poNo) existing.poNos.push(sup.poNo)
-      // 合併費用明細（同 costItemId 加總）
       for (const alloc of sup.allocations) {
         const ex = existing.allocations.find(a => a.costItemId === alloc.costItemId)
         if (ex) ex.allocatedTWD += alloc.allocatedTWD
@@ -82,7 +81,7 @@ function groupBySupplier(suppliers: SupplierAlloc[]): GroupedSupplier[] {
         tradeTerms: sup.tradeTerms,
         isFob: sup.isFob,
         amountTWD: sup.amountTWD,
-        cbm: sup.cbm,
+        cubicFt: sup.cubicFt,
         cbmPct: sup.cbmPct,
         totalDeductionTWD: sup.totalDeductionTWD,
         poNos: sup.poNo ? [sup.poNo] : [],
@@ -90,7 +89,6 @@ function groupBySupplier(suppliers: SupplierAlloc[]): GroupedSupplier[] {
       })
     }
   }
-  // FOB 供應商排前面，FOR 在後
   return Array.from(map.values()).sort((a, b) => Number(b.isFob) - Number(a.isFob))
 }
 
@@ -220,15 +218,15 @@ export default function FobAllocationPanel({ shipmentId }: { shipmentId: number 
                       ⚠ 無材積資料，以金額比例分攤
                     </span>
                   ) : null}
-                  {data.totalAllCbm > 0 ? (
+                  {data.totalAllCubicFt > 0 ? (
                     <span className="text-xs text-gray-500 font-mono">
-                      出貨總材積 {fmtCbm(data.totalAllCbm)}
-                      {data.totalFobCbm > 0 && data.totalFobCbm < data.totalAllCbm &&
-                        `（FOB ${fmtCbm(data.totalFobCbm)}）`}
+                      出貨總材積 {fmtFt(data.totalAllCubicFt)}
+                      {data.totalFobCubicFt > 0 && data.totalFobCubicFt < data.totalAllCubicFt &&
+                        `（FOB ${fmtFt(data.totalFobCubicFt)}）`}
                     </span>
-                  ) : data.totalFobCbm > 0 ? (
+                  ) : data.totalFobCubicFt > 0 ? (
                     <span className="text-xs text-gray-400">
-                      FOB 總材積 {fmtCbm(data.totalFobCbm)}
+                      FOB 總材積 {fmtFt(data.totalFobCubicFt)}
                     </span>
                   ) : null}
                 </div>
@@ -240,7 +238,7 @@ export default function FobAllocationPanel({ shipmentId }: { shipmentId: number 
                     <th className="text-left px-4 py-2 text-xs text-gray-400 font-normal">供應商 / 訂單</th>
                     <th className="text-center px-3 py-2 text-xs text-gray-400 font-normal">條款</th>
                     <th className="text-right px-3 py-2 text-xs text-gray-400 font-normal">未稅應付</th>
-                    <th className="text-right px-3 py-2 text-xs text-gray-400 font-normal">採計材積</th>
+                    <th className="text-right px-3 py-2 text-xs text-gray-400 font-normal">採計材積（ft³）</th>
                     <th className="text-right px-3 py-2 text-xs text-gray-400 font-normal">佔比（全部）</th>
                     <th className="text-right px-4 py-2 text-xs text-gray-400 font-normal">應扣（未稅）</th>
                   </tr>
@@ -271,7 +269,7 @@ export default function FobAllocationPanel({ shipmentId }: { shipmentId: number 
                         {fmtTWD(sup.amountTWD)}
                       </td>
                       <td className="px-3 py-2.5 text-right font-mono text-xs text-gray-600">
-                        {sup.cbm > 0 ? fmtCbm(sup.cbm) : '—'}
+                        {sup.cubicFt > 0 ? fmtFt(sup.cubicFt) : '—'}
                       </td>
                       <td className="px-3 py-2.5 text-right font-mono text-xs">
                         {sup.cbmPct > 0 ? (
@@ -318,7 +316,7 @@ export default function FobAllocationPanel({ shipmentId }: { shipmentId: number 
           )}
 
           {/* FOR 供應商佔比說明 */}
-          {grouped.some(g => !g.isFob && g.cbmPct > 0) && (
+          {grouped.some(g => !g.isFob && g.cubicFt > 0) && (
             <p className="text-xs text-gray-400 px-1">
               * FOR 供應商佔比僅供核對參考，費用由我方承擔，不向該供應商扣款。
             </p>
