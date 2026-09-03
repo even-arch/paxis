@@ -57,7 +57,14 @@ export default async function ShippingNoticeDetailPage({
       ))
     : []
 
-  // ── 材積計算（依 SKU 從 SLS_Item 拉取，邏輯與印刷路由相同）────────────────
+  // ── 材積計算（完全複製印刷路由邏輯：cubicFt 是每箱值，需乘以箱數）─────────
+  // boxCount：依 cartonNoFrom/To 範圍算箱數，與 /print/sn 的 boxCount() 一致
+  function boxCount(from: string | null, to: string | null, cartons: number | null): number {
+    const f = parseInt(from ?? '0') || 0
+    const t = parseInt(to ?? from ?? '0') || f
+    return f > 0 ? Math.max(1, t - f + 1) : (cartons ?? 1)
+  }
+
   let itemCubicFt: number[] = notice.items.map(() => 0)
   let totalCubicFt = 0
 
@@ -68,25 +75,44 @@ export default async function ShippingNoticeDetailPage({
         rawSku: true,
         cubicFt: true,
         cbm: true,
+        cartons: true,
+        cartonNoFrom: true,
+        cartonNoTo: true,
+        pi: { select: { piNo: true } },
         slsItem: { select: { product: { select: { sku: true } } } },
       },
+      orderBy: [{ piId: 'asc' }, { id: 'asc' }],
     })
 
-    // SKU → total ft³（同印刷路由 filter）
+    // 僅保留此通知單涉及的 SKU（與印刷路由 filter 完全相同）
+    const noticeSkus = new Set(notice.items.map(it => it.product.sku).filter((s): s is string => !!s))
+    const filtered = slsItems.filter(it => {
+      const sku = it.rawSku ?? it.slsItem?.product?.sku
+      return sku != null && noticeSkus.has(sku)
+    })
+
+    // 總計：每箱 cubicFt × 箱數；依 piNo:cartonNoFrom 去重（同箱含多 SKU 時不重複算）
+    const seen = new Set<string>()
+    filtered.forEach((it, idx) => {
+      const key = `${it.pi?.piNo ?? ''}:${it.cartonNoFrom ?? `__null_${idx}`}`
+      if (seen.has(key)) return
+      seen.add(key)
+      const boxes = boxCount(it.cartonNoFrom, it.cartonNoTo, it.cartons)
+      const ft = it.cubicFt ? Number(it.cubicFt) * boxes : it.cbm ? Number(it.cbm) * 35.3147 * boxes : 0
+      totalCubicFt += ft
+    })
+
+    // 每 SKU 累計（不去重）：用於在通知單品項列顯示
     const skuFtMap = new Map<string, number>()
-    for (const it of slsItems) {
+    for (const it of filtered) {
       const sku = it.rawSku ?? it.slsItem?.product?.sku
       if (!sku) continue
-      const ft = it.cubicFt ? Number(it.cubicFt) : it.cbm ? Number(it.cbm) * 35.3147 : 0
+      const boxes = boxCount(it.cartonNoFrom, it.cartonNoTo, it.cartons)
+      const ft = it.cubicFt ? Number(it.cubicFt) * boxes : it.cbm ? Number(it.cbm) * 35.3147 * boxes : 0
       skuFtMap.set(sku, (skuFtMap.get(sku) ?? 0) + ft)
     }
 
-    // 僅保留此通知單涉及的 SKU
-    const noticeSkus = new Set(notice.items.map(it => it.product.sku).filter((s): s is string => !!s))
-    const filteredFtMap = new Map<string, number>()
-    skuFtMap.forEach((ft, sku) => { if (noticeSkus.has(sku)) filteredFtMap.set(sku, ft) })
-
-    // 同 SKU 出現在多張 PO 時，依 notifiedQuantity 比例分配
+    // 同 SKU 出現在多張 PO 時，依 notifiedQuantity 比例分配到各列
     const skuQtyMap = new Map<string, number>()
     for (const it of notice.items) {
       if (!it.product.sku) continue
@@ -96,13 +122,11 @@ export default async function ShippingNoticeDetailPage({
     itemCubicFt = notice.items.map(it => {
       const sku = it.product.sku
       if (!sku) return 0
-      const skuTotal = filteredFtMap.get(sku) ?? 0
+      const skuTotal = skuFtMap.get(sku) ?? 0
       const skuQty = skuQtyMap.get(sku) ?? 0
       if (skuTotal === 0 || skuQty === 0) return 0
       return skuTotal * it.notifiedQuantity / skuQty
     })
-
-    filteredFtMap.forEach(ft => { totalCubicFt += ft })
   }
 
   // Decimal → string，避免 Server → Client 序列化錯誤

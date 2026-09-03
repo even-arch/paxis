@@ -199,38 +199,55 @@ async function computeAllocation(
     },
   })
 
-  // Step 2: 裝箱單所有品項（含 sku fallback 路徑）
+  // Step 2: 裝箱單所有品項（含 sku fallback 路徑、箱號欄位）
+  //   cubicFt 是每箱值，必須乘以箱數（boxCount）才是正確總材積
   const slsItems = await prisma.sLS_Item.findMany({
     where: { shipmentId },
     select: {
       rawSku: true,
       cubicFt: true,
       cbm: true,
+      cartons: true,
+      cartonNoFrom: true,
+      cartonNoTo: true,
+      pi: { select: { piNo: true } },
       slsItem: { select: { product: { select: { sku: true } } } },
     },
+    orderBy: [{ piId: 'asc' }, { id: 'asc' }],
   })
 
-  // Step 3: 逐家供應商 → 複製 print route 的 filter → 算出 totalFt
-  //   同一 SKU 若出現在多家通知單（極罕見），各家都拿全部；需人工確認通知單是否正確。
+  // 與 /print/sn 的 boxCount() 完全相同
+  function boxCount(from: string | null, to: string | null, cartons: number | null): number {
+    const f = parseInt(from ?? '0') || 0
+    const t = parseInt(to ?? from ?? '0') || f
+    return f > 0 ? Math.max(1, t - f + 1) : (cartons ?? 1)
+  }
+
+  // Step 3: 逐家供應商 → 複製 print route 的 filter + 去重邏輯 → 算出 totalFt
   //   同一供應商若有多張 PO，依各 PO notifiedQuantity 比例拆分。
   const poCubicFtMap = new Map<number, number>()
 
   for (const notice of shippingNotices) {
-    // 和 print route 完全相同的 noticeSkus 建法
     const noticeSkus = new Set<string>(
       notice.items.map(it => it.product.sku).filter((s): s is string => !!s),
     )
     if (noticeSkus.size === 0) continue
 
-    // 和 print route 完全相同的 filter
-    const totalFt = slsItems
-      .filter(it => {
-        const sku = it.rawSku ?? it.slsItem?.product?.sku
-        return sku != null && noticeSkus.has(sku)
-      })
-      .reduce((sum, it) => {
-        return sum + (it.cubicFt ? Number(it.cubicFt) : it.cbm ? Number(it.cbm) * 35.3147 : 0)
-      }, 0)
+    const filtered = slsItems.filter(it => {
+      const sku = it.rawSku ?? it.slsItem?.product?.sku
+      return sku != null && noticeSkus.has(sku)
+    })
+
+    // 總材積：依 piNo:cartonNoFrom 去重（同 print route 邏輯），每箱 cubicFt × 箱數
+    let totalFt = 0
+    const seen = new Set<string>()
+    filtered.forEach((it, idx) => {
+      const key = `${it.pi?.piNo ?? ''}:${it.cartonNoFrom ?? `__null_${idx}`}`
+      if (seen.has(key)) return
+      seen.add(key)
+      const boxes = boxCount(it.cartonNoFrom, it.cartonNoTo, it.cartons)
+      totalFt += it.cubicFt ? Number(it.cubicFt) * boxes : it.cbm ? Number(it.cbm) * 35.3147 * boxes : 0
+    })
 
     if (totalFt === 0) continue
 
