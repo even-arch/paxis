@@ -17,9 +17,9 @@
  *   - 分母 = 全部出貨供應商材積（FOB + FOR），代表這批出貨的 100%
  *   - FOB 供應商的比例 = 自身材積 / 全部出貨材積（FOR 那份由我們承擔，不向 FOR 收取）
  *   - 材積來源：SLS_Item.cubicFt（ft³，Patisco 原始值）
- *   - 比對路徑：SLS_Item.slsItemId → PO_CustomerCopy_Item.productId → PO_Item.productId
- *     （避免依賴 rawSku 字串比對，客戶 SKU 格式與內部 SKU 不一致時會抓不到資料）
- *   - 若 slsItemId 為 null，fallback 用 rawSku 對 product.sku 比對
+ *   - 比對路徑：SLS_Item.piId ←→ PO.slsPiId（同一 PI = 同一交易）
+ *     裝箱單品項帶著「屬於哪張 PI（piId）」，採購單帶著「為哪張 PI 而開（slsPiId）」。
+ *     兩者 piId 相同 → ft³ 歸屬此供應商。同一 PI 若多家拆單，再依 PO_Item.quantity 比例拆分。
  *   - 若 FOB 供應商完全無材積資料，改以各 PO amountTWD 比例分攤
  */
 import { NextRequest, NextResponse } from 'next/server'
@@ -176,9 +176,11 @@ async function computeAllocation(
 
   // ── 材積資料抓取（ft³）────────────────────────────────────────────────────
   //
-  // 正確路徑：SLS_Item.slsItemId → PO_CustomerCopy_Item.productId
-  // 用 productId 比對 PO_Item.productId，避免靠 rawSku 字串比對
-  // （rawSku 是 Patisco 客戶 SKU，格式與內部 product.sku 不一致）
+  // 正確路徑：SLS_Item.piId ←→ PO.slsPiId
+  //   裝箱單品項帶著「屬於哪張 PI（piId）」，採購單也帶著「為哪張 PI 而開（slsPiId）」。
+  //   兩者 piId 相同 → 這筆 ft³ 就屬於這張採購單的供應商。
+  //   同一 PI 若被多家供應商拆單（同 piId 多張 PO），再用 PO_Item.quantity 按比例拆分。
+  //   不再用 productId/rawSku 跨 PI 比對——那樣會把所有有同產品的廠商全部拉進來，造成嚴重重複計算。
 
   const slsItems = await prisma.sLS_Item.findMany({
     where: { shipmentId },
@@ -186,88 +188,87 @@ async function computeAllocation(
       rawSku: true,
       cubicFt: true,
       cbm: true,
+      piId: true,
       slsItemId: true,
       slsItem: { select: { productId: true } },
     },
   })
 
-  // 建立兩張查找表：
-  //   productId → 該產品在本次出貨的總 ft³（主要路徑）
-  //   rawSku → 總 ft³（fallback：slsItemId 為 null 時用）
-  const productCubicFtMap = new Map<number, number>()
-  const skuCubicFtMap = new Map<string, number>()
-
-  for (const item of slsItems) {
-    // ft³ 優先；cbm 轉換 fallback（1 m³ = 35.3147 ft³）
-    const ft = item.cubicFt
-      ? Number(item.cubicFt)
-      : item.cbm ? Number(item.cbm) * 35.3147 : 0
-
-    if (item.slsItem?.productId) {
-      productCubicFtMap.set(
-        item.slsItem.productId,
-        (productCubicFtMap.get(item.slsItem.productId) ?? 0) + ft,
-      )
-    } else if (item.rawSku) {
-      skuCubicFtMap.set(item.rawSku, (skuCubicFtMap.get(item.rawSku) ?? 0) + ft)
-    }
-  }
-
-  // 取得各 PO 的品項（productId + quantity + product.sku 供 fallback）
+  // 取得各 PO 的 slsPiId（PI 連結）與 PO_Item（含 productId + quantity）
   const poIds = payables.map(p => p.poId).filter(Boolean) as number[]
   const poItems = poIds.length > 0
     ? await prisma.pO_Item.findMany({
         where: { orderId: { in: poIds } },
-        select: { orderId: true, productId: true, quantity: true, product: { select: { sku: true } } },
+        select: {
+          orderId: true,
+          productId: true,
+          quantity: true,
+          order: { select: { slsPiId: true } },
+        },
       })
     : []
 
-  // 建立兩張反查表：
-  //   productId → [{poId, quantity}]  用於比例分配（主要路徑）
-  //   sku → [{poId, quantity}]        用於比例分配（fallback）
-  const productPoQtyMap = new Map<number, { poId: number; quantity: number }[]>()
-  const skuPoQtyMap = new Map<string, { poId: number; quantity: number }[]>()
+  // 建立三層查找表
+  //   (piId, productId) → [{poId, qty}]  最精確：同一 PI 同一產品
+  //   piId              → [{poId, qty}]  fallback：同一 PI（產品未能比對時）
+  const piProductPoMap = new Map<string, { poId: number; qty: number }[]>()
+  const piPoMap = new Map<number, { poId: number; qty: number }[]>()
+
   for (const item of poItems) {
-    const idArr = productPoQtyMap.get(item.productId) ?? []
-    idArr.push({ poId: item.orderId, quantity: item.quantity })
-    productPoQtyMap.set(item.productId, idArr)
-    if (item.product.sku) {
-      const skuArr = skuPoQtyMap.get(item.product.sku) ?? []
-      skuArr.push({ poId: item.orderId, quantity: item.quantity })
-      skuPoQtyMap.set(item.product.sku, skuArr)
-    }
+    const piId = item.order?.slsPiId ?? null
+    if (!piId) continue
+
+    const piArr = piPoMap.get(piId) ?? []
+    piArr.push({ poId: item.orderId, qty: item.quantity })
+    piPoMap.set(piId, piArr)
+
+    const key = `${piId}:${item.productId}`
+    const ppArr = piProductPoMap.get(key) ?? []
+    ppArr.push({ poId: item.orderId, qty: item.quantity })
+    piProductPoMap.set(key, ppArr)
   }
 
-  // 將 totalFt 依各 PO 數量比例分配
-  // 若只有一家 PO 有該產品 → 全部歸它
-  // 若多家 PO 都有該產品 → 按 PO_Item.quantity 比例拆分（避免雙重計算）
+  // 按比例分配 ft³：單一 PO 直接全給；多 PO 依數量加權
   function distributeToPos(
-    totalFt: number,
-    pos: { poId: number; quantity: number }[],
+    ft: number,
+    pos: { poId: number; qty: number }[],
     map: Map<number, number>,
   ) {
-    if (totalFt === 0 || pos.length === 0) return
+    if (ft === 0 || pos.length === 0) return
     if (pos.length === 1) {
-      map.set(pos[0].poId, (map.get(pos[0].poId) ?? 0) + totalFt)
+      map.set(pos[0].poId, (map.get(pos[0].poId) ?? 0) + ft)
       return
     }
-    const totalQty = pos.reduce((s, p) => s + p.quantity, 0)
-    for (const { poId, quantity } of pos) {
-      const share = totalQty > 0 ? totalFt * quantity / totalQty : totalFt / pos.length
+    const totalQty = pos.reduce((s, p) => s + p.qty, 0)
+    for (const { poId, qty } of pos) {
+      const share = totalQty > 0 ? ft * qty / totalQty : ft / pos.length
       map.set(poId, (map.get(poId) ?? 0) + share)
     }
   }
 
-  // 計算每張 PO 的總採計 ft³（比例分配版）
+  // 逐筆裝箱單品項 → 找到對應的 PO → 累計 ft³
   const poCubicFtMap = new Map<number, number>()
-  productCubicFtMap.forEach((totalFt, productId) => {
-    const pos = productPoQtyMap.get(productId)
-    if (pos) distributeToPos(totalFt, pos, poCubicFtMap)
-  })
-  skuCubicFtMap.forEach((totalFt, sku) => {
-    const pos = skuPoQtyMap.get(sku)
-    if (pos) distributeToPos(totalFt, pos, poCubicFtMap)
-  })
+
+  for (const item of slsItems) {
+    const ft = item.cubicFt
+      ? Number(item.cubicFt)
+      : item.cbm ? Number(item.cbm) * 35.3147 : 0
+    if (ft === 0) continue
+
+    // 路徑 1（最精確）：piId + productId → 同一 PI 同一產品的採購單
+    if (item.piId && item.slsItem?.productId) {
+      const pos = piProductPoMap.get(`${item.piId}:${item.slsItem.productId}`)
+      if (pos?.length) { distributeToPos(ft, pos, poCubicFtMap); continue }
+    }
+
+    // 路徑 2（fallback）：piId → 該 PI 對應的所有採購單，依數量比例拆分
+    if (item.piId) {
+      const pos = piPoMap.get(item.piId)
+      if (pos?.length) { distributeToPos(ft, pos, poCubicFtMap); continue }
+    }
+
+    // 路徑 3（最後手段）：piId 為 null 的品項，暫不計入分攤（無法追溯供應商）
+  }
 
   // ── 計算各 payable（供應商）的有效條款與採計材積 ─────────────────────────
 
