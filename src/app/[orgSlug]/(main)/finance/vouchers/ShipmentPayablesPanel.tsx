@@ -496,8 +496,11 @@ export default function ShipmentPayablesPanel({
 
     setCancellingAll(false)
     if (failed.length === 0) {
+      // 清除儲存的材積覆蓋，讓數字退回原始計算值
+      await fetch(`/api/shipments/${shipmentId}/fob-allocation`, { method: 'DELETE' })
       setMsg('✓ 已退回全部付款通知單')
       setCreatedFor(new Set())
+      await loadAlloc()
     } else {
       setError(failed.join('\n'))
     }

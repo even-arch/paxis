@@ -67,8 +67,49 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const shipmentId = Number(params.id)
   if (isNaN(shipmentId)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
 
-  const result = await computeAllocation(prisma, shipmentId)
+  // 若有使用者已儲存的覆蓋材積，優先使用（而非從 SLS_Item 重算）
+  const savedAllocs = await prisma.sLS_FobCostAllocation.findMany({
+    where: { costItem: { shipmentId } },
+    select: { poId: true, cubicFt: true },
+  })
+  let savedPoCubicFt: Map<number, number> | undefined
+  if (savedAllocs.length > 0) {
+    savedPoCubicFt = new Map()
+    for (const row of savedAllocs) {
+      if (row.poId != null && !savedPoCubicFt.has(row.poId)) {
+        savedPoCubicFt.set(row.poId, Number(row.cubicFt))
+      }
+    }
+  }
+
+  const result = await computeAllocation(prisma, shipmentId, undefined, savedPoCubicFt)
   return NextResponse.json(result)
+}
+
+// ─── DELETE：清除儲存的材積覆蓋，退回原始計算值 ───────────────────────────────
+
+export async function DELETE(_req: NextRequest, { params }: Params) {
+  const prisma = await getRequestPrisma()
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const shipmentId = Number(params.id)
+  if (isNaN(shipmentId)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
+
+  const costItems = await prisma.sLS_FobCostItem.findMany({
+    where: { shipmentId },
+    select: { id: true },
+  })
+  const itemIds = costItems.map(i => i.id)
+  if (itemIds.length > 0) {
+    await prisma.sLS_FobCostAllocation.deleteMany({ where: { costItemId: { in: itemIds } } })
+  }
+  await prisma.fIN_Payable.updateMany({
+    where: { shipmentId },
+    data: { fobCostDeductionTWD: new Decimal(0) },
+  })
+
+  return NextResponse.json({ ok: true })
 }
 
 // ─── POST：確認套用 ───────────────────────────────────────────────────────────
@@ -168,6 +209,7 @@ async function computeAllocation(
   prisma: Awaited<ReturnType<typeof getRequestPrisma>>,
   shipmentId: number,
   cubicFtOverrides?: Record<number, number>,
+  savedPoCubicFt?: Map<number, number>,
 ) {
   // 取得費用項目
   const costItems = await prisma.sLS_FobCostItem.findMany({
@@ -301,6 +343,18 @@ async function computeAllocation(
       totalDeductionTWD: 0,
     }
   })
+
+  // ── 套用已儲存的 PO-level 覆蓋（GET 時從 SLS_FobCostAllocation 帶入）────────
+  // 優先於從 SLS_Item 計算出的值；讓使用者儲存過的材積在頁面刷新後仍保留
+
+  if (savedPoCubicFt && savedPoCubicFt.size > 0) {
+    for (const s of supplierInfos) {
+      if (s.poId != null) {
+        const saved = savedPoCubicFt.get(s.poId)
+        if (saved !== undefined) s.cubicFt = saved
+      }
+    }
+  }
 
   // ── 套用手動覆蓋（供應商層級 → 按原始各 PO 比例分配）─────────────────────
 
