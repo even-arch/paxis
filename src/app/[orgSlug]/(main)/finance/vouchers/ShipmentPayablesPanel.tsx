@@ -2,6 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 
+// 安全解析 API 錯誤訊息：伺服器回 500 空 body 時不會再丟 JSON parse 例外
+async function safeErrMsg(res: Response, fallback: string): Promise<string> {
+  try { return (await res.json()).error ?? fallback } catch { return fallback }
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type FobCostItem = { id: number; name: string; amountTWD: number; note: string | null }
@@ -163,7 +168,7 @@ export default function ShipmentPayablesPanel({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'freight_item', name: newItemName.trim(), amountTWD: Number(newItemAmount), note: null }),
       })
-      if (!res.ok) throw new Error((await res.json()).error ?? '新增失敗')
+      if (!res.ok) throw new Error(await safeErrMsg(res, '新增失敗'))
       const data = await res.json()
       setCostItems(prev => [...prev, { id: data.itemId, name: newItemName.trim(), amountTWD: Number(newItemAmount), note: null }])
       setNewItemName(''); setNewItemAmount('')
@@ -181,7 +186,7 @@ export default function ShipmentPayablesPanel({
     setDeletingId(id); setError('')
     try {
       const res = await fetch(`/api/shipments/${shipmentId}/fob-cost-items/${id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error((await res.json()).error ?? '刪除失敗')
+      if (!res.ok) throw new Error(await safeErrMsg(res, '刪除失敗'))
       setCostItems(prev => prev.filter(i => i.id !== id))
       await loadAlloc()
     } catch (err) {
@@ -200,7 +205,7 @@ export default function ShipmentPayablesPanel({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'freight_item', name: s.name, amountTWD: s.amountTWD, note: s.note }),
       })
-      if (!res.ok) throw new Error((await res.json()).error ?? '套用失敗')
+      if (!res.ok) throw new Error(await safeErrMsg(res, '套用失敗'))
       const data = await res.json()
       setCostItems(prev => [...prev, { id: data.itemId, name: s.name, amountTWD: s.amountTWD, note: s.note ?? null }])
       setSuggestions(prev => prev.filter(x => !(x.name === s.name && x.amountTWD === s.amountTWD && x.docId === s.docId)))
@@ -239,7 +244,7 @@ export default function ShipmentPayablesPanel({
     setApplyingAlloc(true); setError('')
     try {
       const res = await fetch(`/api/shipments/${shipmentId}/fob-allocation`, { method: 'POST' })
-      if (!res.ok) throw new Error((await res.json()).error ?? '套用失敗')
+      if (!res.ok) throw new Error(await safeErrMsg(res, '套用失敗'))
       setMsg('✓ FOB 分攤已套用')
       await loadAlloc()
     } catch (err) {
@@ -279,7 +284,7 @@ export default function ShipmentPayablesPanel({
           note: null,
         }),
       })
-      if (!res.ok) throw new Error((await res.json()).error ?? '建立失敗')
+      if (!res.ok) throw new Error(await safeErrMsg(res, '建立失敗'))
       const sup = supplierPayables[0]
       setMsg(`✓ 已建立 ${sup.supplierName} 的付款通知單`)
       setCreatedFor(prev => new Set(Array.from(prev).concat(supplierId)))

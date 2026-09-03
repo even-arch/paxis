@@ -2,6 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react'
 
+async function safeErrMsg(res: Response, fallback: string): Promise<string> {
+  try { return (await res.json()).error ?? fallback } catch { return fallback }
+}
+
 // ─── Types matching the API response ─────────────────────────────────────────
 
 type CostItem = {
@@ -120,7 +124,7 @@ export default function FobAllocationPanel({ shipmentId }: { shipmentId: number 
     setError('')
     try {
       const res = await fetch(`/api/shipments/${shipmentId}/fob-cost-items/${itemId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error((await res.json()).error ?? '刪除失敗')
+      if (!res.ok) throw new Error(await safeErrMsg(res, '刪除失敗'))
       setMessage('已刪除')
       await load()
     } catch (err) {
@@ -137,8 +141,8 @@ export default function FobAllocationPanel({ shipmentId }: { shipmentId: number 
     setMessage('')
     try {
       const res = await fetch(`/api/shipments/${shipmentId}/fob-allocation`, { method: 'POST' })
+      if (!res.ok) throw new Error(await safeErrMsg(res, '套用失敗'))
       const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? '套用失敗')
       setMessage('✓ 分攤已套用，各供應商應付帳款已更新')
       await load()
     } catch (err) {
