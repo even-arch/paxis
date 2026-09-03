@@ -32,6 +32,7 @@ const VOUCHER_STATUS_ZH: Record<string, string> = {
 type AllocEntry = {
   supplierId: number
   isFob: boolean
+  cbm: number
   cbmPct: number
   totalDeductionTWD: number
   allocDetails: { costItemName: string; allocatedTWD: number }[]
@@ -51,13 +52,14 @@ function isFobTerms(terms: string | null | undefined) {
 
 // Group per-PO alloc entries by supplierId
 function buildAllocMap(suppliers: {
-  supplierId: number; isFob: boolean; cbmPct: number; totalDeductionTWD: number
+  supplierId: number; isFob: boolean; cbm: number; cbmPct: number; totalDeductionTWD: number
   allocations: { costItemName: string; allocatedTWD: number }[]
 }[]): Map<number, AllocEntry> {
   const map = new Map<number, AllocEntry>()
   for (const s of suppliers) {
     const existing = map.get(s.supplierId)
     if (existing) {
+      existing.cbm += s.cbm
       existing.cbmPct += s.cbmPct
       existing.totalDeductionTWD += s.totalDeductionTWD
       for (const a of s.allocations) {
@@ -69,6 +71,7 @@ function buildAllocMap(suppliers: {
       map.set(s.supplierId, {
         supplierId: s.supplierId,
         isFob: s.isFob,
+        cbm: s.cbm,
         cbmPct: s.cbmPct,
         totalDeductionTWD: s.totalDeductionTWD,
         allocDetails: s.allocations.map(a => ({ ...a })),
@@ -435,7 +438,8 @@ export default function ShipmentPayablesPanel({
         )}
         {!usedCbmFallback && totalAllCbm > 0 && (
           <p className="text-xs text-gray-400 mt-2">
-            出貨總材積 {totalAllCbm.toFixed(4)} m³，其中 FOB {totalFobCbm.toFixed(4)} m³（{totalAllCbm > 0 ? ((totalFobCbm / totalAllCbm) * 100).toFixed(1) : 0}%）— FOB 供應商僅分攤自身比例的費用
+            出貨總材積 {totalAllCbm.toFixed(4)} m³（分母）；其中 FOB {totalFobCbm.toFixed(4)} m³（{((totalFobCbm / totalAllCbm) * 100).toFixed(1)}%）、FOR {(totalAllCbm - totalFobCbm).toFixed(4)} m³（{(((totalAllCbm - totalFobCbm) / totalAllCbm) * 100).toFixed(1)}%*）。
+            * FOR 供應商佔比僅供核對，費用由我方承擔，不扣款。
           </p>
         )}
       </div>
@@ -493,6 +497,21 @@ export default function ShipmentPayablesPanel({
                           {group.payables.map(p => p.poNo).filter(Boolean).join('、')}
                         </div>
                       )}
+                      {/* 材積 / 採計佔比（全部供應商都顯示） */}
+                      {alloc && (alloc.cbm > 0 || alloc.cbmPct > 0) && (
+                        <div className="text-xs mt-0.5">
+                          {alloc.cbm > 0 && (
+                            <span className="text-gray-400 font-mono">
+                              採計 {alloc.cbm.toFixed(4)} m³
+                            </span>
+                          )}
+                          {alloc.cbmPct > 0 && (
+                            <span className={`ml-1 font-mono ${isFob ? 'text-blue-500 font-semibold' : 'text-gray-400'}`}>
+                              ({alloc.cbmPct.toFixed(1)}%{!isFob ? ' *' : ''})
+                            </span>
+                          )}
+                        </div>
+                      )}
                       {/* FOB 費用拆分明細 */}
                       {isFob && alloc && alloc.allocDetails.length > 0 && deduction > 0 && (
                         <div className="mt-1 pl-1 space-y-0.5">
@@ -501,9 +520,6 @@ export default function ShipmentPayablesPanel({
                               {d.costItemName}：−NT$ {d.allocatedTWD.toLocaleString()}
                             </div>
                           ))}
-                          {!usedCbmFallback && alloc.cbmPct > 0 && (
-                            <div className="text-xs text-blue-400">材積佔比 {alloc.cbmPct.toFixed(1)}%</div>
-                          )}
                         </div>
                       )}
                       {/* 佣金 / Rebate */}

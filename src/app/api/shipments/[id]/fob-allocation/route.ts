@@ -251,9 +251,13 @@ async function computeAllocation(
     for (const sup of fobSuppliers) {
       sup.cbmPct = totalAllAmount > 0 ? (sup.amountTWD / totalAllAmount) * 100 : 0
     }
+    // FOR 供應商亦以金額比例顯示（參考用，不扣款）
+    for (const sup of supplierInfos.filter(s => !s.isFob)) {
+      sup.cbmPct = totalAllAmount > 0 ? (sup.amountTWD / totalAllAmount) * 100 : 0
+    }
   } else {
-    // 正常路徑：以全部出貨總材積為分母
-    for (const sup of fobSuppliers) {
+    // 正常路徑：以全部出貨總材積為分母，全部供應商都算出參考佔比
+    for (const sup of supplierInfos) {
       sup.cbmPct = totalAllCbm > 0 ? (sup.cbm / totalAllCbm) * 100 : 0
     }
   }
