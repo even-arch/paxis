@@ -1588,7 +1588,7 @@ model SLS_FobCostAllocation {
 
   poId        Int?     // 對應的 PO（用於追蹤；可 null）
 
-  cubicFt       Decimal  // 此供應商在本次出貨的材積（ft³，台灣供應商習用單位）
+  cubicFt       Decimal  @map("cbm") // 此供應商在本次出貨的材積（ft³，台灣供應商習用單位）
   cbmPct        Decimal  // 佔全部出貨材積的百分比（0-100）；分母含 FOR 供應商
   allocatedTWD  Decimal  // 分攤金額 = costItem.amountTWD × cbmPct / 100
 
