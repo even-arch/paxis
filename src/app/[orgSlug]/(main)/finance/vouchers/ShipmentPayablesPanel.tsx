@@ -126,6 +126,9 @@ export default function ShipmentPayablesPanel({
   const [creatingVoucher, setCreatingVoucher] = useState<number | null>(null) // supplierId（舊，保留供個別建單）
   const [createdFor, setCreatedFor] = useState<Set<number>>(new Set())        // supplierIds done
   const [creatingAll, setCreatingAll] = useState(false)
+  const [confirmingCreate, setConfirmingCreate] = useState(false)
+  const [cancellingAll, setCancellingAll] = useState(false)
+  const [confirmingCancel, setConfirmingCancel] = useState(false)
   const [uploading, setUploading] = useState(false)
 
   // 手動調整材積
@@ -350,15 +353,12 @@ export default function ShipmentPayablesPanel({
 
   // ── 一次建立全部未開通知單的供應商（解決按個別建立時 state 歸零的問題）────────
   async function createAllVouchers() {
-    // 先確認哪些供應商還沒開單
     const pending = supplierGroups.filter(
       g => !g.payables.every(p => p.voucherInfo != null) && !createdFor.has(g.supplierId),
     )
     if (pending.length === 0) return
 
-    const names = pending.map(g => g.supplierName).join('、')
-    if (!confirm(`即將為以下供應商建立付款通知單：\n${names}\n\n確定繼續？`)) return
-
+    setConfirmingCreate(false)
     setCreatingAll(true); setError(''); setMsg('')
 
     // Step 1：若有 ft³ 調整，先套用分攤並取得最新 allocMap
@@ -432,11 +432,39 @@ export default function ShipmentPayablesPanel({
     setCreatingAll(false)
     if (created.length > 0) {
       setMsg(`✓ 已建立 ${created.join('、')} 的付款通知單`)
-      onVoucherCreated()  // 只在最後呼叫一次，避免中途重建 component 損失 state
+      onVoucherCreated()
     }
     if (failed.length > 0) {
       setError(failed.join('\n'))
     }
+  }
+
+  // ── 退回全部非付款狀態的通知單 ────────────────────────────────────────────
+  async function cancelAllVouchers() {
+    const voucherIds = Array.from(new Set(
+      payables
+        .filter(p => p.voucherInfo && p.voucherInfo.status !== 'PAID')
+        .map(p => p.voucherInfo!.id),
+    ))
+    if (voucherIds.length === 0) return
+
+    setConfirmingCancel(false)
+    setCancellingAll(true); setError(''); setMsg('')
+
+    const failed: string[] = []
+    for (const vid of voucherIds) {
+      const res = await fetch(`/api/finance/payment-vouchers/${vid}`, { method: 'DELETE' })
+      if (!res.ok) failed.push(await safeErrMsg(res, `#${vid} 刪除失敗`))
+    }
+
+    setCancellingAll(false)
+    if (failed.length === 0) {
+      setMsg('✓ 已退回全部付款通知單')
+      setCreatedFor(new Set())
+    } else {
+      setError(failed.join('\n'))
+    }
+    onVoucherCreated()
   }
 
   // ── Derived ───────────────────────────────────────────────────────────────
@@ -619,13 +647,47 @@ export default function ShipmentPayablesPanel({
             {voucherLocked && costItems.length > 0 && fobGroupCount > 0 && (
               <span className="text-xs text-gray-400">已有通知單送出，材積已鎖定</span>
             )}
+            {/* 退回全部（有非付款通知單時顯示） */}
+            {payables.some(p => p.voucherInfo && p.voucherInfo.status !== 'PAID') && (
+              confirmingCancel ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-red-600">確定退回全部？</span>
+                  <button onClick={cancelAllVouchers} disabled={cancellingAll}
+                    className="text-xs px-2 py-1 rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+                    {cancellingAll ? '退回中...' : '確定'}
+                  </button>
+                  <button onClick={() => setConfirmingCancel(false)}
+                    className="text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50">
+                    取消
+                  </button>
+                </div>
+              ) : (
+                <button onClick={() => setConfirmingCancel(true)} disabled={cancellingAll}
+                  className="text-xs px-3 py-1.5 rounded border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 whitespace-nowrap">
+                  退回全部通知單
+                </button>
+              )
+            )}
+            {/* 建立全部（有未建單供應商時顯示） */}
             {supplierGroups.some(g => !g.payables.every(p => p.voucherInfo != null) && !createdFor.has(g.supplierId)) && (
-              <button
-                onClick={createAllVouchers}
-                disabled={creatingAll}
-                className="text-xs px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap">
-                {creatingAll ? '建立中...' : '建立全部付款通知單'}
-              </button>
+              confirmingCreate ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-blue-700">確定建立全部？</span>
+                  <button onClick={createAllVouchers} disabled={creatingAll}
+                    className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
+                    {creatingAll ? '建立中...' : '確定'}
+                  </button>
+                  <button onClick={() => setConfirmingCreate(false)}
+                    className="text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50">
+                    取消
+                  </button>
+                </div>
+              ) : (
+                <button onClick={() => setConfirmingCreate(true)} disabled={creatingAll}
+                  className="text-xs px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap">
+                  建立全部付款通知單
+                </button>
+              )
             )}
           </div>
         </div>
