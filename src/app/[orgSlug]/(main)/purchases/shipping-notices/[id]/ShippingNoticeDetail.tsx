@@ -45,6 +45,10 @@ interface ShippingNoticeDetailProps {
   shippingMarks?: string | null
   /** 在麥頭中找不到對應區塊的 PO 號（常見原因：麥頭原文單號打錯字） */
   marksUnmatchedPoNos?: string[]
+  /** 每個品項的材積（ft³），順序與 notice.items 相同 */
+  itemCubicFt?: number[]
+  /** 本供應商此次出貨的總材積（ft³）*/
+  totalCubicFt?: number
 }
 
 interface PONotificationHistory {
@@ -58,7 +62,7 @@ interface PONotificationHistory {
   }>
 }
 
-export default function ShippingNoticeDetail({ notice, deliverPresets, shippingMarks, marksUnmatchedPoNos }: ShippingNoticeDetailProps) {
+export default function ShippingNoticeDetail({ notice, deliverPresets, shippingMarks, marksUnmatchedPoNos, itemCubicFt = [], totalCubicFt = 0 }: ShippingNoticeDetailProps) {
   const orgPath = useOrgPath()
   const [sendingEmail, setSendingEmail] = useState(false)
   const [emailError, setEmailError] = useState('')
@@ -405,19 +409,26 @@ export default function ShippingNoticeDetail({ notice, deliverPresets, shippingM
               <th className="text-right px-4 py-2 text-xs font-medium text-gray-500 w-20">PO 數量</th>
               <th className="text-right px-4 py-2 text-xs font-medium text-gray-500 w-20">通知數量</th>
               <th className="text-center px-4 py-2 text-xs font-medium text-gray-500 w-16">單位</th>
+              <th className="text-right px-4 py-2 text-xs font-medium text-gray-500 w-24">材積 (ft³)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {notice.items.map(item => (
-              <tr key={item.id} className="hover:bg-gray-50">
-                <td className="px-4 py-2 font-mono text-xs text-blue-600">{item.po.poNo}</td>
-                <td className="px-4 py-2 font-mono text-xs text-gray-500">{item.product.sku || '—'}</td>
-                <td className="px-4 py-2 text-gray-700">{item.product.name}</td>
-                <td className="px-4 py-2 text-right text-gray-500">{item.poQuantity}</td>
-                <td className="px-4 py-2 text-right font-medium text-gray-800">{item.notifiedQuantity}</td>
-                <td className="px-4 py-2 text-center text-gray-500">{item.unit || item.product.unit || 'PCS'}</td>
-              </tr>
-            ))}
+            {notice.items.map((item, idx) => {
+              const ft = itemCubicFt[idx] ?? 0
+              return (
+                <tr key={item.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-2 font-mono text-xs text-blue-600">{item.po.poNo}</td>
+                  <td className="px-4 py-2 font-mono text-xs text-gray-500">{item.product.sku || '—'}</td>
+                  <td className="px-4 py-2 text-gray-700">{item.product.name}</td>
+                  <td className="px-4 py-2 text-right text-gray-500">{item.poQuantity}</td>
+                  <td className="px-4 py-2 text-right font-medium text-gray-800">{item.notifiedQuantity}</td>
+                  <td className="px-4 py-2 text-center text-gray-500">{item.unit || item.product.unit || 'PCS'}</td>
+                  <td className="px-4 py-2 text-right font-mono text-xs text-gray-600">
+                    {ft > 0 ? ft.toFixed(2) : '—'}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
           <tfoot className="bg-gray-50 border-t-2 border-gray-300">
             <tr>
@@ -426,6 +437,9 @@ export default function ShippingNoticeDetail({ notice, deliverPresets, shippingM
               </td>
               <td className="px-4 py-2 text-right text-sm font-bold text-gray-800">{totalNotified}</td>
               <td></td>
+              <td className="px-4 py-2 text-right font-mono text-sm font-bold text-gray-800">
+                {totalCubicFt > 0 ? totalCubicFt.toFixed(2) : '—'}
+              </td>
             </tr>
           </tfoot>
         </table>

@@ -57,6 +57,54 @@ export default async function ShippingNoticeDetailPage({
       ))
     : []
 
+  // ── 材積計算（依 SKU 從 SLS_Item 拉取，邏輯與印刷路由相同）────────────────
+  let itemCubicFt: number[] = notice.items.map(() => 0)
+  let totalCubicFt = 0
+
+  if (notice.sourceShipmentId) {
+    const slsItems = await prisma.sLS_Item.findMany({
+      where: { shipmentId: notice.sourceShipmentId },
+      select: {
+        rawSku: true,
+        cubicFt: true,
+        cbm: true,
+        slsItem: { select: { product: { select: { sku: true } } } },
+      },
+    })
+
+    // SKU → total ft³（同印刷路由 filter）
+    const skuFtMap = new Map<string, number>()
+    for (const it of slsItems) {
+      const sku = it.rawSku ?? it.slsItem?.product?.sku
+      if (!sku) continue
+      const ft = it.cubicFt ? Number(it.cubicFt) : it.cbm ? Number(it.cbm) * 35.3147 : 0
+      skuFtMap.set(sku, (skuFtMap.get(sku) ?? 0) + ft)
+    }
+
+    // 僅保留此通知單涉及的 SKU
+    const noticeSkus = new Set(notice.items.map(it => it.product.sku).filter((s): s is string => !!s))
+    const filteredFtMap = new Map<string, number>()
+    skuFtMap.forEach((ft, sku) => { if (noticeSkus.has(sku)) filteredFtMap.set(sku, ft) })
+
+    // 同 SKU 出現在多張 PO 時，依 notifiedQuantity 比例分配
+    const skuQtyMap = new Map<string, number>()
+    for (const it of notice.items) {
+      if (!it.product.sku) continue
+      skuQtyMap.set(it.product.sku, (skuQtyMap.get(it.product.sku) ?? 0) + it.notifiedQuantity)
+    }
+
+    itemCubicFt = notice.items.map(it => {
+      const sku = it.product.sku
+      if (!sku) return 0
+      const skuTotal = filteredFtMap.get(sku) ?? 0
+      const skuQty = skuQtyMap.get(sku) ?? 0
+      if (skuTotal === 0 || skuQty === 0) return 0
+      return skuTotal * it.notifiedQuantity / skuQty
+    })
+
+    filteredFtMap.forEach(ft => { totalCubicFt += ft })
+  }
+
   // Decimal → string，避免 Server → Client 序列化錯誤
   const serialized = {
     ...notice,
@@ -116,6 +164,8 @@ export default async function ShippingNoticeDetailPage({
         deliverPresets={deliverPresets}
         shippingMarks={shippingMarks}
         marksUnmatchedPoNos={marksUnmatchedPoNos}
+        itemCubicFt={itemCubicFt}
+        totalCubicFt={totalCubicFt}
       />
     </div>
   )
