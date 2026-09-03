@@ -96,6 +96,34 @@ function groupBySupplier(suppliers: SupplierAlloc[]): GroupedSupplier[] {
   return Array.from(map.values()).sort((a, b) => Number(b.isFob) - Number(a.isFob))
 }
 
+// 依手動覆蓋值重新計算佔比與分攤（純 client-side，結果等同 computeAllocation 的邏輯）
+function recalcWithOverrides(
+  base: GroupedSupplier[],
+  costItems: CostItem[],
+  overrides: Record<number, number>,
+): { grouped: GroupedSupplier[]; totalAllCubicFt: number; totalFobCubicFt: number } {
+  const adjusted = base.map(g => ({
+    ...g,
+    cubicFt: overrides[g.supplierId] !== undefined ? overrides[g.supplierId] : g.cubicFt,
+  }))
+  const totalAllCubicFt = adjusted.reduce((s, g) => s + g.cubicFt, 0)
+  const grouped = adjusted.map(g => {
+    const cbmPct = totalAllCubicFt > 0 ? (g.cubicFt / totalAllCubicFt) * 100 : 0
+    if (!g.isFob) return { ...g, cbmPct, totalDeductionTWD: 0 }
+    const allocations = costItems.map(item => ({
+      costItemId: item.id,
+      costItemName: item.name,
+      allocatedTWD: Math.round(item.amountTWD * cbmPct / 100),
+    }))
+    return { ...g, cbmPct, allocations, totalDeductionTWD: allocations.reduce((s, a) => s + a.allocatedTWD, 0) }
+  })
+  return {
+    grouped,
+    totalAllCubicFt,
+    totalFobCubicFt: grouped.filter(g => g.isFob).reduce((s, g) => s + g.cubicFt, 0),
+  }
+}
+
 export default function FobAllocationPanel({ shipmentId }: { shipmentId: number }) {
   const [data, setData] = useState<AllocationData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -104,9 +132,21 @@ export default function FobAllocationPanel({ shipmentId }: { shipmentId: number 
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
+  // 手動調整材積
+  const [editedCubicFt, setEditedCubicFt] = useState<Record<number, string>>({})
+  const [localCalc, setLocalCalc] = useState<{
+    grouped: GroupedSupplier[]
+    totalAllCubicFt: number
+    totalFobCubicFt: number
+  } | null>(null)
+
+  const hasEdits = Object.keys(editedCubicFt).length > 0
+
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
+    setEditedCubicFt({})
+    setLocalCalc(null)
     try {
       const res = await fetch(`/api/shipments/${shipmentId}/fob-allocation`)
       if (res.ok) setData(await res.json())
@@ -134,15 +174,39 @@ export default function FobAllocationPanel({ shipmentId }: { shipmentId: number 
     }
   }
 
+  function handleRecalc() {
+    if (!data) return
+    const baseGrouped = groupBySupplier(data.suppliers)
+    const overrides: Record<number, number> = {}
+    for (const [sid, val] of Object.entries(editedCubicFt)) {
+      const n = parseFloat(val)
+      if (!isNaN(n) && n >= 0) overrides[Number(sid)] = n
+    }
+    setLocalCalc(recalcWithOverrides(baseGrouped, data.costItems, overrides))
+  }
+
   async function handleApply() {
     if (!confirm('確認套用分攤結果？將更新各供應商的 FOB 費用扣款金額。')) return
     setApplying(true)
     setError('')
     setMessage('')
     try {
-      const res = await fetch(`/api/shipments/${shipmentId}/fob-allocation`, { method: 'POST' })
+      // 如果有手動覆蓋值，送給 server 使用
+      const body: { overrides?: Record<string, number> } = {}
+      if (hasEdits) {
+        body.overrides = {}
+        for (const [sid, val] of Object.entries(editedCubicFt)) {
+          const n = parseFloat(val)
+          if (!isNaN(n) && n >= 0) body.overrides[sid] = n
+        }
+      }
+      const res = await fetch(`/api/shipments/${shipmentId}/fob-allocation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
       if (!res.ok) throw new Error(await safeErrMsg(res, '套用失敗'))
-      const json = await res.json()
+      await res.json()
       setMessage('✓ 分攤已套用，各供應商應付帳款已更新')
       await load()
     } catch (err) {
@@ -152,8 +216,11 @@ export default function FobAllocationPanel({ shipmentId }: { shipmentId: number 
     }
   }
 
-  const grouped = data ? groupBySupplier(data.suppliers) : []
+  const baseGrouped = data ? groupBySupplier(data.suppliers) : []
+  const grouped = localCalc?.grouped ?? baseGrouped
   const fobGroups = grouped.filter(g => g.isFob)
+  const displayTotalAllCubicFt = localCalc?.totalAllCubicFt ?? data?.totalAllCubicFt ?? 0
+  const displayTotalFobCubicFt = localCalc?.totalFobCubicFt ?? data?.totalFobCubicFt ?? 0
 
   return (
     <div className="bg-white rounded-lg shadow p-5 mb-6">
@@ -215,6 +282,9 @@ export default function FobAllocationPanel({ shipmentId }: { shipmentId: number 
               <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex items-center justify-between">
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                   供應商分攤預覽
+                  {localCalc && (
+                    <span className="ml-2 text-amber-600 font-normal normal-case">（已套用手動調整）</span>
+                  )}
                 </span>
                 <div className="flex items-center gap-2">
                   {data.usedCbmFallback ? (
@@ -222,15 +292,15 @@ export default function FobAllocationPanel({ shipmentId }: { shipmentId: number 
                       ⚠ 無材積資料，以金額比例分攤
                     </span>
                   ) : null}
-                  {data.totalAllCubicFt > 0 ? (
+                  {displayTotalAllCubicFt > 0 ? (
                     <span className="text-xs text-gray-500 font-mono">
-                      出貨總材積 {fmtFt(data.totalAllCubicFt)}
-                      {data.totalFobCubicFt > 0 && data.totalFobCubicFt < data.totalAllCubicFt &&
-                        `（FOB ${fmtFt(data.totalFobCubicFt)}）`}
+                      出貨總材積 {fmtFt(displayTotalAllCubicFt)}
+                      {displayTotalFobCubicFt > 0 && displayTotalFobCubicFt < displayTotalAllCubicFt &&
+                        `（FOB ${fmtFt(displayTotalFobCubicFt)}）`}
                     </span>
-                  ) : data.totalFobCubicFt > 0 ? (
+                  ) : displayTotalFobCubicFt > 0 ? (
                     <span className="text-xs text-gray-400">
-                      FOB 總材積 {fmtFt(data.totalFobCubicFt)}
+                      FOB 總材積 {fmtFt(displayTotalFobCubicFt)}
                     </span>
                   ) : null}
                 </div>
@@ -248,52 +318,67 @@ export default function FobAllocationPanel({ shipmentId }: { shipmentId: number 
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {grouped.map(sup => (
-                    <tr key={sup.supplierId}
-                        className={sup.isFob ? '' : 'bg-gray-50/50'}>
-                      {/* 供應商名稱 + PO 號（換行展示） */}
-                      <td className="px-4 py-2.5">
-                        <div className={`font-medium ${sup.isFob ? 'text-gray-800' : 'text-gray-500'}`}>{sup.supplierName}</div>
-                        {sup.poNos.length > 0 && (
-                          <div className="text-xs text-gray-400 font-mono mt-0.5">
-                            {sup.poNos.join('、')}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5 text-center">
-                        <span className={`text-xs px-1.5 py-0.5 rounded font-semibold ${
-                          sup.isFob
-                            ? 'bg-blue-50 text-blue-700'
-                            : 'bg-gray-100 text-gray-500'
-                        }`}>
-                          {sup.tradeTerms ?? '未設定'}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-mono text-xs text-gray-600">
-                        {fmtTWD(sup.amountTWD)}
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-mono text-xs text-gray-600">
-                        {sup.cubicFt > 0 ? fmtFt(sup.cubicFt) : '—'}
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-mono text-xs">
-                        {sup.cbmPct > 0 ? (
-                          <span className={sup.isFob ? 'text-gray-700 font-semibold' : 'text-gray-400'}>
-                            {sup.cbmPct.toFixed(1)}%
-                            {!sup.isFob && <span className="text-gray-300 ml-0.5 font-normal">*</span>}
+                  {grouped.map(sup => {
+                    const editKey = String(sup.supplierId)
+                    const editVal = editedCubicFt[sup.supplierId]
+                    const inputVal = editVal !== undefined ? editVal : sup.cubicFt > 0 ? sup.cubicFt.toFixed(2) : ''
+                    return (
+                      <tr key={sup.supplierId} className={sup.isFob ? '' : 'bg-gray-50/50'}>
+                        {/* 供應商名稱 + PO 號（換行展示） */}
+                        <td className="px-4 py-2.5">
+                          <div className={`font-medium ${sup.isFob ? 'text-gray-800' : 'text-gray-500'}`}>{sup.supplierName}</div>
+                          {sup.poNos.length > 0 && (
+                            <div className="text-xs text-gray-400 font-mono mt-0.5">
+                              {sup.poNos.join('、')}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 text-center">
+                          <span className={`text-xs px-1.5 py-0.5 rounded font-semibold ${
+                            sup.isFob
+                              ? 'bg-blue-50 text-blue-700'
+                              : 'bg-gray-100 text-gray-500'
+                          }`}>
+                            {sup.tradeTerms ?? '未設定'}
                           </span>
-                        ) : '—'}
-                      </td>
-                      <td className="px-4 py-2.5 text-right">
-                        {sup.isFob ? (
-                          <span className="font-mono text-red-600 font-medium">
-                            −{fmtTWD(sup.totalDeductionTWD)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-300 text-xs">不分攤</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-mono text-xs text-gray-600">
+                          {fmtTWD(sup.amountTWD)}
+                        </td>
+                        {/* 採計材積：可編輯 */}
+                        <td className="px-3 py-2.5 text-right">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={inputVal}
+                            onChange={e => setEditedCubicFt(prev => ({ ...prev, [sup.supplierId]: e.target.value }))}
+                            className={`w-24 text-right font-mono text-xs border rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400 ${
+                              editVal !== undefined ? 'border-amber-400 bg-amber-50' : 'border-gray-200'
+                            }`}
+                            placeholder="0.00"
+                          />
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-mono text-xs">
+                          {sup.cbmPct > 0 ? (
+                            <span className={sup.isFob ? 'text-gray-700 font-semibold' : 'text-gray-400'}>
+                              {sup.cbmPct.toFixed(1)}%
+                              {!sup.isFob && <span className="text-gray-300 ml-0.5 font-normal">*</span>}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
+                          {sup.isFob ? (
+                            <span className="font-mono text-red-600 font-medium">
+                              −{fmtTWD(sup.totalDeductionTWD)}
+                            </span>
+                          ) : (
+                            <span className="text-gray-300 text-xs">不分攤</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
 
@@ -326,9 +411,19 @@ export default function FobAllocationPanel({ shipmentId }: { shipmentId: number 
             </p>
           )}
 
-          {/* ── 套用按鈕 ── */}
+          {/* ── 操作按鈕區 ── */}
           {fobGroups.length > 0 && data.costItems.length > 0 && (
-            <div className="flex justify-end">
+            <div className="flex items-center justify-end gap-3">
+              {hasEdits && (
+                <button
+                  onClick={handleRecalc}
+                  className="text-sm px-4 py-2 rounded border border-amber-400 text-amber-700 bg-amber-50 hover:bg-amber-100">
+                  🔄 重新計算
+                </button>
+              )}
+              {hasEdits && (
+                <span className="text-xs text-gray-400">調整後的材積將隨「套用」一起寫入</span>
+              )}
               <button
                 onClick={handleApply}
                 disabled={applying}

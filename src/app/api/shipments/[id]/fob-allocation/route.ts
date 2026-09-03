@@ -73,7 +73,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 // ─── POST：確認套用 ───────────────────────────────────────────────────────────
 
-export async function POST(_req: NextRequest, { params }: Params) {
+export async function POST(req: NextRequest, { params }: Params) {
   const prisma = await getRequestPrisma()
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -81,7 +81,17 @@ export async function POST(_req: NextRequest, { params }: Params) {
   const shipmentId = Number(params.id)
   if (isNaN(shipmentId)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
 
-  const { suppliers, costItems, usedCbmFallback } = await computeAllocation(prisma, shipmentId)
+  // 可選：前端手動調整的材積覆蓋值（supplierId → ft³）
+  const body = await req.json().catch(() => ({}))
+  const cubicFtOverrides: Record<number, number> | undefined = body.overrides
+    ? Object.fromEntries(
+        Object.entries(body.overrides as Record<string, unknown>)
+          .map(([k, v]) => [Number(k), Number(v)])
+          .filter(([, v]) => !isNaN(v as number)),
+      )
+    : undefined
+
+  const { suppliers, costItems, usedCbmFallback } = await computeAllocation(prisma, shipmentId, cubicFtOverrides)
 
   if (costItems.length === 0) {
     return NextResponse.json({ error: '尚無貨代費用項目，請先上傳報關發票。' }, { status: 400 })
@@ -153,6 +163,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
 async function computeAllocation(
   prisma: Awaited<ReturnType<typeof getRequestPrisma>>,
   shipmentId: number,
+  cubicFtOverrides?: Record<number, number>,
 ) {
   // 取得費用項目
   const costItems = await prisma.sLS_FobCostItem.findMany({
@@ -286,6 +297,27 @@ async function computeAllocation(
       totalDeductionTWD: 0,
     }
   })
+
+  // ── 套用手動覆蓋（供應商層級 → 按原始各 PO 比例分配）─────────────────────
+
+  if (cubicFtOverrides && Object.keys(cubicFtOverrides).length > 0) {
+    // 先算出每家供應商的原始總材積（跨多張 PO 加總）
+    const origBySupp = new Map<number, number>()
+    for (const s of supplierInfos) {
+      origBySupp.set(s.supplierId, (origBySupp.get(s.supplierId) ?? 0) + s.cubicFt)
+    }
+    for (const s of supplierInfos) {
+      const override = cubicFtOverrides[s.supplierId]
+      if (override == null) continue
+      const origTotal = origBySupp.get(s.supplierId) ?? 0
+      if (origTotal > 0) {
+        s.cubicFt = override * (s.cubicFt / origTotal)
+      } else {
+        const count = supplierInfos.filter(x => x.supplierId === s.supplierId).length
+        s.cubicFt = override / count
+      }
+    }
+  }
 
   // ── 計算佔比（分母 = 全部供應商材積，含 FOR）─────────────────────────────
 
