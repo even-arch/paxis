@@ -102,57 +102,60 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: '本次出貨無 FOB 供應商，無需分攤。' }, { status: 400 })
   }
 
-  await prisma.$transaction(async tx => {
-    // 1. 清除此出貨的所有舊分攤記錄
-    const existingItems = await tx.sLS_FobCostItem.findMany({
-      where: { shipmentId },
-      select: { id: true },
-    })
-    const itemIds = existingItems.map(i => i.id)
-    if (itemIds.length > 0) {
-      await tx.sLS_FobCostAllocation.deleteMany({ where: { costItemId: { in: itemIds } } })
-    }
+  // 1. 清除舊分攤記錄（Neon serverless 不能用 interactive transaction，改為逐步操作）
+  const existingItems = await prisma.sLS_FobCostItem.findMany({
+    where: { shipmentId },
+    select: { id: true },
+  })
+  const itemIds = existingItems.map(i => i.id)
+  if (itemIds.length > 0) {
+    await prisma.sLS_FobCostAllocation.deleteMany({ where: { costItemId: { in: itemIds } } })
+  }
 
-    // 2. 新建分攤記錄
-    for (const sup of fobSuppliers) {
-      for (const alloc of sup.allocations) {
-        await tx.sLS_FobCostAllocation.create({
-          data: {
-            costItemId:   alloc.costItemId,
-            supplierId:   sup.supplierId,
-            poId:         sup.poId,
-            cubicFt:      new Decimal(sup.cubicFt.toFixed(4)),
-            cbmPct:       new Decimal(sup.cbmPct.toFixed(4)),
-            allocatedTWD: new Decimal(alloc.allocatedTWD.toFixed(0)),
-            applied:      true,
-            payableId: sup.poId
-              ? (await tx.fIN_Payable.findUnique({
-                  where: { shipmentId_poId: { shipmentId, poId: sup.poId } },
-                  select: { id: true },
-                }))?.id ?? null
-              : null,
-          },
-        })
-      }
+  // 2. 預先查好所有 payable IDs（一次 query，避免 loop 裡逐一 findUnique 撐爆 tx）
+  const payableRows = await prisma.fIN_Payable.findMany({
+    where: { shipmentId },
+    select: { id: true, poId: true },
+  })
+  const poToPayableId = new Map(
+    payableRows.filter(p => p.poId != null).map(p => [p.poId!, p.id]),
+  )
 
-      // 3. 更新 FIN_Payable.fobCostDeductionTWD
-      if (sup.poId) {
-        await tx.fIN_Payable.updateMany({
-          where: { shipmentId, poId: sup.poId },
-          data: { fobCostDeductionTWD: new Decimal(sup.totalDeductionTWD.toFixed(0)) },
-        })
-      }
-    }
+  // 3. 新建分攤記錄（createMany 一次送完）
+  const allocationData = fobSuppliers.flatMap(sup =>
+    sup.allocations.map(alloc => ({
+      costItemId:   alloc.costItemId,
+      supplierId:   sup.supplierId,
+      poId:         sup.poId,
+      cubicFt:      new Decimal(sup.cubicFt.toFixed(4)),
+      cbmPct:       new Decimal(sup.cbmPct.toFixed(4)),
+      allocatedTWD: new Decimal(alloc.allocatedTWD.toFixed(0)),
+      applied:      true,
+      payableId:    sup.poId != null ? (poToPayableId.get(sup.poId) ?? null) : null,
+    })),
+  )
+  if (allocationData.length > 0) {
+    await prisma.sLS_FobCostAllocation.createMany({ data: allocationData })
+  }
 
-    // 重置所有 FOR 供應商的扣款為 0（避免重算後殘留舊值）
-    const forSuppliers = suppliers.filter(s => !s.isFob && s.poId)
-    for (const sup of forSuppliers) {
-      await tx.fIN_Payable.updateMany({
-        where: { shipmentId, poId: sup.poId! },
-        data: { fobCostDeductionTWD: new Decimal(0) },
+  // 4. 更新 FIN_Payable.fobCostDeductionTWD
+  for (const sup of fobSuppliers) {
+    if (sup.poId) {
+      await prisma.fIN_Payable.updateMany({
+        where: { shipmentId, poId: sup.poId },
+        data: { fobCostDeductionTWD: new Decimal(sup.totalDeductionTWD.toFixed(0)) },
       })
     }
-  })
+  }
+
+  // 5. 重置所有 FOR 供應商的扣款為 0（避免重算後殘留舊值）
+  const forSuppliers = suppliers.filter(s => !s.isFob && s.poId)
+  for (const sup of forSuppliers) {
+    await prisma.fIN_Payable.updateMany({
+      where: { shipmentId, poId: sup.poId! },
+      data: { fobCostDeductionTWD: new Decimal(0) },
+    })
+  }
 
   const updatedResult = await computeAllocation(prisma, shipmentId)
   return NextResponse.json({ ok: true, ...updatedResult })
