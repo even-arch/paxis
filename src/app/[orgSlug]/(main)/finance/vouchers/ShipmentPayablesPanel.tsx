@@ -127,9 +127,18 @@ export default function ShipmentPayablesPanel({
   const [createdFor, setCreatedFor] = useState<Set<number>>(new Set())        // supplierIds done
   const [uploading, setUploading] = useState(false)
 
+  // 手動調整材積
+  const [editedCubicFt, setEditedCubicFt] = useState<Record<number, string>>({})
+
   const [error, setError] = useState('')
   const [msg, setMsg] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // 任何通知單已送出 → 鎖定材積調整
+  const voucherLocked = payables.some(
+    p => p.voucherInfo && ['SENT', 'CONFIRMED', 'PAID'].includes(p.voucherInfo.status),
+  )
+  const hasEdits = Object.keys(editedCubicFt).length > 0
 
   // ── Load FOB allocation + customs-doc suggestions ─────────────────────────
   const loadAlloc = useCallback(async () => {
@@ -238,14 +247,56 @@ export default function ShipmentPayablesPanel({
     }
   }
 
+  // ── 手動調整材積後重新計算（pure client-side）────────────────────────────
+  function handleRecalc() {
+    const adjustedFt = new Map<number, number>()
+    allocMap.forEach((entry, sid) => {
+      const override = editedCubicFt[sid]
+      const n = override !== undefined ? parseFloat(override) : NaN
+      adjustedFt.set(sid, !isNaN(n) && n >= 0 ? n : entry.cubicFt)
+    })
+    const newTotalAll = Array.from(adjustedFt.values()).reduce((s, v) => s + v, 0)
+    const newAllocMap = new Map<number, AllocEntry>()
+    allocMap.forEach((entry, sid) => {
+      const ft = adjustedFt.get(sid) ?? entry.cubicFt
+      const cbmPct = newTotalAll > 0 ? (ft / newTotalAll) * 100 : 0
+      let allocDetails = entry.allocDetails
+      let totalDeductionTWD = entry.totalDeductionTWD
+      if (entry.isFob) {
+        allocDetails = costItems.map(item => ({
+          costItemName: item.name,
+          allocatedTWD: Math.round(item.amountTWD * cbmPct / 100),
+        }))
+        totalDeductionTWD = allocDetails.reduce((s, a) => s + a.allocatedTWD, 0)
+      }
+      newAllocMap.set(sid, { ...entry, cubicFt: ft, cbmPct, allocDetails, totalDeductionTWD })
+    })
+    setAllocMap(newAllocMap)
+    setTotalAllCubicFt(newTotalAll)
+    setTotalFobCubicFt(Array.from(newAllocMap.values()).filter(e => e.isFob).reduce((s, e) => s + e.cubicFt, 0))
+  }
+
   // ── Apply FOB allocation to DB ────────────────────────────────────────────
   async function applyAllocation() {
     if (!confirm('確認套用 FOB 分攤？將更新各供應商的應付扣款金額。')) return
     setApplyingAlloc(true); setError('')
     try {
-      const res = await fetch(`/api/shipments/${shipmentId}/fob-allocation`, { method: 'POST' })
+      const body: { overrides?: Record<string, number> } = {}
+      if (hasEdits) {
+        body.overrides = {}
+        for (const [sid, val] of Object.entries(editedCubicFt)) {
+          const n = parseFloat(val)
+          if (!isNaN(n) && n >= 0) body.overrides[sid] = n
+        }
+      }
+      const res = await fetch(`/api/shipments/${shipmentId}/fob-allocation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
       if (!res.ok) throw new Error(await safeErrMsg(res, '套用失敗'))
       setMsg('✓ FOB 分攤已套用')
+      setEditedCubicFt({})
       await loadAlloc()
     } catch (err) {
       setError(err instanceof Error ? err.message : '套用失敗')
@@ -456,12 +507,27 @@ export default function ShipmentPayablesPanel({
             供應商付款
           </h3>
           {costItems.length > 0 && fobGroupCount > 0 && (
-            <button
-              onClick={applyAllocation}
-              disabled={applyingAlloc}
-              className="text-xs px-3 py-1.5 rounded border border-teal-300 text-teal-700 hover:bg-teal-50 disabled:opacity-50">
-              {applyingAlloc ? '套用中...' : '確認套用 FOB 分攤'}
-            </button>
+            <div className="flex items-center gap-2">
+              {voucherLocked ? (
+                <span className="text-xs text-gray-400">已有通知單送出，材積已鎖定</span>
+              ) : (
+                <>
+                  {hasEdits && (
+                    <button
+                      onClick={handleRecalc}
+                      className="text-xs px-3 py-1.5 rounded border border-amber-400 text-amber-700 bg-amber-50 hover:bg-amber-100">
+                      🔄 重新計算
+                    </button>
+                  )}
+                  <button
+                    onClick={applyAllocation}
+                    disabled={applyingAlloc}
+                    className="text-xs px-3 py-1.5 rounded border border-teal-300 text-teal-700 hover:bg-teal-50 disabled:opacity-50">
+                    {applyingAlloc ? '套用中...' : '確認套用 FOB 分攤'}
+                  </button>
+                </>
+              )}
+            </div>
           )}
         </div>
 
@@ -504,14 +570,30 @@ export default function ShipmentPayablesPanel({
                       )}
                       {/* 材積 / 採計佔比（全部供應商都顯示） */}
                       {alloc && (alloc.cubicFt > 0 || alloc.cbmPct > 0) && (
-                        <div className="text-xs mt-0.5">
-                          {alloc.cubicFt > 0 && (
-                            <span className="text-gray-400 font-mono">
-                              採計 {alloc.cubicFt.toFixed(2)} ft³
-                            </span>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="text-gray-400 text-xs">採計</span>
+                          {!voucherLocked ? (
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={editedCubicFt[group.supplierId] !== undefined
+                                ? editedCubicFt[group.supplierId]
+                                : alloc.cubicFt > 0 ? alloc.cubicFt.toFixed(2) : ''}
+                              onChange={e => setEditedCubicFt(prev => ({ ...prev, [group.supplierId]: e.target.value }))}
+                              className={`w-20 text-right font-mono text-xs border rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-400 ${
+                                editedCubicFt[group.supplierId] !== undefined
+                                  ? 'border-amber-400 bg-amber-50'
+                                  : 'border-gray-200 bg-transparent'
+                              }`}
+                              placeholder="0.00"
+                            />
+                          ) : (
+                            <span className="text-gray-400 font-mono text-xs">{alloc.cubicFt.toFixed(2)}</span>
                           )}
+                          <span className="text-gray-400 text-xs">ft³</span>
                           {alloc.cbmPct > 0 && (
-                            <span className={`ml-1 font-mono ${isFob ? 'text-blue-500 font-semibold' : 'text-gray-400'}`}>
+                            <span className={`font-mono text-xs ${isFob ? 'text-blue-500 font-semibold' : 'text-gray-400'}`}>
                               ({alloc.cbmPct.toFixed(1)}%{!isFob ? ' *' : ''})
                             </span>
                           )}
