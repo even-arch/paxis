@@ -353,13 +353,21 @@ export default function ShipmentPayablesPanel({
 
   // ── 一次建立全部未開通知單的供應商（解決按個別建立時 state 歸零的問題）────────
   async function createAllVouchers() {
+    // 注意：pending 必須在這裡計算，不能用 supplierGroups 閉包以外的快取
     const pending = supplierGroups.filter(
       g => !g.payables.every(p => p.voucherInfo != null) && !createdFor.has(g.supplierId),
     )
-    if (pending.length === 0) return
 
-    setConfirmingCreate(false)
-    setCreatingAll(true); setError(''); setMsg('')
+    setConfirmingCreate(false)  // 永遠先關確認 UI
+
+    if (pending.length === 0) {
+      setMsg('所有供應商已有付款通知單，無需重複建立')
+      return
+    }
+
+    setCreatingAll(true)
+    setError('')
+    setMsg(`建立中：${pending.map(g => g.supplierName).join('、')}…`)
 
     // Step 1：若有 ft³ 調整，先套用分攤並取得最新 allocMap
     let currentAllocMap = allocMap
@@ -431,11 +439,13 @@ export default function ShipmentPayablesPanel({
 
     setCreatingAll(false)
     if (created.length > 0) {
-      setMsg(`✓ 已建立 ${created.join('、')} 的付款通知單`)
+      setMsg(`✓ 已建立：${created.join('、')}`)
       onVoucherCreated()
+    } else if (failed.length === 0) {
+      setMsg('未建立任何通知單（可能所有應付款均已建單）')
     }
     if (failed.length > 0) {
-      setError(failed.join('\n'))
+      setError(`建立失敗：\n${failed.join('\n')}`)
     }
   }
 
