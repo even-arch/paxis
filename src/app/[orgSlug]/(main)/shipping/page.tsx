@@ -360,6 +360,9 @@ export default function ShippingPage() {
     allLabels?: Array<{ trackingNumber: string; labelBase64: string }>
   } | null>(null)
   const [shipmentError, setShipmentError] = useState('')
+  const [showPostPickupForm, setShowPostPickupForm] = useState(false)
+  const [bookingPickup, setBookingPickup] = useState(false)
+  const [postPickupError, setPostPickupError] = useState('')
 
   // ── 從出貨 Excel 匯入（shipment-import 頁傳來的 sessionStorage 資料）─────────────
 
@@ -981,6 +984,44 @@ export default function ShippingPage() {
       setPaxisError(err instanceof Error ? err.message : '儲存失敗')
     } finally {
       setPaxisSaving(false)
+    }
+  }
+
+  async function handleBookPickup() {
+    if (!shipmentResult) return
+    setBookingPickup(true)
+    setPostPickupError('')
+    try {
+      const totalWeightKg = packages.reduce((s, p) => s + (p.weightKg || 0) * (p.quantity || 1), 0)
+      const totalQty = packages.reduce((s, p) => s + (p.quantity || 1), 0)
+      const res = await fetch('/api/shipping/schedule-pickup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          logId: shipmentResult.logId,
+          pickupDate,
+          readyTime: pickupReady,
+          closeTime: pickupClose,
+          contactPhone: pickupPhone,
+          serviceCode: selectedOption?.serviceCode ?? '07',
+          totalWeightKg,
+          quantity: totalQty,
+          companyName: origin.name,
+          addressLine: origin.addressLine,
+          city: origin.city,
+          stateProvinceCode: origin.stateProvinceCode,
+          postalCode: origin.postalCode,
+          countryCode: origin.countryCode,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? '預約失敗')
+      setShipmentResult(prev => prev ? { ...prev, pickupConfirmation: data.confirmationNumber, pickupDueDate: data.dueDate } : prev)
+      setShowPostPickupForm(false)
+    } catch (err) {
+      setPostPickupError(err instanceof Error ? err.message : '預約失敗')
+    } finally {
+      setBookingPickup(false)
     }
   }
 
@@ -1923,8 +1964,8 @@ export default function ShippingPage() {
             )}
           </div>
 
-          {/* 提貨預約結果 */}
-          {shipmentResult.pickupConfirmation && (
+          {/* 提貨預約結果 or 預約按鈕 */}
+          {shipmentResult.pickupConfirmation ? (
             <div className="bg-green-50 rounded p-3">
               <p className="text-sm font-medium text-green-800">✓ 提貨預約完成</p>
               <p className="text-xs text-green-700 mt-1">
@@ -1934,11 +1975,57 @@ export default function ShippingPage() {
                 <p className="text-xs text-green-600">預計提貨：{shipmentResult.pickupDueDate}</p>
               )}
             </div>
-          )}
-          {deliveryMethod === 'dropoff' && (
-            <p className="text-xs text-gray-500 bg-gray-50 rounded p-2">
-              📦 請自行將包裹送至 UPS 門市或授權轉運站。
-            </p>
+          ) : (
+            <div className="border rounded p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-600">尚未預約提貨時間</p>
+                <button
+                  onClick={() => setShowPostPickupForm(v => !v)}
+                  className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                  🚚 預約提貨時間
+                </button>
+              </div>
+              {showPostPickupForm && (
+                <div className="space-y-3 pt-2 border-t">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500">提貨日期 *</label>
+                      <input type="date"
+                        value={pickupDate.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3')}
+                        onChange={e => setPickupDate(e.target.value.replace(/-/g, ''))}
+                        className="mt-1 w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500">聯絡電話 *</label>
+                      <input value={pickupPhone} onChange={e => setPickupPhone(e.target.value)}
+                        placeholder="例：0223938133"
+                        className="mt-1 w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500">最早可提貨（HHmm）</label>
+                      <input value={pickupReady} onChange={e => setPickupReady(e.target.value)}
+                        placeholder="1400"
+                        className="mt-1 w-full border rounded px-2 py-1.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500">最晚等到（HHmm）</label>
+                      <input value={pickupClose} onChange={e => setPickupClose(e.target.value)}
+                        placeholder="1800"
+                        className="mt-1 w-full border rounded px-2 py-1.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                    </div>
+                  </div>
+                  {postPickupError && (
+                    <p className="text-sm text-red-600 bg-red-50 rounded px-2 py-1.5">❌ {postPickupError}</p>
+                  )}
+                  <button
+                    onClick={handleBookPickup}
+                    disabled={bookingPickup || !pickupDate || !pickupPhone}
+                    className="w-full py-2 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 disabled:opacity-50">
+                    {bookingPickup ? '預約中...' : '確認預約'}
+                  </button>
+                </div>
+              )}
+            </div>
           )}
 
           {/* 提單已建但預約失敗的錯誤 */}
