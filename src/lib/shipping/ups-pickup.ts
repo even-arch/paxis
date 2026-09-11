@@ -78,7 +78,7 @@ export async function scheduleUpsPickup(req: UpsPickupRequest): Promise<UpsPicku
       AlternateAddressIndicator: 'N',
       PickupPiece: [
         {
-          ServiceCode: req.serviceCode,
+          ServiceCode: req.serviceCode.padStart(3, '0'),
           Quantity: String(req.quantity),
           DestinationCountryCode: 'US',  // 主要目的地，後續可參數化
           ContainerCode: '01',           // 一般紙箱
