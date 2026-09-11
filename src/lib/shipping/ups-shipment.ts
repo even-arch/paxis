@@ -10,6 +10,11 @@ const UPS_SHIP_URL = 'https://onlinetools.ups.com/api/shipments/v2403/ship'
 // UPS labels use Latin fonts — strip CJK and non-printable chars
 const toAscii = (s: string) => s.replace(/[^\x00-\x7F]/g, '').trim()
 
+// UPS address fields only accept: A-Z a-z 0-9 space . , - / # & '
+// Other ASCII punctuation (!, @, :, (, ), +, etc.) will be rejected with [120302]
+const toUpsAddress = (s: string, maxLen = 35) =>
+  toAscii(s).replace(/[^A-Za-z0-9 .,\-/#&']/g, '').replace(/\s+/g, ' ').trim().slice(0, maxLen)
+
 export interface UpsShipmentRequest {
   accessToken: string
   accountNumber: string
@@ -34,11 +39,11 @@ export interface UpsShipmentResult {
 }
 
 export async function createUpsShipment(req: UpsShipmentRequest): Promise<UpsShipmentResult> {
-  // UPS 要求所有地址欄位必須是 ASCII（Latin 字元），中文字元會被 toAscii 完全刪除
-  const shipperLine = toAscii(req.shipper.addressLine)
-  const shipToLine  = toAscii(req.shipTo.addressLine)
-  if (!shipperLine) throw new Error('發件地址（Address Line）不能為空，且必須使用英文。請在出貨表單中填寫英文地址，或在「設定 → 公司基本資料」中設定公司英文地址。')
-  if (!shipToLine)  throw new Error('收件地址（Address Line）不能為空，且必須使用英文。')
+  // UPS 地址只接受 A-Z a-z 0-9 空格 . , - / # & '，其他標點（!@:()+ 等）一律去除
+  const shipperLine = toUpsAddress(req.shipper.addressLine)
+  const shipToLine  = toUpsAddress(req.shipTo.addressLine)
+  if (!shipperLine) throw new Error('發件地址（Address Line）不能為空，且必須使用英文字母。UPS 只接受 A-Z、數字和 . , - / # & \' 這幾個標點。')
+  if (!shipToLine)  throw new Error('收件地址（Address Line）不能為空，且必須使用英文字母。')
 
   const labelType = req.labelFormat ?? 'GIF'
 
@@ -78,7 +83,7 @@ export async function createUpsShipment(req: UpsShipmentRequest): Promise<UpsShi
           Phone: { Number: (req.shipper.phone?.replace(/\D/g, '') || '0223938133') },
           ...(req.shipper.taxId?.trim() ? { TaxIdentificationNumber: req.shipper.taxId } : {}),
           Address: {
-            AddressLine: toAscii(req.shipper.addressLine) || undefined,
+            AddressLine: shipperLine || undefined,
             City: toAscii(req.shipper.city),
             PostalCode: req.shipper.postalCode,
             CountryCode: req.shipper.countryCode.toUpperCase(),
@@ -90,7 +95,7 @@ export async function createUpsShipment(req: UpsShipmentRequest): Promise<UpsShi
           ...(req.shipTo.phone?.trim() ? { Phone: { Number: req.shipTo.phone.replace(/\D/g, '') } } : {}),
           ...(req.shipTo.taxId?.trim() ? { TaxIdentificationNumber: req.shipTo.taxId } : {}),
           Address: {
-            AddressLine: toAscii(req.shipTo.addressLine) || undefined,
+            AddressLine: shipToLine || undefined,
             City: toAscii(req.shipTo.city),
             ...(req.shipTo.stateProvinceCode?.trim() ? { StateProvinceCode: req.shipTo.stateProvinceCode.trim() } : {}),
             PostalCode: req.shipTo.postalCode,
@@ -101,7 +106,7 @@ export async function createUpsShipment(req: UpsShipmentRequest): Promise<UpsShi
           Name: toAscii(req.shipper.name),
           AttentionName: toAscii(req.shipper.attentionName?.trim() || req.shipper.name),
           Address: {
-            AddressLine: toAscii(req.shipper.addressLine) || undefined,
+            AddressLine: shipperLine || undefined,
             City: toAscii(req.shipper.city),
             PostalCode: req.shipper.postalCode,
             CountryCode: req.shipper.countryCode.toUpperCase(),
