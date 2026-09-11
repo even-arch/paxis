@@ -687,7 +687,7 @@ export default function ShippingPage() {
       if (data && (data.nameZh || data.nameEn)) {
         setOrigin({
           name:              data.nameEn    || data.nameZh    || '',
-          addressLine:       data.addressEn || data.addressZh || '',
+          addressLine:       data.addressEn || '',  // 只用英文地址；中文地址會被 toAscii 刪掉，UPS 拒絕
           city:              data.city          || '',
           stateProvinceCode: '',
           postalCode:        data.postalCode    || '',

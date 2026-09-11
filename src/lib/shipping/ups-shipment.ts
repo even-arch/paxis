@@ -34,6 +34,12 @@ export interface UpsShipmentResult {
 }
 
 export async function createUpsShipment(req: UpsShipmentRequest): Promise<UpsShipmentResult> {
+  // UPS 要求所有地址欄位必須是 ASCII（Latin 字元），中文字元會被 toAscii 完全刪除
+  const shipperLine = toAscii(req.shipper.addressLine)
+  const shipToLine  = toAscii(req.shipTo.addressLine)
+  if (!shipperLine) throw new Error('發件地址（Address Line）不能為空，且必須使用英文。請在出貨表單中填寫英文地址，或在「設定 → 公司基本資料」中設定公司英文地址。')
+  if (!shipToLine)  throw new Error('收件地址（Address Line）不能為空，且必須使用英文。')
+
   const labelType = req.labelFormat ?? 'GIF'
 
   const packages = req.packages.flatMap(p =>
