@@ -992,8 +992,8 @@ export default function ShippingPage() {
     setBookingPickup(true)
     setPostPickupError('')
     try {
-      const totalWeightKg = packages.reduce((s, p) => s + (p.weightKg || 0) * (p.quantity || 1), 0)
-      const totalQty = packages.reduce((s, p) => s + (p.quantity || 1), 0)
+      const totalWeightKg = packages.reduce((s, p) => s + (parseFloat(p.grossWeightKg) || 0) * (parseInt(p.quantity) || 1), 0)
+      const totalQty = packages.reduce((s, p) => s + (parseInt(p.quantity) || 1), 0)
       const res = await fetch('/api/shipping/schedule-pickup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
